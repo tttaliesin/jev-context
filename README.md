@@ -97,3 +97,7 @@ Modal은 사용자가 시작한 작업 세션에서만 사용하고 준비된 �
 - [판단 모델 비교 진단](docs/model-comparison.md): 같은 한국어 30문항에서 OpenJev Modal·Laya·AgentJev-0.6B 비교
 - [호스트 기능표(V0)](docs/host-capabilities.md): Desktop MCP·Skill·hooks의 문서·노출·시험 상태와 설계 hook 구성
 - [원본 상세 설계](docs/design/detailed-design.md)
+
+## 라이선스
+
+[MIT](LICENSE). 모델 가중치와 Electron 런타임은 저장소에 포함되지 않으며 각자의 라이선스를 따릅니다.

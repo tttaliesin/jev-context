@@ -5,5 +5,5 @@
   "description": "Local model and work record manager for Jev Context",
   "private": true,
   "main": "main.cjs",
-  "license": "UNLICENSED"
+  "license": "MIT"
 }
