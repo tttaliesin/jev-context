@@ -435,6 +435,22 @@ def test_required_judgment_unavailable_is_not_success(v2):
     assert result["outcome"] == "insufficient"
 
 
+def test_required_judgment_with_unjudged_candidates_is_not_success(v2):
+    wid = work(v2)
+    for index in range(10):
+        sync(v2, f"로그인 실패 사례 {index}: 연결 오류", f"case{index}.md")
+    v2.config.engine = {"state": "shadow"}
+    v2.engine = Judge(choice="relevant")
+    args = {"work_id": wid, "query": "로그인"}
+    optional = call(v2, "context_prepare", **args)
+    assert optional["data"]["judgment"]["status"] == "observed"
+    assert optional["data"]["judgment"]["unjudged_candidates"] > 0
+    assert optional["outcome"] == "ok"
+    required = call(v2, "context_prepare", **args, judge_mode="required")
+    assert required["data"]["judgment"]["status"] == "observed"
+    assert required["outcome"] == "insufficient"
+
+
 def test_completion_retires_prior_revision_only_when_explicitly_not_applicable(v2):
     from jev_context.completion import coverage
 
