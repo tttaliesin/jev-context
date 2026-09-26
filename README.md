@@ -1,5 +1,7 @@
 # Jev Context
 
+[![check](https://github.com/tttaliesin/jev-context/actions/workflows/check.yml/badge.svg)](https://github.com/tttaliesin/jev-context/actions/workflows/check.yml)
+
 Codex로 한국어 코딩 작업을 이어 갈 때 **작업의 목표·제약·근거를 잃지 않게** 하는 로컬 문맥 조정기입니다.
 
 - 작업을 저장하고, 서버를 다시 시작해도 같은 work ID로 목표와 제약을 복원합니다.

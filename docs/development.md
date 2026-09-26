@@ -32,9 +32,11 @@ mise 없이 설치할 때는 `--python`으로 Python 3.12 실행 파일을 지�
 
 검사 명령은 의존성을 설치하거나 lock을 바꾸지 않고, 첫 실패의 종료 코드를 그대로 돌려줍니다. build 도구(hatchling)는 dev 의존성에 고정돼 있어 offline build 중 추가로 내려받지 않습니다.
 
+GitHub Actions([check.yml](../.github/workflows/check.yml))는 `master` push와 pull request마다 Windows 러너에서 같은 순서로 검사하고, `test_window_state.cjs`도 실행합니다.
+
 pytest는 약 250개 테스트를 1분 20초 정도에 실행합니다. `test_coding_benchmark.py`는 격리된 pytest를 프로젝트의 `.t/` 아래에서 실행하고, 끝나면 그 임시 폴더를 지웁니다.
 
-샌드박스 계정 등 **다른 Windows 계정으로 테스트를 실행하면**, 저장 폴더에 거는 보호 권한(`storage.protect_directory`) 때문에 원래 사용자가 지울 수 없는 임시 폴더가 남을 수 있습니다. 이런 폴더는 관리자 권한으로 소유권을 가져온 뒤 지워야 합니다.
+샌드박스 계정 등 **다른 Windows 계정으로 테스트를 실행하면**, 저장 폴더에 거는 보호 권한(`storage.protect_directory`) 때문에 원래 사용자가 지울 수 없는 임시 폴더가 남을 수 있습니다. 이런 폴더는 관리자 권한으로 소유권을 가져온 뒤 지워야 합니다. pytest의 기본 임시 폴더 `%TEMP%\pytest-of-<사용자>`가 이렇게 잠기면 모든 테스트가 `PermissionError`로 실패하므로, 그 폴더를 지우거나 `--basetemp`로 다른 위치를 지정합니다.
 
 ### 데스크톱 앱 검사
 
