@@ -1,0 +1,2 @@
+# Isolated client for the one-shot OpenJev diagnostic, outside the MCP runtime.
+modal==1.5.5

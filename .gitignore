@@ -1,0 +1,15 @@
+.venv/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+.local/
+.t/
+node_modules/
+.uv-cache/
+*.sqlite*
+.codex/config.toml
+.codex/hooks.json
+.agents/skills/jev-context/

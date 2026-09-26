@@ -1,0 +1,516 @@
+{
+  "provenance": "agent_authored",
+  "split": "validation_fresh",
+  "human_reviewed": false,
+  "description": "Frozen before v3 candidate inference; paired contrasts, not independent human-reviewed heldout",
+  "cases": [
+    {
+      "id": "fresh-v3-1-ko",
+      "source_case_id": "fresh-v3-1",
+      "purpose": "evidence_relation",
+      "language": "ko",
+      "expected": "insufficient_evidence",
+      "critical": true,
+      "tag": "accepted-no-outcome",
+      "state": {
+        "claim": "색인 갱신이 성공했다",
+        "candidate": "갱신 요청 접수만 기록돼 있다. 최종 상태와 새 색인 내용은 수집하지 않았다."
+      }
+    },
+    {
+      "id": "fresh-v3-1-en",
+      "source_case_id": "fresh-v3-1",
+      "purpose": "evidence_relation",
+      "language": "en",
+      "expected": "insufficient_evidence",
+      "critical": true,
+      "tag": "accepted-no-outcome",
+      "state": {
+        "claim": "The index refresh succeeded",
+        "candidate": "Only acceptance of the refresh request was recorded. Neither final status nor the new index contents were collected."
+      }
+    },
+    {
+      "id": "fresh-v3-2-ko",
+      "source_case_id": "fresh-v3-2",
+      "purpose": "evidence_relation",
+      "language": "ko",
+      "expected": "contradicts",
+      "critical": true,
+      "tag": "explicitly-incomplete",
+      "state": {
+        "claim": "14시에 압축이 완료됐다",
+        "candidate": "14시 검사에서 작업은 실행 중이고 전체 40개 중 7개만 압축된 상태임을 확인했다."
+      }
+    },
+    {
+      "id": "fresh-v3-2-en",
+      "source_case_id": "fresh-v3-2",
+      "purpose": "evidence_relation",
+      "language": "en",
+      "expected": "contradicts",
+      "critical": true,
+      "tag": "explicitly-incomplete",
+      "state": {
+        "claim": "Compression was complete at 14:00",
+        "candidate": "At 14:00 an inspection confirmed the job was still running and only 7 of 40 files were compressed."
+      }
+    },
+    {
+      "id": "fresh-v3-3-ko",
+      "source_case_id": "fresh-v3-3",
+      "purpose": "evidence_relation",
+      "language": "ko",
+      "expected": "supports",
+      "critical": true,
+      "tag": "verified-complete",
+      "state": {
+        "claim": "변환된 음원이 정상 저장됐다",
+        "candidate": "변환 성공 응답과 결과 파일의 해시 일치, 재생 검사를 모두 확인했다."
+      }
+    },
+    {
+      "id": "fresh-v3-3-en",
+      "source_case_id": "fresh-v3-3",
+      "purpose": "evidence_relation",
+      "language": "en",
+      "expected": "supports",
+      "critical": true,
+      "tag": "verified-complete",
+      "state": {
+        "claim": "The converted audio was saved correctly",
+        "candidate": "A successful conversion response, a matching output file hash, and a playback check were all verified."
+      }
+    },
+    {
+      "id": "fresh-v3-4-ko",
+      "source_case_id": "fresh-v3-4",
+      "purpose": "evidence_relation",
+      "language": "ko",
+      "expected": "supports",
+      "critical": true,
+      "tag": "literal-disagreement",
+      "state": {
+        "claim": "두 진단 결과가 서로 다르다",
+        "candidate": "같은 요청에 대해 진단 A는 정상, 진단 B는 오류로 기록됐다. 어느 쪽이 정확한지는 모른다."
+      }
+    },
+    {
+      "id": "fresh-v3-4-en",
+      "source_case_id": "fresh-v3-4",
+      "purpose": "evidence_relation",
+      "language": "en",
+      "expected": "supports",
+      "critical": true,
+      "tag": "literal-disagreement",
+      "state": {
+        "claim": "The two diagnostic results disagree",
+        "candidate": "For the same request, diagnostic A recorded healthy and B recorded an error. Which result is accurate is unknown."
+      }
+    },
+    {
+      "id": "fresh-v3-5-ko",
+      "source_case_id": "fresh-v3-5",
+      "purpose": "evidence_relation",
+      "language": "ko",
+      "expected": "insufficient_evidence",
+      "critical": true,
+      "tag": "unresolved-success",
+      "state": {
+        "claim": "현재 캐시 내용은 정확하다",
+        "candidate": "같은 시점과 권한의 검사 A는 정확, 검사 B는 손상이라고 보고했다. 충돌은 해소되지 않았다."
+      }
+    },
+    {
+      "id": "fresh-v3-5-en",
+      "source_case_id": "fresh-v3-5",
+      "purpose": "evidence_relation",
+      "language": "en",
+      "expected": "insufficient_evidence",
+      "critical": true,
+      "tag": "unresolved-success",
+      "state": {
+        "claim": "The cache contents are currently correct",
+        "candidate": "Checks A and B with equal authority at the same time report correct and corrupt respectively. The conflict is unresolved."
+      }
+    },
+    {
+      "id": "fresh-v3-6-ko",
+      "source_case_id": "fresh-v3-6",
+      "purpose": "evidence_relation",
+      "language": "ko",
+      "expected": "supports",
+      "critical": true,
+      "tag": "explicit-missing-proof",
+      "state": {
+        "claim": "아직 메일 수신 여부는 검증되지 않았다",
+        "candidate": "발송 API의 접수 응답만 있고 수신 확인은 수행하지 않았다."
+      }
+    },
+    {
+      "id": "fresh-v3-6-en",
+      "source_case_id": "fresh-v3-6",
+      "purpose": "evidence_relation",
+      "language": "en",
+      "expected": "supports",
+      "critical": true,
+      "tag": "explicit-missing-proof",
+      "state": {
+        "claim": "Receipt of the email has not yet been verified",
+        "candidate": "Only an acceptance response from the sending API is available; no receipt check has been performed."
+      }
+    },
+    {
+      "id": "fresh-v3-7-ko",
+      "source_case_id": "fresh-v3-7",
+      "purpose": "evidence_relation",
+      "language": "ko",
+      "expected": "partial",
+      "critical": true,
+      "tag": "compound-known-unknown",
+      "state": {
+        "claim": "패키지가 생성되고 설치도 성공했다",
+        "candidate": "패키지 생성은 확인됐다. 설치는 아직 시험하지 않았다."
+      }
+    },
+    {
+      "id": "fresh-v3-7-en",
+      "source_case_id": "fresh-v3-7",
+      "purpose": "evidence_relation",
+      "language": "en",
+      "expected": "partial",
+      "critical": true,
+      "tag": "compound-known-unknown",
+      "state": {
+        "claim": "The package was built and installed successfully",
+        "candidate": "The package build was verified. Installation has not yet been tested."
+      }
+    },
+    {
+      "id": "fresh-v3-8-ko",
+      "source_case_id": "fresh-v3-8",
+      "purpose": "evidence_relation",
+      "language": "ko",
+      "expected": "contradicts",
+      "critical": true,
+      "tag": "failed-conjunct",
+      "state": {
+        "claim": "복사와 검증이 모두 성공했다",
+        "candidate": "복사는 완료됐지만 검증에서 해시 불일치가 확인됐다."
+      }
+    },
+    {
+      "id": "fresh-v3-8-en",
+      "source_case_id": "fresh-v3-8",
+      "purpose": "evidence_relation",
+      "language": "en",
+      "expected": "contradicts",
+      "critical": true,
+      "tag": "failed-conjunct",
+      "state": {
+        "claim": "Copying and verification both succeeded",
+        "candidate": "Copying completed, but verification detected a hash mismatch."
+      }
+    },
+    {
+      "id": "fresh-v3-9-ko",
+      "source_case_id": "fresh-v3-9",
+      "purpose": "evidence_relation",
+      "language": "ko",
+      "expected": "insufficient_evidence",
+      "critical": true,
+      "tag": "failure-claim-no-proof",
+      "state": {
+        "claim": "압축 해제에 실패했다",
+        "candidate": "압축 해제 요청을 접수했고 결과 관측은 없다."
+      }
+    },
+    {
+      "id": "fresh-v3-9-en",
+      "source_case_id": "fresh-v3-9",
+      "purpose": "evidence_relation",
+      "language": "en",
+      "expected": "insufficient_evidence",
+      "critical": true,
+      "tag": "failure-claim-no-proof",
+      "state": {
+        "claim": "Decompression failed",
+        "candidate": "The decompression request was accepted and no outcome was observed."
+      }
+    },
+    {
+      "id": "fresh-v3-10-ko",
+      "source_case_id": "fresh-v3-10",
+      "purpose": "evidence_relation",
+      "language": "ko",
+      "expected": "supports",
+      "critical": true,
+      "tag": "resolved-authority",
+      "state": {
+        "claim": "현재 배포판은 8이다",
+        "candidate": "옛 캐시는 7을 표시했으나 현재 권위 있는 배포 서버 조회는 8이며 캐시가 오래됐음도 확인했다."
+      }
+    },
+    {
+      "id": "fresh-v3-10-en",
+      "source_case_id": "fresh-v3-10",
+      "purpose": "evidence_relation",
+      "language": "en",
+      "expected": "supports",
+      "critical": true,
+      "tag": "resolved-authority",
+      "state": {
+        "claim": "The current release is 8",
+        "candidate": "An old cache showed 7, but the current authoritative release server returned 8 and the cache was confirmed stale."
+      }
+    },
+    {
+      "id": "fresh-v3-11-ko",
+      "source_case_id": "fresh-v3-11",
+      "purpose": "capability_fit",
+      "language": "ko",
+      "expected": "unfit",
+      "critical": true,
+      "tag": "unavailable-matching",
+      "state": {
+        "query": "SVG 파일을 읽어줘",
+        "candidate": {
+          "id": "utility",
+          "available": false,
+          "description": "SVG 파일을 읽고 구조를 반환한다."
+        },
+        "scope": {
+          "constraints": []
+        }
+      }
+    },
+    {
+      "id": "fresh-v3-11-en",
+      "source_case_id": "fresh-v3-11",
+      "purpose": "capability_fit",
+      "language": "en",
+      "expected": "unfit",
+      "critical": true,
+      "tag": "unavailable-matching",
+      "state": {
+        "query": "Read an SVG file",
+        "candidate": {
+          "id": "utility",
+          "available": false,
+          "description": "Reads SVG files and returns their structure."
+        },
+        "scope": {
+          "constraints": []
+        }
+      }
+    },
+    {
+      "id": "fresh-v3-12-ko",
+      "source_case_id": "fresh-v3-12",
+      "purpose": "capability_fit",
+      "language": "ko",
+      "expected": "fit",
+      "critical": true,
+      "tag": "available-matching",
+      "state": {
+        "query": "SVG 파일을 읽어줘",
+        "candidate": {
+          "id": "utility",
+          "available": true,
+          "description": "SVG 파일을 읽고 구조를 반환한다."
+        },
+        "scope": {
+          "constraints": []
+        }
+      }
+    },
+    {
+      "id": "fresh-v3-12-en",
+      "source_case_id": "fresh-v3-12",
+      "purpose": "capability_fit",
+      "language": "en",
+      "expected": "fit",
+      "critical": true,
+      "tag": "available-matching",
+      "state": {
+        "query": "Read an SVG file",
+        "candidate": {
+          "id": "utility",
+          "available": true,
+          "description": "Reads SVG files and returns their structure."
+        },
+        "scope": {
+          "constraints": []
+        }
+      }
+    },
+    {
+      "id": "fresh-v3-13-ko",
+      "source_case_id": "fresh-v3-13",
+      "purpose": "capability_fit",
+      "language": "ko",
+      "expected": "insufficient_evidence",
+      "critical": true,
+      "tag": "vague-name",
+      "state": {
+        "query": "로그 파일을 요약해줘",
+        "candidate": {
+          "id": "utility",
+          "available": true,
+          "description": "LogExpert: 궁극의 도구. 기능 설명 없음."
+        },
+        "scope": {
+          "constraints": []
+        }
+      }
+    },
+    {
+      "id": "fresh-v3-13-en",
+      "source_case_id": "fresh-v3-13",
+      "purpose": "capability_fit",
+      "language": "en",
+      "expected": "insufficient_evidence",
+      "critical": true,
+      "tag": "vague-name",
+      "state": {
+        "query": "Summarize a log file",
+        "candidate": {
+          "id": "utility",
+          "available": true,
+          "description": "LogExpert: the ultimate tool. No functionality is described."
+        },
+        "scope": {
+          "constraints": []
+        }
+      }
+    },
+    {
+      "id": "fresh-v3-14-ko",
+      "source_case_id": "fresh-v3-14",
+      "purpose": "capability_fit",
+      "language": "ko",
+      "expected": "unfit",
+      "critical": true,
+      "tag": "prohibited-network",
+      "state": {
+        "query": "이미지 메타데이터를 확인해줘",
+        "candidate": {
+          "id": "utility",
+          "available": true,
+          "description": "이미지를 외부 서버에 업로드해야만 메타데이터를 분석한다."
+        },
+        "scope": {
+          "constraints": [
+            "네트워크 전송 금지"
+          ]
+        }
+      }
+    },
+    {
+      "id": "fresh-v3-14-en",
+      "source_case_id": "fresh-v3-14",
+      "purpose": "capability_fit",
+      "language": "en",
+      "expected": "unfit",
+      "critical": true,
+      "tag": "prohibited-network",
+      "state": {
+        "query": "Inspect image metadata",
+        "candidate": {
+          "id": "utility",
+          "available": true,
+          "description": "Analyzes metadata only by uploading the image to an external server."
+        },
+        "scope": {
+          "constraints": [
+            "No network transmission"
+          ]
+        }
+      }
+    },
+    {
+      "id": "fresh-v3-15-ko",
+      "source_case_id": "fresh-v3-15",
+      "purpose": "capability_fit",
+      "language": "ko",
+      "expected": "fit",
+      "critical": true,
+      "tag": "useful-scope",
+      "state": {
+        "query": "데이터 형식을 검사해줘",
+        "candidate": {
+          "id": "utility",
+          "available": true,
+          "description": "원본을 수정하지 않고 로컬 메모리에서 JSON 형식을 검사한다."
+        },
+        "scope": {
+          "constraints": [
+            "읽기만 허용"
+          ]
+        }
+      }
+    },
+    {
+      "id": "fresh-v3-15-en",
+      "source_case_id": "fresh-v3-15",
+      "purpose": "capability_fit",
+      "language": "en",
+      "expected": "fit",
+      "critical": true,
+      "tag": "useful-scope",
+      "state": {
+        "query": "Validate the data format",
+        "candidate": {
+          "id": "utility",
+          "available": true,
+          "description": "Validates JSON syntax locally in memory without modifying the source."
+        },
+        "scope": {
+          "constraints": [
+            "Read-only access"
+          ]
+        }
+      }
+    },
+    {
+      "id": "fresh-v3-16-ko",
+      "source_case_id": "fresh-v3-16",
+      "purpose": "capability_fit",
+      "language": "ko",
+      "expected": "unfit",
+      "critical": true,
+      "tag": "unsupported-function",
+      "state": {
+        "query": "동영상을 편집해줘",
+        "candidate": {
+          "id": "utility",
+          "available": true,
+          "description": "텍스트 파일의 인코딩만 판별하며 영상 처리 기능은 없다."
+        },
+        "scope": {
+          "constraints": []
+        }
+      }
+    },
+    {
+      "id": "fresh-v3-16-en",
+      "source_case_id": "fresh-v3-16",
+      "purpose": "capability_fit",
+      "language": "en",
+      "expected": "unfit",
+      "critical": true,
+      "tag": "unsupported-function",
+      "state": {
+        "query": "Edit a video",
+        "candidate": {
+          "id": "utility",
+          "available": true,
+          "description": "Only detects text-file encodings and provides no video processing."
+        },
+        "scope": {
+          "constraints": []
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'" />
+    <title>JEV · 로컬 작업 관리자</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="command-menu.js" defer></script>
+    <script src="renderer.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">본문으로 이동</a>
+    <div id="app-shell" class="app-shell">
+      <aside id="sidebar" class="sidebar" aria-label="작업 탐색">
+        <div class="brand">
+          <img class="brand-mark" src="jev-mark.svg" width="26" height="26" alt="" />
+          <strong>JEV</strong><span>로컬 관리자</span>
+        </div>
+        <span id="sidebar-project" class="sr-only">프로젝트 확인 중</span>
+        <section class="work-navigation" aria-labelledby="work-list-label">
+          <div class="section-caption"><h2 id="work-list-label">작업 기록</h2><span id="work-count" class="count" aria-live="polite">—</span></div>
+          <div class="search-field">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"></circle><path d="m13 13 4 4"></path></svg>
+            <label class="sr-only" for="work-filter">불러온 작업 필터</label>
+            <input id="work-filter" type="search" placeholder="불러온 작업 필터" autocomplete="off" aria-describedby="search-scope" />
+            <kbd id="search-shortcut" class="search-shortcut" title="Ctrl+F로 목록 필터">Ctrl F</kbd>
+            <button id="search-clear" class="search-clear" type="button" aria-label="작업 필터 초기화" title="필터 초기화 · Escape" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 6 8 8M14 6l-8 8"></path></svg></button>
+          </div>
+          <p id="search-scope" class="search-scope">불러온 0개에서 찾기</p>
+          <p id="list-loading" class="loading-status list-loading" role="status" hidden>작업 목록 불러오는 중…</p>
+          <div id="work-list" class="work-list" role="list" aria-label="저장된 작업"></div>
+          <p id="work-list-empty" class="sidebar-empty">작업 기록을 불러오는 중입니다.</p>
+          <button id="filter-reset" class="button button-quiet filter-reset" type="button" hidden>필터 초기화</button>
+          <div class="list-summary">
+            <button id="load-more" class="button button-quiet full-width" type="button" hidden>작업 더 보기</button>
+          </div>
+        </section>
+        <div class="sidebar-bottom">
+          <div class="sidebar-footer"><span id="bridge-dot" class="status-dot" aria-hidden="true"></span><span id="bridge-label">관리 도구 연결 확인 중</span></div>
+          <p class="sidebar-note">코딩 대화는 Codex에서<br />모델과 작업 기록은 여기에서</p>
+        </div>
+      </aside>
+      <div id="sidebar-resize" class="sidebar-resize" role="separator" tabindex="0" aria-orientation="vertical" aria-controls="sidebar" aria-label="작업 목록 너비" aria-valuemin="220" aria-valuemax="400" aria-valuenow="260" aria-valuetext="260픽셀" title="드래그 또는 좌우 방향키로 너비 조절 · 더블클릭으로 기본 너비"></div>
+
+      <header class="topbar">
+        <button id="sidebar-toggle" class="icon-button sidebar-toggle" type="button" aria-label="작업 목록 접기" aria-controls="sidebar" aria-expanded="true" title="작업 목록 접기 · Ctrl+B"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2"></rect><path d="M7.5 3.5v13m5-9-2 2.5 2 2.5"></path></svg></button>
+        <div class="project-location">
+          <button id="select-project" class="icon-button project-select" type="button" aria-label="프로젝트 설정 열기" title="프로젝트 설정 열기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10H3Z"></path><path d="m9 12 3 3 3-3"></path></svg></button>
+          <div class="location-copy"><h1 id="project-name">프로젝트 확인 중</h1><span id="location-work" class="location-work">작업 기록을 선택하세요</span></div>
+          <span id="project-access" class="badge badge-neutral">조회 중</span>
+        </div>
+        <div class="topbar-actions"><button id="command-open" class="command-open" type="button" aria-label="빠른 실행" aria-haspopup="dialog" aria-controls="command-dialog" title="빠른 실행 · Ctrl+K"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4 5 5 5-5 5M11 15h5"></path></svg><span class="command-open-label">빠른 실행</span><kbd>Ctrl K</kbd></button><button id="refresh" class="icon-button" type="button" aria-label="프로젝트 상태 새로고침" title="새로고침 · F5 또는 Ctrl+R"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"></path><path d="M6.1 7a7 7 0 0 1 11.5-1L20 9M4 15l2.4 3A7 7 0 0 0 18 17"></path></svg></button><button id="shortcuts-open" class="icon-button" type="button" aria-label="키보드 단축키" aria-haspopup="dialog" aria-controls="shortcuts-dialog" title="키보드 단축키 · F1"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.5"></circle><path d="M7.7 7.2a2.4 2.4 0 0 1 4.6.8c0 1.7-2.3 1.7-2.3 3.2M10 14h.01"></path></svg></button></div>
+      </header>
+
+      <main id="main" class="main" tabindex="-1">
+        <div id="error-banner" class="notice notice-error" role="alert" hidden><div><strong id="error-title">프로젝트를 불러오지 못했습니다</strong><p id="error-message"></p></div><button id="retry" class="button button-quiet" type="button">다시 시도</button></div>
+        <div id="action-notice" class="notice notice-info" role="status" aria-live="polite" hidden><span id="action-message"></span><button id="action-dismiss" class="icon-button" type="button" aria-label="알림 닫기" title="알림 닫기"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 6 8 8M14 6l-8 8"></path></svg></button></div>
+
+        <section class="model-band" aria-labelledby="model-heading">
+          <div class="model-main">
+            <div class="model-identification">
+              <div class="model-label-line"><h2 id="model-heading">로컬 모델</h2><span id="model-mode" class="badge badge-neutral">미확인</span></div>
+              <p id="model-identity" class="model-identity">모델 정보 확인 중</p>
+            </div>
+            <div class="model-state"><span id="model-dot" class="status-dot large" aria-hidden="true"></span><h3 id="model-state">상태 확인 중</h3></div>
+            <div class="model-actions"><button id="prepare-model" class="button button-primary" type="button" disabled><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7 4 8 6-8 6Z"></path></svg><span>모델 준비</span></button><button id="stop-model" class="button button-secondary" type="button" disabled><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="5" width="10" height="10" rx="1"></rect></svg><span>모델 종료</span></button></div>
+          </div>
+          <p id="model-description" class="model-description">현재 모델 상태를 조회하고 있습니다.</p>
+          <div class="model-bottom">
+            <dl class="model-metrics"><div><dt>메모리</dt><dd id="model-memory">미확인</dd></div><div><dt>유휴 해제</dt><dd id="model-idle">미확인</dd></div><div><dt>최근 준비</dt><dd id="model-startup">기록 없음</dd></div></dl>
+            <details id="model-diagnostics" class="model-diagnostics"><summary>진단 정보<svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4"></path></svg></summary><div class="diagnostic-content"><p id="model-detail">상태 조회는 모델을 시작하지 않습니다.</p><p id="project-path" class="path">로컬 설정과 저장된 기록을 확인합니다.</p></div></details>
+          </div>
+          <div id="preparing-indicator" class="preparing-indicator" hidden><span aria-hidden="true"></span><p class="sr-only">모델 준비 중 · 준비가 끝나면 상태가 갱신됩니다.</p></div>
+        </section>
+
+        <section class="connection-bar" aria-labelledby="connection-heading">
+          <details id="connection-details" class="connection-details">
+            <summary><span id="connection-heading" class="connection-heading">연결</span><span class="connection-summary"><span class="connection-item"><span class="connection-label">관리 도구</span><span id="connection-manager" class="connection-value">미확인</span></span><span class="connection-item"><span class="connection-label">MCP 통신</span><span id="connection-mcp" class="connection-value">아직 점검 안 함</span></span><span class="connection-item"><span class="connection-label">현재 Codex 대화</span><span id="connection-desktop" class="connection-value">직접 관측 안 함</span></span></span><svg class="disclosure-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4"></path></svg></summary>
+            <div class="connection-explanation"><p id="connection-description">MCP 통신 점검과 현재 Codex 대화의 연결은 별도로 확인합니다.</p><p id="connection-checked">연결 점검은 모델을 로드하지 않습니다.</p></div>
+          </details>
+          <button id="check-connection" class="button button-quiet connection-check" type="button" disabled>연결 점검</button>
+        </section>
+
+        <section id="work-panel" class="work-panel" aria-labelledby="detail-heading" aria-busy="true" tabindex="0">
+          <header class="work-panel-header"><h2 id="detail-heading">작업 기록</h2><span id="work-loading" class="loading-status work-loading" role="status" hidden>불러오는 중…</span><span id="work-status" class="badge badge-neutral" hidden></span></header>
+          <div id="work-empty" class="empty-state"><svg class="empty-symbol" viewBox="0 0 32 32" aria-hidden="true"><path d="M8 4h11l5 5v19H8Z"></path><path d="M18 4v7h6M12 16h8M12 21h6"></path></svg><h3>저장된 작업을 선택하세요</h3><p>목표, 제약, 최근 진행 내용이 여기에 표시됩니다.</p><button id="work-retry" class="button button-secondary" type="button" hidden>작업 다시 불러오기</button></div>
+          <div id="work-detail" hidden>
+            <div class="work-detail-heading"><h3 id="work-title"></h3><p id="work-meta" class="muted"></p></div>
+            <p id="work-provenance" class="provenance-note"></p>
+            <div class="work-detail-grid">
+              <section class="detail-section goal-section"><h4>목표</h4><p id="work-goal" class="body-copy"></p></section>
+              <details id="work-constraints-details" class="detail-section constraints-section" open><summary>유지할 제약<svg class="disclosure-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4"></path></svg></summary><ul id="work-constraints" class="content-list"></ul></details>
+            </div>
+            <section class="detail-section progress-section"><div class="detail-section-heading"><h4>최근 진행</h4><span id="work-revision" class="revision-tag"></span></div><p id="work-progress" class="body-copy"></p><ul id="work-next-actions" class="content-list next-actions"></ul></section>
+            <section id="work-issues-section" class="detail-section issues-section" hidden><h4>남은 확인</h4><ul id="work-issues" class="content-list"></ul></section>
+          </div>
+        </section>
+        <footer class="main-footer"><span id="source-summary">등록 자료 확인 중</span><span id="refreshed-at">아직 조회하지 않음</span></footer>
+      </main>
+    </div>
+    <dialog id="command-dialog" class="command-dialog" aria-labelledby="command-title" aria-describedby="command-scope">
+      <header class="command-header"><div><h2 id="command-title">빠른 실행</h2><p id="command-scope">명령과 불러온 작업에서 찾습니다. 전체 저장소 검색은 아닙니다.</p></div><button id="command-close" class="icon-button" type="button" aria-label="빠른 실행 닫기" title="닫기 · Esc"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 6 8 8M14 6l-8 8"></path></svg></button></header>
+      <div class="command-search"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"></circle><path d="m13 13 4 4"></path></svg><label class="sr-only" for="command-input">명령 또는 불러온 작업 찾기</label><input id="command-input" type="text" role="combobox" aria-controls="command-results" aria-expanded="true" aria-autocomplete="list" aria-describedby="command-scope" placeholder="명령 또는 작업 이름 입력" autocomplete="off" spellcheck="false" autofocus /><span id="command-count" class="command-count" role="status" aria-live="polite"></span></div>
+      <div class="command-result-area"><div id="command-results" class="command-results" role="listbox" aria-label="명령과 불러온 작업"></div><p id="command-empty" class="command-empty" hidden>일치하는 명령이나 불러온 작업이 없습니다.</p></div>
+      <footer class="command-footer"><p id="command-current" class="command-current">실행할 항목을 선택하세요.</p><div class="command-footer-keys"><span><kbd>↑</kbd><kbd>↓</kbd> 이동</span><span><kbd>Enter</kbd> <span id="command-submit-label">실행</span></span><span><kbd>Esc</kbd> 닫기</span></div></footer>
+    </dialog>
+    <dialog id="shortcuts-dialog" class="shortcuts-dialog" aria-labelledby="shortcuts-title" aria-describedby="shortcuts-help">
+      <header class="shortcuts-header"><h2 id="shortcuts-title">키보드 단축키</h2><button id="shortcuts-close" class="icon-button" type="button" aria-label="단축키 안내 닫기" title="닫기 · Esc" autofocus><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 6 8 8M14 6l-8 8"></path></svg></button></header>
+      <div class="shortcuts-body">
+        <dl class="shortcut-list">
+          <div><dt>작업 목록 접기·펼치기</dt><dd><kbd>Ctrl</kbd><kbd>B</kbd></dd></div>
+          <div><dt>빠른 실행</dt><dd><kbd>Ctrl</kbd><kbd>K</kbd></dd></div>
+          <div><dt>불러온 작업 목록 필터</dt><dd><kbd>Ctrl</kbd><kbd>F</kbd></dd></div>
+          <div><dt>프로젝트 상태 새로고침</dt><dd><kbd>F5</kbd><span>또는</span><kbd>Ctrl</kbd><kbd>R</kbd></dd></div>
+          <div><dt>단축키 안내</dt><dd><kbd>F1</kbd></dd></div>
+          <div><dt>열린 안내 닫기·목록 필터 초기화</dt><dd><kbd>Esc</kbd></dd></div>
+          <div><dt>목록 필터에서 첫 작업 열기</dt><dd><kbd>Enter</kbd></dd></div>
+          <div><dt>목록에서 앞·뒤 작업으로 이동</dt><dd><kbd>↑</kbd><kbd>↓</kbd></dd></div>
+          <div><dt>목록의 처음·마지막으로 이동</dt><dd><kbd>Home</kbd><kbd>End</kbd></dd></div>
+          <div><dt>목록에서 작업 선택</dt><dd><kbd>Enter</kbd><span>또는</span><kbd>Space</kbd></dd></div>
+          <div><dt>빠른 실행에서 항목 이동·실행</dt><dd><kbd>↑</kbd><kbd>↓</kbd><span>·</span><kbd>Enter</kbd></dd></div>
+          <div><dt>사이드바 경계에서 너비 조절</dt><dd><kbd>←</kbd><kbd>→</kbd></dd></div>
+          <div><dt>사이드바 경계에서 최소·최대 너비</dt><dd><kbd>Home</kbd><kbd>End</kbd></dd></div>
+          <div><dt>사이드바 경계에서 접기</dt><dd><kbd>Enter</kbd></dd></div>
+        </dl>
+        <p id="shortcuts-help" class="shortcuts-help">목록과 경계의 단축키는 해당 영역에 포커스가 있을 때 사용합니다. Tab으로 사이드바 경계에 접근하거나 마우스로 드래그해 너비를 바꿀 수 있습니다. 경계를 더블클릭하면 기본 너비로 돌아갑니다.</p>
+      </div>
+    </dialog>
+    <div id="announcement" class="sr-only" role="status" aria-live="polite"></div>
+  </body>
+</html>

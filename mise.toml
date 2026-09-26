@@ -1,0 +1,37 @@
+# Adapted from development-tooling template 1.0.0 for Windows-native Python.
+[tools]
+python = "3.12.14"
+uv = "0.12.17"
+
+[settings.task]
+run_auto_install = false
+
+[env]
+UV_PYTHON = { value = "{{ tools.python.path }}", tools = true }
+UV_PYTHON_DOWNLOADS = "never"
+UV_PYTHON_PREFERENCE = "only-system"
+PYTHONUTF8 = "1"
+
+[tasks.doctor]
+run = ["python --version", "uv --version"]
+
+[tasks.sync]
+run = "uv sync --locked"
+
+[tasks.lint]
+run = ["uv lock --check", "uv run --no-sync ruff check src tests scripts", "uv run --no-sync ruff format --check src tests scripts"]
+
+[tasks.format]
+run = ["uv lock --check", "uv run --no-sync ruff format src tests scripts"]
+
+[tasks.test]
+run = ["uv lock --check", "uv run --no-sync pytest -q"]
+
+[tasks.build]
+run = ["uv lock --check", "uv build --no-build-isolation --offline"]
+
+[tasks.check]
+run = ["uv lock --check", "uv run --no-sync python scripts/check.py", "uv build --no-build-isolation --offline"]
+
+[tasks.demo]
+run = ["uv lock --check", "uv run --no-sync jev-context demo"]

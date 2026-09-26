@@ -1,0 +1,470 @@
+{
+  "provenance": "agent_authored_diagnostic",
+  "split": "development",
+  "cases": [
+    {
+      "id": "en-01",
+      "language": "en",
+      "purpose": "relevance",
+      "state": {
+        "query": "Investigate the cause of the login error",
+        "goal": "Investigate the cause of the login error",
+        "constraints": [
+          "Preserve the original text"
+        ],
+        "candidate": "Login failed because the authentication token had expired."
+      },
+      "expected": "relevant",
+      "critical": true,
+      "source_case_id": "ko-01"
+    },
+    {
+      "id": "en-02",
+      "language": "en",
+      "purpose": "relevance",
+      "state": {
+        "query": "Investigate the cause of the login error",
+        "goal": "Investigate the cause of the login error",
+        "constraints": [
+          "Preserve the original text"
+        ],
+        "candidate": "The background color of the product introduction screen was changed."
+      },
+      "expected": "irrelevant",
+      "critical": false,
+      "source_case_id": "ko-02"
+    },
+    {
+      "id": "en-03",
+      "language": "en",
+      "purpose": "relevance",
+      "state": {
+        "query": "Fix SQLite write conflicts",
+        "goal": "Fix SQLite write conflicts",
+        "constraints": [
+          "Preserve the original text"
+        ],
+        "candidate": "Concurrent write operations failed while waiting for the database lock."
+      },
+      "expected": "relevant",
+      "critical": true,
+      "source_case_id": "ko-03"
+    },
+    {
+      "id": "en-04",
+      "language": "en",
+      "purpose": "relevance",
+      "state": {
+        "query": "Fix SQLite write conflicts",
+        "goal": "Fix SQLite write conflicts",
+        "constraints": [
+          "Preserve the original text"
+        ],
+        "candidate": "The image resolution was increased."
+      },
+      "expected": "irrelevant",
+      "critical": false,
+      "source_case_id": "ko-04"
+    },
+    {
+      "id": "en-05",
+      "language": "en",
+      "purpose": "relevance",
+      "state": {
+        "query": "Check whether personal information remains after deleting the original text",
+        "goal": "Check whether personal information remains after deleting the original text",
+        "constraints": [
+          "Preserve the original text"
+        ],
+        "candidate": "The original text was deleted, but a name remains in the cached excerpt."
+      },
+      "expected": "relevant",
+      "critical": true,
+      "source_case_id": "ko-05"
+    },
+    {
+      "id": "en-06",
+      "language": "en",
+      "purpose": "relevance",
+      "state": {
+        "query": "Check whether personal information remains after deleting the original text",
+        "goal": "Check whether personal information remains after deleting the original text",
+        "constraints": [
+          "Preserve the original text"
+        ],
+        "candidate": "The bicycle tires were inflated."
+      },
+      "expected": "irrelevant",
+      "critical": false,
+      "source_case_id": "ko-06"
+    },
+    {
+      "id": "en-07",
+      "language": "en",
+      "purpose": "relevance",
+      "state": {
+        "query": "Investigate missing Korean search results",
+        "goal": "Investigate missing Korean search results",
+        "constraints": [
+          "Preserve the original text"
+        ],
+        "candidate": "Two-character search queries were missed by FTS, so substring search was added."
+      },
+      "expected": "relevant",
+      "critical": true,
+      "source_case_id": "ko-07"
+    },
+    {
+      "id": "en-08",
+      "language": "en",
+      "purpose": "relevance",
+      "state": {
+        "query": "Investigate missing Korean search results",
+        "goal": "Investigate missing Korean search results",
+        "constraints": [
+          "Preserve the original text"
+        ],
+        "candidate": "The total on the receipt was calculated."
+      },
+      "expected": "irrelevant",
+      "critical": false,
+      "source_case_id": "ko-08"
+    },
+    {
+      "id": "en-09",
+      "language": "en",
+      "purpose": "relevance",
+      "state": {
+        "query": "Investigate an MCP connection failure",
+        "goal": "Investigate an MCP connection failure",
+        "constraints": [
+          "Preserve the original text"
+        ],
+        "candidate": "The server wrote logs to standard output, causing JSON-RPC parsing to fail."
+      },
+      "expected": "relevant",
+      "critical": true,
+      "source_case_id": "ko-09"
+    },
+    {
+      "id": "en-10",
+      "language": "en",
+      "purpose": "relevance",
+      "state": {
+        "query": "Investigate an MCP connection failure",
+        "goal": "Investigate an MCP connection failure",
+        "constraints": [
+          "Preserve the original text"
+        ],
+        "candidate": "The button color on the login screen was changed."
+      },
+      "expected": "irrelevant",
+      "critical": false,
+      "source_case_id": "ko-10"
+    },
+    {
+      "id": "en-11",
+      "language": "en",
+      "purpose": "relevance",
+      "state": {
+        "query": "Verify a completion report",
+        "goal": "Verify a completion report",
+        "constraints": [
+          "Preserve the original text"
+        ],
+        "candidate": "The task was reported as complete even though the tests had not been run."
+      },
+      "expected": "relevant",
+      "critical": true,
+      "source_case_id": "ko-11"
+    },
+    {
+      "id": "en-12",
+      "language": "en",
+      "purpose": "relevance",
+      "state": {
+        "query": "Verify a completion report",
+        "goal": "Verify a completion report",
+        "constraints": [
+          "Preserve the original text"
+        ],
+        "candidate": "The weather is clear today."
+      },
+      "expected": "irrelevant",
+      "critical": false,
+      "source_case_id": "ko-12"
+    },
+    {
+      "id": "en-13",
+      "language": "en",
+      "purpose": "evidence_relation",
+      "state": {
+        "claim": "Token expiration is the cause of the login failure.",
+        "candidate": "Token expiration was confirmed to be the cause of the login failure."
+      },
+      "expected": "supports",
+      "critical": false,
+      "source_case_id": "ko-13"
+    },
+    {
+      "id": "en-14",
+      "language": "en",
+      "purpose": "evidence_relation",
+      "state": {
+        "claim": "Token expiration is the cause of the login failure.",
+        "candidate": "The token is valid. The login failure is caused by a database connection error."
+      },
+      "expected": "contradicts",
+      "critical": true,
+      "source_case_id": "ko-14"
+    },
+    {
+      "id": "en-15",
+      "language": "en",
+      "purpose": "evidence_relation",
+      "state": {
+        "claim": "All tests passed.",
+        "candidate": "Every test execution result was successful."
+      },
+      "expected": "supports",
+      "critical": false,
+      "source_case_id": "ko-15"
+    },
+    {
+      "id": "en-16",
+      "language": "en",
+      "purpose": "evidence_relation",
+      "state": {
+        "claim": "All tests passed.",
+        "candidate": "Three tests failed."
+      },
+      "expected": "contradicts",
+      "critical": true,
+      "source_case_id": "ko-16"
+    },
+    {
+      "id": "en-17",
+      "language": "en",
+      "purpose": "evidence_relation",
+      "state": {
+        "claim": "The sensitive original text was deleted.",
+        "candidate": "The original text in question and its excerpts were deleted."
+      },
+      "expected": "supports",
+      "critical": false,
+      "source_case_id": "ko-17"
+    },
+    {
+      "id": "en-18",
+      "language": "en",
+      "purpose": "evidence_relation",
+      "state": {
+        "claim": "The sensitive original text was deleted.",
+        "candidate": "The original text remains intact."
+      },
+      "expected": "contradicts",
+      "critical": true,
+      "source_case_id": "ko-18"
+    },
+    {
+      "id": "en-19",
+      "language": "en",
+      "purpose": "evidence_relation",
+      "state": {
+        "claim": "Semantic judgments were performed without a model.",
+        "candidate": "It was reported that the semantic judgment function had been run without a model."
+      },
+      "expected": "supports",
+      "critical": false,
+      "source_case_id": "ko-19"
+    },
+    {
+      "id": "en-20",
+      "language": "en",
+      "purpose": "evidence_relation",
+      "state": {
+        "claim": "Semantic judgments were performed without a model.",
+        "candidate": "Only keyword search was run without a model; no semantic judgments were performed."
+      },
+      "expected": "contradicts",
+      "critical": true,
+      "source_case_id": "ko-20"
+    },
+    {
+      "id": "en-21",
+      "language": "en",
+      "purpose": "evidence_relation",
+      "state": {
+        "claim": "The current tool inventory includes an available file-reading tool.",
+        "candidate": "File reading was confirmed in the current inventory of available tools."
+      },
+      "expected": "supports",
+      "critical": false,
+      "source_case_id": "ko-21"
+    },
+    {
+      "id": "en-22",
+      "language": "en",
+      "purpose": "evidence_relation",
+      "state": {
+        "claim": "The current tool inventory includes an available file-reading tool.",
+        "candidate": "The file-reading tool is currently disconnected and unavailable."
+      },
+      "expected": "contradicts",
+      "critical": true,
+      "source_case_id": "ko-22"
+    },
+    {
+      "id": "en-23",
+      "language": "en",
+      "purpose": "evidence_relation",
+      "state": {
+        "claim": "Checks were run on the modified code.",
+        "candidate": "Checks were run after confirming the new hash of the modified file."
+      },
+      "expected": "supports",
+      "critical": false,
+      "source_case_id": "ko-23"
+    },
+    {
+      "id": "en-24",
+      "language": "en",
+      "purpose": "evidence_relation",
+      "state": {
+        "claim": "Checks were run on the modified code.",
+        "candidate": "Checks were run only on the code before the changes, and were not run after the changes."
+      },
+      "expected": "contradicts",
+      "critical": true,
+      "source_case_id": "ko-24"
+    },
+    {
+      "id": "en-25",
+      "language": "en",
+      "purpose": "capability_fit",
+      "state": {
+        "query": "Read the current contents of the file",
+        "scope": {
+          "allowed_actions": [
+            "read",
+            "run_checks"
+          ]
+        },
+        "candidate": {
+          "description": "Reads the original file text and line numbers.",
+          "available": true
+        }
+      },
+      "expected": "fit",
+      "critical": false,
+      "source_case_id": "ko-25"
+    },
+    {
+      "id": "en-26",
+      "language": "en",
+      "purpose": "capability_fit",
+      "state": {
+        "query": "Read the current contents of the file",
+        "scope": {
+          "allowed_actions": [
+            "read",
+            "run_checks"
+          ]
+        },
+        "candidate": {
+          "description": "Sends email messages to external recipients.",
+          "available": true
+        }
+      },
+      "expected": "unfit",
+      "critical": false,
+      "source_case_id": "ko-26"
+    },
+    {
+      "id": "en-27",
+      "language": "en",
+      "purpose": "capability_fit",
+      "state": {
+        "query": "Run Python regression tests",
+        "scope": {
+          "allowed_actions": [
+            "read",
+            "run_checks"
+          ]
+        },
+        "candidate": {
+          "description": "Runs the pytest command in a local shell.",
+          "available": true
+        }
+      },
+      "expected": "fit",
+      "critical": false,
+      "source_case_id": "ko-27"
+    },
+    {
+      "id": "en-28",
+      "language": "en",
+      "purpose": "capability_fit",
+      "state": {
+        "query": "Run Python regression tests",
+        "scope": {
+          "allowed_actions": [
+            "read",
+            "run_checks"
+          ]
+        },
+        "candidate": {
+          "description": "Changes the colors in a photograph.",
+          "available": true
+        }
+      },
+      "expected": "unfit",
+      "critical": false,
+      "source_case_id": "ko-28"
+    },
+    {
+      "id": "en-29",
+      "language": "en",
+      "purpose": "capability_fit",
+      "state": {
+        "query": "Restore a saved task and its original evidence",
+        "scope": {
+          "allowed_actions": [
+            "read",
+            "run_checks"
+          ]
+        },
+        "candidate": {
+          "description": "Retrieves saved tasks and evidence from the current project.",
+          "available": true
+        }
+      },
+      "expected": "fit",
+      "critical": false,
+      "source_case_id": "ko-29"
+    },
+    {
+      "id": "en-30",
+      "language": "en",
+      "purpose": "capability_fit",
+      "state": {
+        "query": "Restore a saved task and its original evidence",
+        "scope": {
+          "allowed_actions": [
+            "read",
+            "run_checks"
+          ]
+        },
+        "candidate": {
+          "description": "Retrieves next week's weather forecast.",
+          "available": true
+        }
+      },
+      "expected": "unfit",
+      "critical": false,
+      "source_case_id": "ko-30"
+    }
+  ],
+  "translation_provenance": "codex_authored_offline_translation; no runtime translation cost measured",
+  "source_dataset_sha256": "b3f88c9d31c53d51754f5f6b8c5db82f9078aa69a9ddc8b1ccf43919f162cc52"
+}

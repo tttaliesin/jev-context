@@ -1,0 +1,438 @@
+{
+  "provenance": "agent_authored_diagnostic",
+  "split": "development",
+  "cases": [
+    {
+      "id": "ko-01",
+      "language": "ko",
+      "purpose": "relevance",
+      "state": {
+        "query": "로그인 오류 원인을 조사",
+        "goal": "로그인 오류 원인을 조사",
+        "constraints": [
+          "원문을 보존"
+        ],
+        "candidate": "만료된 인증 토큰 때문에 로그인에 실패했다."
+      },
+      "expected": "relevant",
+      "critical": true
+    },
+    {
+      "id": "ko-02",
+      "language": "ko",
+      "purpose": "relevance",
+      "state": {
+        "query": "로그인 오류 원인을 조사",
+        "goal": "로그인 오류 원인을 조사",
+        "constraints": [
+          "원문을 보존"
+        ],
+        "candidate": "제품 소개 화면의 배경색을 바꿨다."
+      },
+      "expected": "irrelevant",
+      "critical": false
+    },
+    {
+      "id": "ko-03",
+      "language": "ko",
+      "purpose": "relevance",
+      "state": {
+        "query": "SQLite 쓰기 충돌 수정",
+        "goal": "SQLite 쓰기 충돌 수정",
+        "constraints": [
+          "원문을 보존"
+        ],
+        "candidate": "동시 쓰기 작업이 데이터베이스 잠금을 기다리다 실패했다."
+      },
+      "expected": "relevant",
+      "critical": true
+    },
+    {
+      "id": "ko-04",
+      "language": "ko",
+      "purpose": "relevance",
+      "state": {
+        "query": "SQLite 쓰기 충돌 수정",
+        "goal": "SQLite 쓰기 충돌 수정",
+        "constraints": [
+          "원문을 보존"
+        ],
+        "candidate": "이미지의 해상도를 높였다."
+      },
+      "expected": "irrelevant",
+      "critical": false
+    },
+    {
+      "id": "ko-05",
+      "language": "ko",
+      "purpose": "relevance",
+      "state": {
+        "query": "원문 삭제 후 개인정보 잔존 확인",
+        "goal": "원문 삭제 후 개인정보 잔존 확인",
+        "constraints": [
+          "원문을 보존"
+        ],
+        "candidate": "원문은 삭제했지만 캐시된 발췌에 이름이 남아 있다."
+      },
+      "expected": "relevant",
+      "critical": true
+    },
+    {
+      "id": "ko-06",
+      "language": "ko",
+      "purpose": "relevance",
+      "state": {
+        "query": "원문 삭제 후 개인정보 잔존 확인",
+        "goal": "원문 삭제 후 개인정보 잔존 확인",
+        "constraints": [
+          "원문을 보존"
+        ],
+        "candidate": "자전거 타이어에 공기를 넣었다."
+      },
+      "expected": "irrelevant",
+      "critical": false
+    },
+    {
+      "id": "ko-07",
+      "language": "ko",
+      "purpose": "relevance",
+      "state": {
+        "query": "한국어 검색 누락 확인",
+        "goal": "한국어 검색 누락 확인",
+        "constraints": [
+          "원문을 보존"
+        ],
+        "candidate": "두 글자 검색어가 FTS에서 누락되어 부분 문자열 검색을 추가했다."
+      },
+      "expected": "relevant",
+      "critical": true
+    },
+    {
+      "id": "ko-08",
+      "language": "ko",
+      "purpose": "relevance",
+      "state": {
+        "query": "한국어 검색 누락 확인",
+        "goal": "한국어 검색 누락 확인",
+        "constraints": [
+          "원문을 보존"
+        ],
+        "candidate": "영수증의 합계를 계산했다."
+      },
+      "expected": "irrelevant",
+      "critical": false
+    },
+    {
+      "id": "ko-09",
+      "language": "ko",
+      "purpose": "relevance",
+      "state": {
+        "query": "MCP 연결 실패 조사",
+        "goal": "MCP 연결 실패 조사",
+        "constraints": [
+          "원문을 보존"
+        ],
+        "candidate": "서버가 표준 출력에 로그를 써서 JSON-RPC 파싱이 실패했다."
+      },
+      "expected": "relevant",
+      "critical": true
+    },
+    {
+      "id": "ko-10",
+      "language": "ko",
+      "purpose": "relevance",
+      "state": {
+        "query": "MCP 연결 실패 조사",
+        "goal": "MCP 연결 실패 조사",
+        "constraints": [
+          "원문을 보존"
+        ],
+        "candidate": "로그인 화면의 버튼 색상을 바꿨다."
+      },
+      "expected": "irrelevant",
+      "critical": false
+    },
+    {
+      "id": "ko-11",
+      "language": "ko",
+      "purpose": "relevance",
+      "state": {
+        "query": "완료 보고 검증",
+        "goal": "완료 보고 검증",
+        "constraints": [
+          "원문을 보존"
+        ],
+        "candidate": "테스트를 실행하지 않았는데 작업이 완료되었다고 보고했다."
+      },
+      "expected": "relevant",
+      "critical": true
+    },
+    {
+      "id": "ko-12",
+      "language": "ko",
+      "purpose": "relevance",
+      "state": {
+        "query": "완료 보고 검증",
+        "goal": "완료 보고 검증",
+        "constraints": [
+          "원문을 보존"
+        ],
+        "candidate": "오늘의 날씨는 맑다."
+      },
+      "expected": "irrelevant",
+      "critical": false
+    },
+    {
+      "id": "ko-13",
+      "language": "ko",
+      "purpose": "evidence_relation",
+      "state": {
+        "claim": "로그인 실패의 원인은 토큰 만료다.",
+        "candidate": "로그인 실패 원인이 토큰 만료임을 확인했다."
+      },
+      "expected": "supports",
+      "critical": false
+    },
+    {
+      "id": "ko-14",
+      "language": "ko",
+      "purpose": "evidence_relation",
+      "state": {
+        "claim": "로그인 실패의 원인은 토큰 만료다.",
+        "candidate": "토큰은 유효하다. 로그인 실패 원인은 데이터베이스 접속 오류다."
+      },
+      "expected": "contradicts",
+      "critical": true
+    },
+    {
+      "id": "ko-15",
+      "language": "ko",
+      "purpose": "evidence_relation",
+      "state": {
+        "claim": "테스트가 모두 통과했다.",
+        "candidate": "모든 테스트 실행 결과가 성공이었다."
+      },
+      "expected": "supports",
+      "critical": false
+    },
+    {
+      "id": "ko-16",
+      "language": "ko",
+      "purpose": "evidence_relation",
+      "state": {
+        "claim": "테스트가 모두 통과했다.",
+        "candidate": "테스트 3개가 실패했다."
+      },
+      "expected": "contradicts",
+      "critical": true
+    },
+    {
+      "id": "ko-17",
+      "language": "ko",
+      "purpose": "evidence_relation",
+      "state": {
+        "claim": "민감한 원문은 삭제되었다.",
+        "candidate": "해당 원문과 발췌를 삭제했다."
+      },
+      "expected": "supports",
+      "critical": false
+    },
+    {
+      "id": "ko-18",
+      "language": "ko",
+      "purpose": "evidence_relation",
+      "state": {
+        "claim": "민감한 원문은 삭제되었다.",
+        "candidate": "원문이 그대로 남아 있다."
+      },
+      "expected": "contradicts",
+      "critical": true
+    },
+    {
+      "id": "ko-19",
+      "language": "ko",
+      "purpose": "evidence_relation",
+      "state": {
+        "claim": "모델 없이도 의미 판단을 수행했다.",
+        "candidate": "모델 없이 의미 판단 기능을 실행했다고 보고했다."
+      },
+      "expected": "supports",
+      "critical": false
+    },
+    {
+      "id": "ko-20",
+      "language": "ko",
+      "purpose": "evidence_relation",
+      "state": {
+        "claim": "모델 없이도 의미 판단을 수행했다.",
+        "candidate": "모델 없이 실행한 것은 키워드 검색뿐이며 의미 판단은 수행하지 않았다."
+      },
+      "expected": "contradicts",
+      "critical": true
+    },
+    {
+      "id": "ko-21",
+      "language": "ko",
+      "purpose": "evidence_relation",
+      "state": {
+        "claim": "현재 도구 목록에는 파일 읽기 도구가 있다.",
+        "candidate": "현재 사용 가능한 도구 목록에서 파일 읽기를 확인했다."
+      },
+      "expected": "supports",
+      "critical": false
+    },
+    {
+      "id": "ko-22",
+      "language": "ko",
+      "purpose": "evidence_relation",
+      "state": {
+        "claim": "현재 도구 목록에는 파일 읽기 도구가 있다.",
+        "candidate": "파일 읽기 도구는 현재 연결이 끊겨 사용할 수 없다."
+      },
+      "expected": "contradicts",
+      "critical": true
+    },
+    {
+      "id": "ko-23",
+      "language": "ko",
+      "purpose": "evidence_relation",
+      "state": {
+        "claim": "변경한 코드에 대한 검사를 실행했다.",
+        "candidate": "수정한 파일의 새 해시를 확인한 후 검사를 실행했다."
+      },
+      "expected": "supports",
+      "critical": false
+    },
+    {
+      "id": "ko-24",
+      "language": "ko",
+      "purpose": "evidence_relation",
+      "state": {
+        "claim": "변경한 코드에 대한 검사를 실행했다.",
+        "candidate": "검사는 수정 이전 코드에서만 실행했고 수정 후에는 실행하지 않았다."
+      },
+      "expected": "contradicts",
+      "critical": true
+    },
+    {
+      "id": "ko-25",
+      "language": "ko",
+      "purpose": "capability_fit",
+      "state": {
+        "query": "현재 파일 내용을 확인",
+        "scope": {
+          "allowed_actions": [
+            "read",
+            "run_checks"
+          ]
+        },
+        "candidate": {
+          "description": "파일의 원문과 줄 번호를 읽는다.",
+          "available": true
+        }
+      },
+      "expected": "fit",
+      "critical": false
+    },
+    {
+      "id": "ko-26",
+      "language": "ko",
+      "purpose": "capability_fit",
+      "state": {
+        "query": "현재 파일 내용을 확인",
+        "scope": {
+          "allowed_actions": [
+            "read",
+            "run_checks"
+          ]
+        },
+        "candidate": {
+          "description": "메일 메시지를 외부 수신자에게 보낸다.",
+          "available": true
+        }
+      },
+      "expected": "unfit",
+      "critical": false
+    },
+    {
+      "id": "ko-27",
+      "language": "ko",
+      "purpose": "capability_fit",
+      "state": {
+        "query": "Python 회귀 테스트 실행",
+        "scope": {
+          "allowed_actions": [
+            "read",
+            "run_checks"
+          ]
+        },
+        "candidate": {
+          "description": "로컬 쉘에서 pytest 명령을 실행한다.",
+          "available": true
+        }
+      },
+      "expected": "fit",
+      "critical": false
+    },
+    {
+      "id": "ko-28",
+      "language": "ko",
+      "purpose": "capability_fit",
+      "state": {
+        "query": "Python 회귀 테스트 실행",
+        "scope": {
+          "allowed_actions": [
+            "read",
+            "run_checks"
+          ]
+        },
+        "candidate": {
+          "description": "사진의 색상을 변경한다.",
+          "available": true
+        }
+      },
+      "expected": "unfit",
+      "critical": false
+    },
+    {
+      "id": "ko-29",
+      "language": "ko",
+      "purpose": "capability_fit",
+      "state": {
+        "query": "저장된 작업과 원문 복원",
+        "scope": {
+          "allowed_actions": [
+            "read",
+            "run_checks"
+          ]
+        },
+        "candidate": {
+          "description": "현재 프로젝트의 저장 작업과 근거를 조회한다.",
+          "available": true
+        }
+      },
+      "expected": "fit",
+      "critical": false
+    },
+    {
+      "id": "ko-30",
+      "language": "ko",
+      "purpose": "capability_fit",
+      "state": {
+        "query": "저장된 작업과 원문 복원",
+        "scope": {
+          "allowed_actions": [
+            "read",
+            "run_checks"
+          ]
+        },
+        "candidate": {
+          "description": "다음 주의 날씨를 조회한다.",
+          "available": true
+        }
+      },
+      "expected": "unfit",
+      "critical": false
+    }
+  ]
+}

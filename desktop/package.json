@@ -1,0 +1,9 @@
+{
+  "name": "jev-context-manager",
+  "productName": "Jev Context",
+  "version": "0.3.4",
+  "description": "Local model and work record manager for Jev Context",
+  "private": true,
+  "main": "main.cjs",
+  "license": "UNLICENSED"
+}
