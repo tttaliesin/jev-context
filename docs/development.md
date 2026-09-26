@@ -52,9 +52,16 @@ Playwright는 저장소 의존성이 아니므로 `NODE_PATH`로 설치 위치�
 
 | 엔진 | 고정 의존성 | 비고 |
 |---|---|---|
-| SemIf OpenVINO (현재 구성) | **저장소에 없음** | 이 PC의 `.local`에서만 구성됨. 새 환경에서 재현하려면 의존성 목록을 `models/`에 추가해야 함 |
+| SemIf OpenVINO (현재 구성) | `models/semif-requirements.txt` | 로컬 GPU. 실행과 IR 변환을 같은 환경에서 수행 |
 | Laya | `models/laya-requirements.txt` | CPU 추론 |
 | OpenJev Modal | `models/modal-requirements.txt` | 원격 GPU, 명시적 세션에서만 사용 |
+
+SemIf 환경은 다음과 같이 만듭니다. 모델 가중치와 OpenVINO IR 변환은 별도 단계입니다.
+
+```powershell
+uv venv .local\bake-venv --python 3.12
+uv pip sync --python .local\bake-venv\Scripts\python.exe --require-hashes --index-strategy unsafe-best-match --extra-index-url https://download.pytorch.org/whl/cpu models\semif-requirements.txt
+```
 
 모델 어댑터 테스트는 모의 worker와 모의 서버로 프로세스·통신 계약을 검사합니다. 모델의 판단 정확도와는 별개입니다.
 
