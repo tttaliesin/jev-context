@@ -1,39 +1,68 @@
 # 개발 환경
 
-Python 패키지·SQLite·MCP 서버의 단일 로컬 구현
-최종 납품 위치는 현재 프로젝트 폴더, GitHub push·PR·Issue는 요청 범위에 미포함
-작업 시작 시 기존 코드·Git 이력·AGENTS.md가 없는 빈 폴더로 확인
+Python 패키지·SQLite·MCP 서버로 된 단일 로컬 구현입니다. 저장소는 [tttaliesin/jev-context](https://github.com/tttaliesin/jev-context)입니다.
 
-## 도구 소유권
+## 도구와 버전
 
-- runtime 선택: `mise.toml`의 Python 3.12.14
-- 의존성·venv: uv 0.12.17, `pyproject.toml`, `uv.lock`
-- 공통 진입점: `mise run sync`, `mise run check`, `mise run demo`
-- 검사 구현: Ruff·pytest와 순차 실행 `scripts/check.py`
+| 항목 | 기준 |
+|---|---|
+| 지원 환경 | Windows x64 |
+| Python | 3.12.14 (`mise.toml`) |
+| 의존성·venv | uv 0.12.17, `pyproject.toml`, `uv.lock` |
+| 검사 | Ruff(lint·format), pytest, 순차 실행 스크립트 `scripts/check.py` |
+| 데스크톱 앱 | Electron 44.4.5 (`desktop/runtime.json`에 SHA-256 고정) |
 
-development-tooling 템플릿 1.0.0의 Python overlay를 렌더한 뒤 Windows용으로 POSIX 셸 검사를 교체
-현재 호스트에는 Python·uv·mise가 PATH에 없어 Codex 번들 Python과 프로젝트 내부 uv 실행기로 bootstrap
-초기 venv 생성 이후 의존성의 실제 설치·lock은 uv로 관리
-별도 Python runtime 다운로드나 전역 도구 변경 없음
-mise 선언은 정적 검사, Windows의 실제 검사·build는 아래 동등 명령으로 실행
+`mise.toml`은 development-tooling 템플릿 1.0.0의 Python overlay를 Windows용으로 바꾼 것입니다. mise가 Python·uv 버전을 고르고, 의존성 설치와 lock은 uv가 관리합니다.
 
-## 현재 작업 폴더에서 검증
+## 설치
 
 ```powershell
-.\.local\tools\uv.exe lock --check --python .venv\Scripts\python.exe --no-python-downloads --cache-dir .uv-cache
-.\.local\tools\uv.exe run --no-sync python scripts/check.py
-.\.local\tools\uv.exe build --no-build-isolation --offline
+uv sync --locked
 ```
 
-검사 진입점은 의존성을 설치하거나 lock을 변경하지 않고 첫 실패의 종료 코드를 전달
-build 도구는 dev 의존성에 고정해 offline build에서 임의 추가 다운로드를 막는 구성
-`mise.lock`과 mise runtime 설치 경로는 현재 호스트에서 미검증이므로 완전한 mise 채택 완료로 보고하지 않는 범위
+mise 없이 설치할 때는 `--python`으로 Python 3.12 실행 파일을 지정하고 `--no-python-downloads`를 붙입니다. 명령은 [README](../README.md#빠른-시작)에 있습니다.
 
-## 재현 가능한 경계
+## 검사
 
-공식 MCP SDK 1.30.0과 JSON Schema validator 사용
-핵심 코드의 모델 의존성은 없으며 Laya SDK·PyTorch·transformers는 별도 환경에서만 준비
-모델 어댑터 테스트는 모의 서버 응답과 자식 프로세스 계약을 검사하며 모델 정확도와 구분
+| 명령 | 하는 일 |
+|---|---|
+| `mise run check` | lock 확인 → lint·format·pytest → offline build |
+| `mise run lint` / `mise run test` | lock 확인 후 lint 또는 pytest만 실행 |
+| `.\.venv\Scripts\python.exe scripts\check.py` | mise·uv 없이 lint·format·pytest 실행 |
 
-명령 실행 후 [검증 기록](verification.md)의 실제 결과와 미검증 범위 확인
-새로운 오류가 없는 동일 검사의 반복 대신 변경한 경계의 회귀 사례부터 실행
+검사 명령은 의존성을 설치하거나 lock을 바꾸지 않고, 첫 실패의 종료 코드를 그대로 돌려줍니다. build 도구(hatchling)는 dev 의존성에 고정돼 있어 offline build 중 추가로 내려받지 않습니다.
+
+pytest는 약 250개 테스트를 1분 20초 정도에 실행합니다. `test_coding_benchmark.py`는 격리된 pytest를 프로젝트의 `.t/` 아래에서 실행하고, 끝나면 그 임시 폴더를 지웁니다.
+
+샌드박스 계정 등 **다른 Windows 계정으로 테스트를 실행하면**, 저장 폴더에 거는 보호 권한(`storage.protect_directory`) 때문에 원래 사용자가 지울 수 없는 임시 폴더가 남을 수 있습니다. 이런 폴더는 관리자 권한으로 소유권을 가져온 뒤 지워야 합니다.
+
+### 데스크톱 앱 검사
+
+Python 검사에는 포함되지 않습니다. Node가 필요합니다.
+
+- `node --test scripts\test_window_state.cjs`: 창 위치·크기 저장 로직. Node만 있으면 실행됩니다.
+- `scripts\test_desktop.cjs`, `test_desktop_ux.cjs`: 빌드된 `dist\JevContext`를 Playwright로 실제 실행하는 화면 검사입니다.
+- `scripts\test_desktop_states.cjs`: 실제 렌더러를 fixture로 띄워 상태별 화면을 검사합니다. Electron main, Python, DB, 모델은 쓰지 않습니다.
+
+Playwright는 저장소 의존성이 아니므로 `NODE_PATH`로 설치 위치를 지정합니다. 빌드는 `powershell.exe -NoProfile -File scripts\build_desktop.ps1`입니다 ([데스크톱 앱 실행 안내](desktop-manager.md)).
+
+## 모델 환경
+
+핵심 서비스는 모델 라이브러리에 의존하지 않습니다. 판단 엔진은 각각 별도 Python 환경에서 실행합니다. 로컬 엔진은 프로필 JSON의 `python`·`model_path`로 worker 프로세스를 띄웁니다 ([모델 준비와 제한](models.md)).
+
+| 엔진 | 고정 의존성 | 비고 |
+|---|---|---|
+| SemIf OpenVINO (현재 구성) | **저장소에 없음** | 이 PC의 `.local`에서만 구성됨. 새 환경에서 재현하려면 의존성 목록을 `models/`에 추가해야 함 |
+| Laya | `models/laya-requirements.txt` | CPU 추론 |
+| OpenJev Modal | `models/modal-requirements.txt` | 원격 GPU, 명시적 세션에서만 사용 |
+
+모델 어댑터 테스트는 모의 worker와 모의 서버로 프로세스·통신 계약을 검사합니다. 모델의 판단 정확도와는 별개입니다.
+
+## 로컬 전용 파일
+
+아래 파일과 폴더는 Git에 포함되지 않습니다 (`.gitignore`).
+
+- `.local/`: 프로젝트 설정(`project.toml`), 작업 DB, 모델 가중치와 캐시, 모델용 venv, 벤치마크 결과
+- `.t/`: 테스트와 벤치마크의 임시 폴더
+- `dist/`: 데스크톱 앱 빌드 결과
+- `.codex/config.toml`, `.codex/hooks.json`: 이 PC의 절대 경로가 들어간 Codex 설정
