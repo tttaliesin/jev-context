@@ -208,12 +208,12 @@ class SharedLocalEngine:
                 try:
                     with FileLock(self.directory / "broker.lock"):
                         pass
-                except DomainError:
+                except DomainError as exc:
                     if persistent and not self._call("status").get("persistent"):
                         raise DomainError(
                             "engine_host_mode_conflict",
                             "Existing host is transient; stop it when idle before installing a persistent host",
-                        )
+                        ) from exc
                     return
                 profile_path = self.directory / "profile.json"
                 profile_path.write_text(dumps(self.profile), encoding="utf-8")

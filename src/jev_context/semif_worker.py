@@ -71,7 +71,7 @@ def answer(request_infer, static, ids, slots, labels):
     top = max(values)
     weights = [math.exp(v - top) for v in values]
     total = sum(weights)
-    probabilities = {label: w / total for label, w in zip(labels, weights)}
+    probabilities = {label: w / total for label, w in zip(labels, weights, strict=True)}
     entropy = -sum(p * math.log(p) for p in probabilities.values() if p > 0)
     return {
         "choice": max(probabilities, key=probabilities.get),

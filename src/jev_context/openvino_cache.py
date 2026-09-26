@@ -104,7 +104,7 @@ def prepare_cache(namespace, identity):
             stream.write(contents)
     except FileExistsError:
         if marker.read_text(encoding="utf-8") != contents:
-            raise ValueError("OpenVINO cache identity changed")
+            raise ValueError("OpenVINO cache identity changed") from None
 
 
 def quarantine_cache(namespace):
