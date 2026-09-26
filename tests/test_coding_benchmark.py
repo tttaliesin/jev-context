@@ -1,4 +1,5 @@
 import json
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -7,7 +8,22 @@ from scripts.coding_benchmark import ROOT, TASKS, prepare_suite, verify_trial
 from scripts.coding_contexts import seal_contexts
 
 
+def record_scratch(monkeypatch):
+    """Paths the grader creates under .t/, whether via mkdtemp or TemporaryDirectory."""
+    created, mkdtemp = [], tempfile.mkdtemp
+
+    def recording(*args, **kwargs):
+        path = Path(mkdtemp(*args, **kwargs))
+        if path.parent == ROOT / ".t":
+            created.append(path)
+        return str(path)
+
+    monkeypatch.setattr(tempfile, "mkdtemp", recording)
+    return created
+
+
 def test_seeded_trials_require_passing_reference_and_failing_start(tmp_path, monkeypatch):
+    scratch = record_scratch(monkeypatch)
     # A suite inside another repository must not inherit its import-path settings.
     (tmp_path / "pyproject.toml").write_text(
         '[tool.pytest.ini_options]\npythonpath = ["' + (ROOT / "src").as_posix() + '"]\n'
@@ -19,6 +35,9 @@ def test_seeded_trials_require_passing_reference_and_failing_start(tmp_path, mon
     assert all(task["reference"]["passed"] for task in suite["tasks"])
     assert all(task["seed"]["exit_code"] == 1 for task in suite["tasks"])
     assert all(task["seed"]["failures"] > 0 for task in suite["tasks"])
+    # Every grading run removes its in-project pytest scratch directory.
+    assert len(scratch) == 6
+    assert all(path.parent == ROOT / ".t" and not path.exists() for path in scratch)
 
     evidence = [{"id": "policy", "text": "한국어 원문 보존"}]
     with pytest.raises(ValueError, match="observed judgment"):

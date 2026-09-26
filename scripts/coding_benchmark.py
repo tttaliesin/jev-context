@@ -53,7 +53,14 @@ def run_checks(project, check, receipt):
     xml = receipt.with_suffix(".xml")
     scratch_root = ROOT / ".t"
     scratch_root.mkdir(exist_ok=True)
-    scratch = tempfile.mkdtemp(prefix="c-", dir=scratch_root)
+    # Inside the project for sandboxed hosts; removed afterwards so runs do not accumulate.
+    with tempfile.TemporaryDirectory(
+        prefix="c-", dir=scratch_root, ignore_cleanup_errors=True
+    ) as scratch:
+        return _run_checks(project, check, receipt, xml, scratch)
+
+
+def _run_checks(project, check, receipt, xml, scratch):
     command = [
         sys.executable,
         "-X",
