@@ -306,73 +306,14 @@ class Laya:
                 f"{self.NAME} requires an existing local model and dedicated Python environment",
             )
         if self.profile.get("manifest_sha256"):
-            manifest_bytes = (model_path / "manifest.json").read_bytes()
-            if digest(manifest_bytes) != self.profile["manifest_sha256"]:
-                raise DomainError("engine_unavailable", "Prepared model manifest changed")
-            manifest = strict_loads(manifest_bytes)
-            for relative, expected in manifest["files"].items():
-                target = (model_path / relative).resolve(strict=True)
-                if not target.is_relative_to(model_path.resolve()):
-                    raise DomainError("engine_unavailable", "Invalid model manifest path")
-                with target.open("rb") as source:
-                    actual = hashlib.file_digest(source, "sha256").hexdigest()
-                if actual != expected:
-                    raise DomainError("engine_unavailable", "Prepared model bytes changed")
+            self._verify_manifest(model_path)
         manifest_seconds = time.monotonic() - preparation_started
         lock_path = Path(self.profile["lock_root"]) / "resident.lock"
         self.lock = FileLock(lock_path.with_suffix(".startup.lock"))
         try:
             self.lock.__enter__()
             self.log("prepare_start")
-            stderr_path = lock_path.with_name("worker.stderr.log")
-            with contextlib.suppress(OSError):  # may still be open in an older worker
-                if stderr_path.stat().st_size > 1024 * 1024:
-                    stderr_path.unlink()
-            from .worker_lifetime import create_job
-
-            self.worker_job, job_name = create_job()
-            environment = {
-                **os.environ,
-                "HF_HUB_OFFLINE": "1",
-                "TRANSFORMERS_OFFLINE": "1",
-                "HF_HUB_DISABLE_TELEMETRY": "1",
-                "JEV_CPU_THREADS": str(self.profile.get("cpu_threads", "")),
-                "JEV_WARMUP": "1" if self.profile.get("warmup", False) else "0",
-                "JEV_OV_CACHE": str(self.profile.get("cache_dir", "")),
-                "JEV_WORKER_JOB": job_name,
-                "JEV_OWNER_PID": str(os.getpid()),
-            }
-            with stderr_path.open("ab") as stderr:
-                self.process = subprocess.Popen(
-                    [
-                        str(executable),
-                        "-u",
-                        str(Path(__file__).with_name(self.WORKER)),
-                        str(model_path),
-                        self.profile.get("device", "cpu"),
-                        str(lock_path),
-                    ],
-                    stdin=subprocess.PIPE,
-                    stdout=subprocess.PIPE,
-                    stderr=stderr,
-                    env=environment,
-                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
-                )
-
-            process = self.process
-            responses = self.responses = queue.Queue(maxsize=2)
-
-            def reader():
-                try:
-                    while process and process.stdout:
-                        line = process.stdout.readline(MAX_RESPONSE + 1)
-                        if not line:
-                            break
-                        responses.put(line)
-                except (OSError, ValueError):
-                    return
-
-            threading.Thread(target=reader, daemon=True).start()
+            self._start_worker(executable, model_path, lock_path)
             ready = strict_loads(
                 self.responses.get(timeout=self.profile.get("prepare_timeout_seconds", 30))
             )
@@ -409,6 +350,71 @@ class Laya:
             raise DomainError(
                 "engine_unavailable", f"{self.NAME} worker did not become ready"
             ) from exc
+
+    def _verify_manifest(self, model_path):
+        manifest_bytes = (model_path / "manifest.json").read_bytes()
+        if digest(manifest_bytes) != self.profile["manifest_sha256"]:
+            raise DomainError("engine_unavailable", "Prepared model manifest changed")
+        manifest = strict_loads(manifest_bytes)
+        for relative, expected in manifest["files"].items():
+            target = (model_path / relative).resolve(strict=True)
+            if not target.is_relative_to(model_path.resolve()):
+                raise DomainError("engine_unavailable", "Invalid model manifest path")
+            with target.open("rb") as source:
+                actual = hashlib.file_digest(source, "sha256").hexdigest()
+            if actual != expected:
+                raise DomainError("engine_unavailable", "Prepared model bytes changed")
+
+    def _start_worker(self, executable, model_path, lock_path):
+        stderr_path = lock_path.with_name("worker.stderr.log")
+        with contextlib.suppress(OSError):  # may still be open in an older worker
+            if stderr_path.stat().st_size > 1024 * 1024:
+                stderr_path.unlink()
+        from .worker_lifetime import create_job
+
+        self.worker_job, job_name = create_job()
+        environment = {
+            **os.environ,
+            "HF_HUB_OFFLINE": "1",
+            "TRANSFORMERS_OFFLINE": "1",
+            "HF_HUB_DISABLE_TELEMETRY": "1",
+            "JEV_CPU_THREADS": str(self.profile.get("cpu_threads", "")),
+            "JEV_WARMUP": "1" if self.profile.get("warmup", False) else "0",
+            "JEV_OV_CACHE": str(self.profile.get("cache_dir", "")),
+            "JEV_WORKER_JOB": job_name,
+            "JEV_OWNER_PID": str(os.getpid()),
+        }
+        with stderr_path.open("ab") as stderr:
+            self.process = subprocess.Popen(
+                [
+                    str(executable),
+                    "-u",
+                    str(Path(__file__).with_name(self.WORKER)),
+                    str(model_path),
+                    self.profile.get("device", "cpu"),
+                    str(lock_path),
+                ],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=stderr,
+                env=environment,
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+            )
+
+        process = self.process
+        responses = self.responses = queue.Queue(maxsize=2)
+
+        def reader():
+            try:
+                while process and process.stdout:
+                    line = process.stdout.readline(MAX_RESPONSE + 1)
+                    if not line:
+                        break
+                    responses.put(line)
+            except (OSError, ValueError):
+                return
+
+        threading.Thread(target=reader, daemon=True).start()
 
     def evaluate(self, request):
         if self.state != "shadow" or not self.process:

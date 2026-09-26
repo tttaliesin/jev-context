@@ -21,6 +21,40 @@ VALIDATORS_V2 = {
     name: Draft202012Validator(schema) for name, schema in CONTRACT_V2["tools"].items()
 }
 MUTATING = {"work_record", "source_sync", "data_forget"}
+RECORD_HANDLERS = {
+    "decision_proposed": "_record_decision_proposed",
+    "decision_adopted": "_record_decision_transition",
+    "decision_superseded": "_record_decision_transition",
+    "scope_revised": "_record_scope_revised",
+    "issue_opened": "_record_issue_opened",
+    "issue_resolved": "_record_issue_resolved",
+    "evidence_reported": "_record_evidence_reported",
+    "criterion_registered": "_record_criterion",
+    "criterion_result": "_record_criterion",
+    "progress_reported": "_record_progress_reported",
+    "completion_reported": "_record_completion_reported",
+    "work_reopened": "_record_work_reopened",
+}
+
+
+class _Record:
+    """One work_record event: its new IDs, accumulated source refs and response."""
+
+    def __init__(self, service, wid, body, event):
+        self.service, self.wid, self.body, self.event = service, wid, body, event
+        self.eid = uid("event")
+        self.refs = event.get("source_refs", []) + event.get("origin", {}).get("source_refs", [])
+        self.result = dict(work_id=wid, event_id=self.eid, revision=body["revision"] + 1)
+
+    def insert(self, table, prefix, payload):
+        object_id = uid(prefix)
+        payload.update(id=object_id, provenance="agent_reported", event_id=self.eid)
+        self.service.db.execute(
+            f"INSERT INTO {table} VALUES(?,?,?)", (object_id, self.wid, dumps(payload))
+        )
+        self.service.store.refs(table, object_id, self.refs)
+        self.result[prefix + "_id"] = object_id
+        return object_id
 
 
 class Service:
@@ -239,134 +273,24 @@ class Service:
         body = self.store.body("works", wid)
         if body["revision"] != args["expected_revision"]:
             raise DomainError("revision_conflict", "Work revision changed")
-        event = json.loads(dumps(args["event"]))
-        kind, eid = event["kind"], uid("event")
-        refs = event.get("source_refs", []) + event.get("origin", {}).get("source_refs", [])
-        result = dict(work_id=wid, event_id=eid, revision=body["revision"] + 1)
-
-        def insert(table, prefix, payload):
-            object_id = uid(prefix)
-            payload.update(id=object_id, provenance="agent_reported", event_id=eid)
-            self.db.execute(f"INSERT INTO {table} VALUES(?,?,?)", (object_id, wid, dumps(payload)))
-            self.store.refs(table, object_id, refs)
-            result[prefix + "_id"] = object_id
-            return object_id
-
-        if kind == "decision_proposed":
-            insert(
-                "decisions",
-                "decision",
-                dict(text=event["text"], status="proposed", source_refs=refs),
-            )
-        elif kind in {"decision_adopted", "decision_superseded"}:
-            decision = self.store.body("decisions", event["decision_id"], wid)
-            if decision.get("redacted"):
-                raise DomainError("input_incomplete", "Decision evidence was deleted")
-            expected = "proposed" if kind == "decision_adopted" else "adopted_reported"
-            if decision["status"] != expected:
-                raise DomainError("invalid_argument", "Invalid decision state transition")
-            refs += self.store.inherited_refs("decisions", event["decision_id"])
-            if kind == "decision_superseded":
-                replacement = self.store.body("decisions", event["replacement_id"], wid)
-                if (
-                    replacement.get("status") != "adopted_reported"
-                    or replacement["id"] == decision["id"]
-                ):
-                    raise DomainError(
-                        "invalid_argument", "Replacement must be another adopted decision"
-                    )
-                decision.update(status="superseded", replacement_id=replacement["id"])
-                refs += self.store.inherited_refs("decisions", replacement["id"])
-            else:
-                decision.update(status="adopted_reported", origin=event["origin"])
-            self.store.put_body("decisions", decision["id"], decision)
-            self.store.refs("decisions", decision["id"], refs)
-        elif kind == "scope_revised":
-            if "goal" in event:
-                body["goal"] = event["goal"]
-            body.update(
-                scope=self.scope_defaults(event["scope"]),
-                origin=event["origin"],
-                origin_event_id=eid,
-            )
-            self.store.refs("works", wid, refs)
-        elif kind == "issue_opened":
-            insert(
-                "issues",
-                "issue",
-                dict(text=event["text"], kind=event["issue_kind"], status="open", source_refs=refs),
-            )
-        elif kind == "issue_resolved":
-            issue = self.store.body("issues", event["issue_id"], wid)
-            if issue.get("status") != "open":
-                raise DomainError("invalid_argument", "Issue is not open")
-            refs += self.store.inherited_refs("issues", issue["id"])
-            issue.update(status="resolved_reported", resolution=event["resolution"])
-            self.store.put_body("issues", issue["id"], issue)
-            self.store.refs("issues", issue["id"], refs)
-        elif kind == "evidence_reported":
-            insert(
-                "evidence",
-                "evidence",
-                dict(
-                    claim=event["claim"],
-                    target_revision=event["target_revision"],
-                    observation=event["observation"],
-                    **(
-                        {"role": event.get("role", "support")}
-                        if self.config.contract_version == "2.0"
-                        else {}
-                    ),
-                ),
-            )
-        elif kind in {"criterion_registered", "criterion_result"}:
-            from .completion import record_criterion
-
-            refs += record_criterion(self, body, event)
-            self.store.refs("works", wid, refs)
-        elif kind == "progress_reported":
-            body.update(progress=dict(summary=event["summary"], next_actions=event["next_actions"]))
-            self.store.refs("works", wid, refs)
-        elif kind == "completion_reported":
-            for evidence_id in event["evidence_ids"]:
-                self.store.body("evidence", evidence_id, wid)
-                refs += self.store.inherited_refs("evidence", evidence_id)
-            body.update(
-                status="completion_reported",
-                completion_coverage="incomplete",
-                completion_reason="Required acceptance criteria are not independently verified",
-                completion_summary=event["summary"],
-                evidence_ids=event["evidence_ids"],
-                open_items=event["open_items"],
-            )
-            if self.config.contract_version == "2.0":
-                from .completion import coverage
-
-                body.update(
-                    completion_coverage=coverage(self, body, event["target_revision"]),
-                    completion_target_revision=event["target_revision"],
-                    completion_reason="Coverage uses agent-reported evidence; it is not independent host verification",
-                )
-            self.store.refs("works", wid, refs)
-        elif kind == "work_reopened":
-            if body["status"] != "completion_reported":
-                raise DomainError(
-                    "invalid_argument", "Only a reported-complete work can be reopened"
-                )
-            body.update(status="active", completion_coverage="incomplete")
-        if self.config.contract_version == "2.0" and kind != "completion_reported":
+        record = _Record(self, wid, body, json.loads(dumps(args["event"])))
+        handler = RECORD_HANDLERS.get(record.event["kind"])
+        if handler:
+            getattr(self, handler)(record)
+        event, result = record.event, record.result
+        if self.config.contract_version == "2.0" and event["kind"] != "completion_reported":
             body["completion_coverage"] = "incomplete"
         body.update(revision=result["revision"], updated_at=now())
         event.update(
-            event_id=eid,
+            event_id=record.eid,
             work_revision=body["revision"],
             provenance="agent_reported",
             created_at=now(),
         )
         self.db.execute(
-            "INSERT INTO events VALUES(?,?,?,?)", (eid, wid, body["revision"], dumps(event))
+            "INSERT INTO events VALUES(?,?,?,?)", (record.eid, wid, body["revision"], dumps(event))
         )
-        self.store.refs("events", eid, refs)
+        self.store.refs("events", record.eid, record.refs)
         self.db.execute(
             "UPDATE works SET revision=?,body=? WHERE id=?", (body["revision"], dumps(body), wid)
         )
@@ -374,6 +298,128 @@ class Service:
         self.store.bump()
         result["provenance"] = "agent_reported"
         return result
+
+    def _record_decision_proposed(self, record):
+        record.insert(
+            "decisions",
+            "decision",
+            dict(text=record.event["text"], status="proposed", source_refs=record.refs),
+        )
+
+    def _record_decision_transition(self, record):
+        event, kind = record.event, record.event["kind"]
+        decision = self.store.body("decisions", event["decision_id"], record.wid)
+        if decision.get("redacted"):
+            raise DomainError("input_incomplete", "Decision evidence was deleted")
+        expected = "proposed" if kind == "decision_adopted" else "adopted_reported"
+        if decision["status"] != expected:
+            raise DomainError("invalid_argument", "Invalid decision state transition")
+        record.refs += self.store.inherited_refs("decisions", event["decision_id"])
+        if kind == "decision_superseded":
+            replacement = self.store.body("decisions", event["replacement_id"], record.wid)
+            if (
+                replacement.get("status") != "adopted_reported"
+                or replacement["id"] == decision["id"]
+            ):
+                raise DomainError(
+                    "invalid_argument", "Replacement must be another adopted decision"
+                )
+            decision.update(status="superseded", replacement_id=replacement["id"])
+            record.refs += self.store.inherited_refs("decisions", replacement["id"])
+        else:
+            decision.update(status="adopted_reported", origin=event["origin"])
+        self.store.put_body("decisions", decision["id"], decision)
+        self.store.refs("decisions", decision["id"], record.refs)
+
+    def _record_scope_revised(self, record):
+        event, body = record.event, record.body
+        if "goal" in event:
+            body["goal"] = event["goal"]
+        body.update(
+            scope=self.scope_defaults(event["scope"]),
+            origin=event["origin"],
+            origin_event_id=record.eid,
+        )
+        self.store.refs("works", record.wid, record.refs)
+
+    def _record_issue_opened(self, record):
+        event = record.event
+        record.insert(
+            "issues",
+            "issue",
+            dict(
+                text=event["text"],
+                kind=event["issue_kind"],
+                status="open",
+                source_refs=record.refs,
+            ),
+        )
+
+    def _record_issue_resolved(self, record):
+        issue = self.store.body("issues", record.event["issue_id"], record.wid)
+        if issue.get("status") != "open":
+            raise DomainError("invalid_argument", "Issue is not open")
+        record.refs += self.store.inherited_refs("issues", issue["id"])
+        issue.update(status="resolved_reported", resolution=record.event["resolution"])
+        self.store.put_body("issues", issue["id"], issue)
+        self.store.refs("issues", issue["id"], record.refs)
+
+    def _record_evidence_reported(self, record):
+        event = record.event
+        role = (
+            {"role": event.get("role", "support")} if self.config.contract_version == "2.0" else {}
+        )
+        record.insert(
+            "evidence",
+            "evidence",
+            dict(
+                claim=event["claim"],
+                target_revision=event["target_revision"],
+                observation=event["observation"],
+                **role,
+            ),
+        )
+
+    def _record_criterion(self, record):
+        from .completion import record_criterion
+
+        record.refs += record_criterion(self, record.body, record.event)
+        self.store.refs("works", record.wid, record.refs)
+
+    def _record_progress_reported(self, record):
+        event = record.event
+        record.body.update(
+            progress=dict(summary=event["summary"], next_actions=event["next_actions"])
+        )
+        self.store.refs("works", record.wid, record.refs)
+
+    def _record_completion_reported(self, record):
+        event, body = record.event, record.body
+        for evidence_id in event["evidence_ids"]:
+            self.store.body("evidence", evidence_id, record.wid)
+            record.refs += self.store.inherited_refs("evidence", evidence_id)
+        body.update(
+            status="completion_reported",
+            completion_coverage="incomplete",
+            completion_reason="Required acceptance criteria are not independently verified",
+            completion_summary=event["summary"],
+            evidence_ids=event["evidence_ids"],
+            open_items=event["open_items"],
+        )
+        if self.config.contract_version == "2.0":
+            from .completion import coverage
+
+            body.update(
+                completion_coverage=coverage(self, body, event["target_revision"]),
+                completion_target_revision=event["target_revision"],
+                completion_reason="Coverage uses agent-reported evidence; it is not independent host verification",
+            )
+        self.store.refs("works", record.wid, record.refs)
+
+    def _record_work_reopened(self, record):
+        if record.body["status"] != "completion_reported":
+            raise DomainError("invalid_argument", "Only a reported-complete work can be reopened")
+        record.body.update(status="active", completion_coverage="incomplete")
 
     def paginate(self, items, args, revision, scope, default):
         offset = 0

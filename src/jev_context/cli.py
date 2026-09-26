@@ -159,8 +159,7 @@ def demo():
         )
 
 
-def main():
-    sys.stdout.reconfigure(encoding="utf-8")
+def build_parser():
     parser = argparse.ArgumentParser(prog="jev-context")
     commands = parser.add_subparsers(dest="command", required=True)
     setup = commands.add_parser(
@@ -191,6 +190,12 @@ def main():
             command.add_argument("--work-id", required=True)
             command.add_argument("--ttl", type=int, default=600)
             command.add_argument("--idle", type=int, default=90)
+    return parser
+
+
+def main():
+    sys.stdout.reconfigure(encoding="utf-8")
+    parser = build_parser()
     args = parser.parse_args()
     if args.command == "init":
         print(write_config(args.config, args.project_root, args.data_root, args.allow))
@@ -203,76 +208,95 @@ def main():
                 f"{key} = {json.dumps(value)}" for key, value in codex_entry(args.config).items()
             )
         )
+    elif args.command.startswith("session-"):
+        from .session_control import control
+
+        print(dumps(control(Config.load(args.config), args)))
     else:
-        config = Config.load(args.config)
-        if args.command.startswith("session-"):
-            from .session_control import control
+        CONFIGURED_COMMANDS[args.command](parser, Config.load(args.config), args)
 
-            print(dumps(control(config, args)))
-        elif args.command == "schema":
-            contract = CONTRACT_V2 if config.contract_version == "2.0" else CONTRACT
-            if args.tool not in contract["tools"]:
-                parser.error("Tool is not available in the configured contract")
-            print(
-                dumps(
-                    {
-                        "contract_version": config.contract_version,
-                        "tool": args.tool,
-                        "input_schema": contract["tools"][args.tool],
-                        "output_schema": contract["output"],
-                    }
-                )
-            )
-        elif args.command == "call":
-            try:
-                arguments = read_call_input(args.input)
-            except (OSError, ValueError, UnicodeError, RecursionError) as exc:
-                parser.error(str(exc))
-            engine = prepare_engine(config) if args.prepare_engine else None
-            service = None
-            try:
-                service = Service(config, engine=engine)
-                result = service.call(args.tool, arguments)
-                print(dumps(result))
-                if result["outcome"] in {"error", "conflict"}:
-                    raise SystemExit(1)
-            finally:
-                if service:
-                    service.close()
-                if engine:
-                    engine.close()
-        elif args.command == "migrate":
-            from .storage import Store
 
-            if config.contract_version != "2.0":
-                parser.error("Set contract_version=2.0 explicitly before migration")
-            store = Store(config, migrate=True)
-            print(
-                dumps(
-                    {
-                        "schema_version": store.meta()["schema_version"],
-                        "backup": str(store.path.with_suffix(".v1-backup.sqlite")),
-                    }
-                )
-            )
-            store.close()
-        elif args.command == "serve":
-            import anyio
+def run_schema(parser, config, args):
+    contract = CONTRACT_V2 if config.contract_version == "2.0" else CONTRACT
+    if args.tool not in contract["tools"]:
+        parser.error("Tool is not available in the configured contract")
+    print(
+        dumps(
+            {
+                "contract_version": config.contract_version,
+                "tool": args.tool,
+                "input_schema": contract["tools"][args.tool],
+                "output_schema": contract["output"],
+            }
+        )
+    )
 
-            from .server import serve
 
-            engine = prepare_engine(config, background=True) if args.prepare_engine else None
-            try:
-                anyio.run(serve, config, engine)
-            finally:
-                if engine:
-                    engine.close()
-        else:
-            service = Service(config)
-            try:
-                arguments = {"request_id": uid("req")}
-                if config.contract_version == "2.0":
-                    arguments["contract_version"] = "2.0"
-                print(dumps(service.call("workspace_status", arguments)))
-            finally:
-                service.close()
+def run_call(parser, config, args):
+    try:
+        arguments = read_call_input(args.input)
+    except (OSError, ValueError, UnicodeError, RecursionError) as exc:
+        parser.error(str(exc))
+    engine = prepare_engine(config) if args.prepare_engine else None
+    service = None
+    try:
+        service = Service(config, engine=engine)
+        result = service.call(args.tool, arguments)
+        print(dumps(result))
+        if result["outcome"] in {"error", "conflict"}:
+            raise SystemExit(1)
+    finally:
+        if service:
+            service.close()
+        if engine:
+            engine.close()
+
+
+def run_migrate(parser, config, args):
+    from .storage import Store
+
+    if config.contract_version != "2.0":
+        parser.error("Set contract_version=2.0 explicitly before migration")
+    store = Store(config, migrate=True)
+    print(
+        dumps(
+            {
+                "schema_version": store.meta()["schema_version"],
+                "backup": str(store.path.with_suffix(".v1-backup.sqlite")),
+            }
+        )
+    )
+    store.close()
+
+
+def run_serve(parser, config, args):
+    import anyio
+
+    from .server import serve
+
+    engine = prepare_engine(config, background=True) if args.prepare_engine else None
+    try:
+        anyio.run(serve, config, engine)
+    finally:
+        if engine:
+            engine.close()
+
+
+def run_status(parser, config, args):
+    service = Service(config)
+    try:
+        arguments = {"request_id": uid("req")}
+        if config.contract_version == "2.0":
+            arguments["contract_version"] = "2.0"
+        print(dumps(service.call("workspace_status", arguments)))
+    finally:
+        service.close()
+
+
+CONFIGURED_COMMANDS = {
+    "schema": run_schema,
+    "call": run_call,
+    "migrate": run_migrate,
+    "serve": run_serve,
+    "status": run_status,
+}

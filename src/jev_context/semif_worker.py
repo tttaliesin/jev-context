@@ -226,32 +226,40 @@ def main(protocol):
     print(json.dumps({"status": "ready", "device": device, "question_seconds": question_seconds,
                       "startup": startup}),
           file=protocol, flush=True)  # fmt: skip
+    serve(protocol, tokenizer, infer, static)
+
+
+def serve(protocol, tokenizer, infer, static):
     while True:
         line = sys.stdin.buffer.readline(65537)
         if not line or len(line) > 65536:
             break
         request = json.loads(line)
         try:
-            answers, tokens = {}, 0
-            # The host sends the state pre-serialized so its key order survives sorted JSON.
-            state = json.loads(request["state_json"])
-            for question_id, question in request["questions"].items():
-                options = [(label, text) for label, text in question["criteria"]]
-                labels = [label for label, _ in options]
-                if not 2 <= len(labels) <= len(LETTERS) or len(set(labels)) != len(labels):
-                    raise ValueError("Unsupported or duplicate options")
-                ids, slots = prompt_ids(tokenizer, state, question, options)
-                with contextlib.redirect_stdout(sys.stderr):
-                    answers[question_id] = answer(infer, static, ids, slots, labels)
-                tokens += len(ids)
-            result = {"evaluation_id": request["evaluation_id"], "answers": answers,
-                      "usage": {"input_tokens": tokens}}  # fmt: skip
+            result = evaluate(tokenizer, infer, static, request)
         except Exception:
             result = {
                 "evaluation_id": request.get("evaluation_id"),
                 "error": "input_or_runtime_incomplete",
             }
         print(json.dumps(result, ensure_ascii=False, allow_nan=False), file=protocol, flush=True)
+
+
+def evaluate(tokenizer, infer, static, request):
+    answers, tokens = {}, 0
+    # The host sends the state pre-serialized so its key order survives sorted JSON.
+    state = json.loads(request["state_json"])
+    for question_id, question in request["questions"].items():
+        options = [(label, text) for label, text in question["criteria"]]
+        labels = [label for label, _ in options]
+        if not 2 <= len(labels) <= len(LETTERS) or len(set(labels)) != len(labels):
+            raise ValueError("Unsupported or duplicate options")
+        ids, slots = prompt_ids(tokenizer, state, question, options)
+        with contextlib.redirect_stdout(sys.stderr):
+            answers[question_id] = answer(infer, static, ids, slots, labels)
+        tokens += len(ids)
+    return {"evaluation_id": request["evaluation_id"], "answers": answers,
+            "usage": {"input_tokens": tokens}}  # fmt: skip
 
 
 if __name__ == "__main__":
