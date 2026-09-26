@@ -225,3 +225,33 @@ def test_modal_credentials_excluded_even_with_broad_allowlist(service):
     for path in ("modal.toml", ".local/modal.toml", "modal-session.secret.json"):
         with pytest.raises(DomainError, match="Excluded file pattern"):
             service.config.check_path(path)
+
+
+@pytest.mark.parametrize(
+    ("engine", "profile_text", "message"),
+    [
+        ({"state": "disabled"}, None, "engine.profile_file"),
+        ({"state": "shadow", "profile_file": "missing.json"}, None, "Cannot read"),
+        ({"state": "shadow", "profile_file": "profile.json"}, "{not json", "Cannot read"),
+        ({"state": "shadow", "profile_file": "profile.json"}, '{"family": "laya"}', "Modal"),
+        ({"state": "shadow", "profile_file": "profile.json"}, "[]", "Modal"),
+        (
+            {"state": "shadow", "profile_file": "profile.json"},
+            '{"family": "openjev_modal"}',
+            "session_file",
+        ),
+    ],
+)
+def test_session_control_rejects_missing_or_foreign_profiles(
+    service, tmp_path, engine, profile_text, message
+):
+    if profile_text is not None:
+        (tmp_path / "profile.json").write_text(profile_text, encoding="utf-8")
+    if "profile_file" in engine:
+        engine = {**engine, "profile_file": str(tmp_path / engine["profile_file"])}
+    service.config.engine = engine
+    for command in ("session-status", "session-stop"):
+        with pytest.raises(DomainError) as error:
+            control(service.config, SimpleNamespace(command=command))
+        assert error.value.code == "invalid_argument"
+        assert message in error.value.message

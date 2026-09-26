@@ -11,11 +11,28 @@ from .service import Service
 from .storage import FileLock
 
 
-def control(config, args):
+def modal_profile(config):
+    """The configured OpenJev Modal profile, or a DomainError naming what is missing."""
+    if "profile_file" not in config.engine:
+        raise DomainError(
+            "invalid_argument", "Configure engine.profile_file with an OpenJev Modal profile first"
+        )
     profile_path = Path(config.engine["profile_file"])
-    profile = json.loads(profile_path.read_text(encoding="utf-8"))
-    if profile["family"] != "openjev_modal":
+    try:
+        profile = json.loads(profile_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise DomainError(
+            "invalid_argument", f"Cannot read the engine profile: {profile_path}"
+        ) from exc
+    if not isinstance(profile, dict) or profile.get("family") != "openjev_modal":
         raise DomainError("invalid_argument", "Configure an OpenJev Modal profile first")
+    if not isinstance(profile.get("session_file"), str):
+        raise DomainError("invalid_argument", "The OpenJev Modal profile has no session_file")
+    return profile_path, profile
+
+
+def control(config, args):
+    profile_path, profile = modal_profile(config)
     path = Path(profile["session_file"])
     try:
         session = descriptor(path)

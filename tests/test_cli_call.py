@@ -137,3 +137,12 @@ def test_modal_call_attaches_without_allocating_gpu(cli_config):
     assert engine["family"] == "openjev_modal"
     assert engine["state"] == "unavailable"
     assert not Path(profile.parent / "missing.secret.json").exists()
+
+
+def test_session_command_without_modal_profile_is_a_json_error(cli_config):
+    result = command(cli_config, "session-status")
+    assert result.returncode == 1
+    assert "Traceback" not in result.stderr
+    error = json.loads(result.stdout)["error"]
+    assert error["code"] == "invalid_argument"
+    assert "engine.profile_file" in error["message"]

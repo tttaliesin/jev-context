@@ -211,7 +211,11 @@ def main():
     elif args.command.startswith("session-"):
         from .session_control import control
 
-        print(dumps(control(Config.load(args.config), args)))
+        try:
+            print(dumps(control(Config.load(args.config), args)))
+        except DomainError as exc:
+            print(dumps({"error": {"code": exc.code, "message": exc.message}}))
+            raise SystemExit(1) from exc
     else:
         CONFIGURED_COMMANDS[args.command](parser, Config.load(args.config), args)
 
