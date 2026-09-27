@@ -40,6 +40,8 @@ Jev Context는 한국어 코딩 작업의 **목표·제약·근거를 저장하�
 
 **0.7.0 문제 해결:** 연결 영역에서 앱을 다시 연결하고 진단 요약을 미리 본 뒤 복사할 수 있습니다. 반복 조회 실패는 대기 간격을 늘리며, 창으로 돌아오면 상태를 재확인합니다. [사례 조사·적용·검증](docs/desktop-operations-research.md)
 
+**0.8.0 기억 복원 확인:** 연결 상세에서 서버 코드 변경 여부와 마지막 MCP 문맥 응답을 확인합니다. 복원 revision과 현재 기록을 구분하며 호스트 수신·답변 반영은 미확인으로 표시합니다. [적용 계획](docs/agent-memory-implementation-plan.md) · [검증 결과](docs/agent-memory-implementation-results.md)
+
 > **개발 버전입니다.** 모델 판단은 현재 `shadow` 모드로 기록되며 근거 선택을 바꾸지 않습니다. 일반 코딩 효율 개선과 모델의 독립 품질은 아직 입증하지 못했습니다. [검증 현황 보기](#검증-현황)
 
 ## 빠른 시작
@@ -139,7 +141,7 @@ Jev와 Workroom은 **독립 제품**입니다. Codex·Claude Desktop의 에이�
 | 구성 요소 | 버전 | 현재 범위 |
 |---|---|---|
 | Python 서비스 · MCP 서버 | 0.2.0 | 계약 1.0 기본 제공, 계약 2.0 명시 선택 |
-| Electron 관리 앱 | 0.7.0 | 프로젝트 준비·Codex 연결 안내·한국어/영어 전환을 포함한 Windows x64 앱 |
+| Electron 관리 앱 | 0.8.0 | 프로젝트 준비·Codex 연결 안내·한국어/영어 전환·문맥 응답 관측을 포함한 Windows x64 앱 |
 | 로컬 모델 판단 | shadow | 판단 기록만 수행. active 승격 평가를 통과한 프로필 없음 |
 
 모델 판단을 선택에 반영하려면 사람이 검토한 heldout 평가를 통과해야 합니다. 현재 구성은 **SemIf OpenVINO · Qwen3.5-4B INT8 · 로컬 GPU**입니다. [모델 준비와 제한](docs/models.md)

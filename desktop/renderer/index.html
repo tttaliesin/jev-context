@@ -82,7 +82,7 @@
         <section class="connection-bar" aria-labelledby="connection-heading">
           <details id="connection-details" class="connection-details">
             <summary><span id="connection-heading" class="connection-heading"><span data-i18n="연결">연결</span></span><span class="connection-summary"><span class="connection-item"><span class="connection-label"><span data-i18n="관리 도구">관리 도구</span></span><span id="connection-manager" class="connection-value"><span data-i18n="미확인">미확인</span></span></span><span class="connection-item"><span class="connection-label"><span data-i18n="MCP 통신">MCP 통신</span></span><span id="connection-mcp" class="connection-value"><span data-i18n="아직 점검 안 함">아직 점검 안 함</span></span></span><span class="connection-item"><span class="connection-label"><span data-i18n="현재 Codex 대화">현재 Codex 대화</span></span><span id="connection-desktop" class="connection-value"><span data-i18n="직접 관측 안 함">직접 관측 안 함</span></span></span></span><svg class="disclosure-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4"></path></svg></summary>
-            <div class="connection-explanation"><p id="connection-description"><span data-i18n="MCP 통신 점검과 현재 Codex 대화의 연결은 별도로 확인합니다.">MCP 통신 점검과 현재 Codex 대화의 연결은 별도로 확인합니다.</span></p><p id="connection-checked"><span data-i18n="연결 점검은 모델을 로드하지 않습니다.">연결 점검은 모델을 로드하지 않습니다.</span></p></div>
+            <div class="connection-explanation"><p id="connection-description"><span data-i18n="MCP 통신 점검과 현재 Codex 대화의 연결은 별도로 확인합니다.">MCP 통신 점검과 현재 Codex 대화의 연결은 별도로 확인합니다.</span></p><p id="connection-checked"><span data-i18n="연결 점검은 모델을 로드하지 않습니다.">연결 점검은 모델을 로드하지 않습니다.</span></p><p id="connection-runtime"></p><p id="connection-host-runtime"></p><p id="connection-memory"></p><p data-i18n="마지막 서버 관측입니다. 현재 연결·Codex 수신·답변 반영은 확인되지 않았습니다.">마지막 서버 관측입니다. 현재 연결·Codex 수신·답변 반영은 확인되지 않았습니다.</p><details><summary data-i18n="서버 식별 정보">서버 식별 정보</summary><pre id="connection-runtime-detail" class="runtime-detail"></pre></details></div>
           </details>
           <button id="check-connection" class="button button-quiet connection-check" type="button" disabled><span data-i18n="연결 점검">연결 점검</span></button>
           <button id="support-open" class="button button-quiet" type="button" aria-haspopup="dialog"><span data-i18n="문제 해결">문제 해결</span></button>
@@ -94,6 +94,7 @@
           <div id="work-detail" hidden>
             <div class="work-detail-heading"><h3 id="work-title"></h3><p id="work-meta" class="muted"></p></div>
             <p id="work-provenance" class="provenance-note"></p>
+            <p id="work-restore" class="provenance-note"></p>
             <div class="work-detail-grid">
               <section class="detail-section goal-section"><h4><span data-i18n="목표">목표</span></h4><p id="work-goal" class="body-copy"></p></section>
               <details id="work-constraints-details" class="detail-section constraints-section" open><summary><span data-i18n="유지할 제약">유지할 제약</span><svg class="disclosure-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4"></path></svg></summary><ul id="work-constraints" class="content-list"></ul></details>

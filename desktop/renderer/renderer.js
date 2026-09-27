@@ -365,6 +365,29 @@
     setText("connection-checked", connection.checked_at
       ? t("마지막 점검 {0}", dateLabel(connection.checked_at))
       : t("연결 점검은 모델을 로드하지 않습니다."));
+    const codeLabel = (value) => value === "matches_disk" ? t("설치 파일과 일치")
+      : value === "restart_required" ? t("코드 변경됨 · 재연결 필요") : t("버전 미확인");
+    setText("connection-runtime", t("앱 서버: {0}", codeLabel(connection.runtime?.code_state)));
+    const observation = connection.host_observation;
+    const host = observation?.last_status;
+    setText("connection-host-runtime", observation?.state === "settings_changed"
+      ? t("설정 변경 후 MCP 호출을 다시 확인하세요.")
+      : host ? t("마지막 MCP 상태 응답: {0} · {1}", codeLabel(host.runtime?.code_state), dateLabel(host.observed_at))
+      : t("MCP 서버 버전 관측 기록이 없습니다."));
+    const recall = observation?.last_context;
+    setText("connection-memory", recall ? recallLabel(recall) : t("문맥 응답 관측 기록이 없습니다."));
+    const runtimes = [connection.runtime, host?.runtime, recall?.runtime];
+    setText("connection-runtime-detail", runtimes.filter(Boolean).map(runtime =>
+      `${text(runtime.transport)} · ${text(runtime.service_version)} · ${text(runtime.instance_id)} · ${text(runtime.build_hash)}`
+    ).join("\n"));
+  }
+
+  function recallLabel(recall) {
+    const result = { ok: t("응답 준비됨"), partial: t("일부 문맥만 포함"), insufficient: t("필수 문맥 부족") };
+    const message = t("마지막 문맥 응답 {0} · {1} · 근거 {2}개 · {3} B",
+      dateLabel(recall.observed_at), result[recall.outcome] || t("미확인"), recall.evidence_count ?? 0, recall.wire_bytes ?? 0);
+    return recall.runtime?.code_state === "restart_required"
+      ? `${message} · ${t("코드 변경됨 · 재연결 필요")}` : message;
   }
 
   function renderWorkList() {
@@ -459,8 +482,14 @@
       : t("저장된 작업 기록입니다. 기록의 출처와 현재 검증 여부는 확인되지 않았습니다."));
     setText("work-goal", text(work.goal, t("등록된 목표가 없습니다.")));
     renderList("work-constraints", work.scope?.constraints, t("등록된 제약이 없습니다."));
-    setText("work-progress", text(work.progress?.summary, text(work.completion_summary, t("아직 진행 보고가 없습니다."))));
-    renderList("work-next-actions", work.progress?.next_actions);
+    const checkpoint = work.checkpoint || work.progress;
+    setText("work-progress", text(checkpoint?.summary, text(work.completion_summary, t("아직 진행 보고가 없습니다."))));
+    renderList("work-next-actions", work.status === "completion_reported" ? [] : checkpoint?.next_actions);
+    const recall = state.snapshot?.connection?.host_observation?.last_context;
+    setText("work-restore", recall?.work_id === work.work_id
+      ? `${recallLabel(recall)} · ${number(recall.work_revision) && recall.work_revision === work.revision
+        ? t("저장된 작업 버전과 일치") : t("현재 작업 버전의 복원은 미확인")}`
+      : t("이 작업의 최근 문맥 응답 기록이 없습니다."));
     const openIssues = (Array.isArray(work.issues) ? work.issues : []).filter((issue) => issue.status === "open");
     const issues = [...(Array.isArray(work.open_items) ? work.open_items : []), ...openIssues];
     $("work-issues-section").hidden = renderList("work-issues", issues) === 0;

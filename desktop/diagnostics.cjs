@@ -27,6 +27,11 @@ function diagnosticReport({ appVersion, versions = {}, platform, arch, files = {
       worker_present: !!engine.worker_pid, idle_timeout_seconds: count(engine.idle_timeout_seconds),
       mcp_transport: choose(connection.mcp_stdio, ['verified', 'failed', 'not_checked']),
       mcp_checked_at: date(connection.checked_at), host_session: 'not_observed',
+      app_code: choose(connection.runtime?.code_state, ['matches_disk', 'restart_required', 'unknown']),
+      mcp_code: choose(connection.host_observation?.last_status?.runtime?.code_state, ['matches_disk', 'restart_required', 'unknown']),
+      context_response_at: date(connection.host_observation?.last_context?.observed_at),
+      context_outcome: choose(connection.host_observation?.last_context?.outcome, ['ok', 'partial', 'insufficient']),
+      host_receipt: 'not_observed', answer_use: 'not_observed',
       workspace_error: snapshot.workspace_error ? errorCode(snapshot.workspace_error.code) : null,
     } : null,
     last_failure: lastFailure ? {

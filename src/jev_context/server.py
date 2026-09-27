@@ -11,6 +11,7 @@ from mcp.shared.message import SessionMessage
 from mcp.types import CallToolResult, ErrorData, JSONRPCMessage, TextContent, Tool, ToolAnnotations
 
 from .common import DomainError, digest, dumps, failed, strict_loads
+from .runtime_observation import RuntimeIdentity, observe_response
 from .service import CONTRACT, CONTRACT_V2, Service
 
 DESCRIPTIONS = {
@@ -98,6 +99,7 @@ async def strict_stdio(contract=CONTRACT):
 
 
 async def serve(config, engine=None, config_path=None):
+    runtime = RuntimeIdentity("mcp_stdio")
     loaded_hash = digest(Path(config_path).read_bytes()) if config_path else None
     contract = CONTRACT_V2 if config.contract_version == "2.0" else CONTRACT
     server = Server("jev-context", version="0.2.0")
@@ -144,11 +146,25 @@ async def serve(config, engine=None, config_path=None):
                     service.close()
 
         result = await anyio.to_thread.run_sync(invoke, limiter=limiter)
+        identity = runtime.snapshot(config.contract_version)
+        if name == "workspace_status" and result.get("outcome") == "ok":
+            result["data"]["runtime"] = identity
+        client = server.request_context.session.client_params
+        client_name = client.clientInfo.name if client else ""
+        await anyio.to_thread.run_sync(
+            observe_response,
+            config,
+            name,
+            arguments,
+            result,
+            identity,
+            client_name,
+            loaded_hash,
+            limiter=limiter,
+        )
         if config_path and name == "workspace_status":
             from .onboarding import observe_confirmation
 
-            client = server.request_context.session.client_params
-            client_name = client.clientInfo.name if client else ""
             await anyio.to_thread.run_sync(
                 observe_confirmation,
                 config,

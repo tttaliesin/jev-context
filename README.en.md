@@ -42,6 +42,8 @@ Jev Context is a **local context coordinator that stores and restores goals, con
 
 **Troubleshooting in 0.7.0:** Reconnect the app and preview or copy a diagnostic summary from the connection area. Repeated refresh failures increase the retry interval; returning to the window rechecks current state. [Research, implementation and validation (Korean)](docs/desktop-operations-research.md)
 
+**Memory observations in 0.8.0:** Connection details show server code changes and the last prepared MCP context response. Work revisions are compared with the stored record; host receipt and use in an answer remain unverified. [Plan](docs/agent-memory-implementation-plan.md) · [Validation](docs/agent-memory-implementation-results.md) (Korean).
+
 > **Development version.** Model judgments currently run in `shadow` mode and do not change evidence selection. General coding efficiency gains and independent model quality have not been demonstrated. [See validation status](#validation-status).
 
 ## Quick start
@@ -143,7 +145,7 @@ The authoritative contracts are [contracts.json](src/jev_context/contracts.json)
 | Component | Version | Current scope |
 |---|---|---|
 | Python service / MCP server | 0.2.0 | Contract 1.0 by default; contract 2.0 by explicit selection |
-| Electron manager | 0.7.0 | Windows x64 app with project setup, Codex connection guidance, and Korean/English UI |
+| Electron manager | 0.8.0 | Windows x64 app with project setup, Codex connection guidance, Korean/English UI, and context response observations |
 | Local model judgment | shadow | Records judgments only; no profile has passed the active promotion gate |
 
 Model judgments must pass a human-reviewed heldout evaluation before they can affect selection. The current configuration is **SemIf OpenVINO · Qwen3.5-4B INT8 · local GPU**. [Model setup and limits](docs/models.md) (Korean).

@@ -4,6 +4,23 @@
 (function (root) {
   'use strict';
   const en = {
+  "설치 파일과 일치": "Matches installed files",
+  "코드 변경됨 · 재연결 필요": "Code changed · reconnect required",
+  "버전 미확인": "Version unverified",
+  "앱 서버: {0}": "App server: {0}",
+  "설정 변경 후 MCP 호출을 다시 확인하세요.": "Settings changed. Verify with a new MCP call.",
+  "마지막 MCP 상태 응답: {0} · {1}": "Last MCP status response: {0} · {1}",
+  "MCP 서버 버전 관측 기록이 없습니다.": "No MCP server version observation recorded.",
+  "문맥 응답 관측 기록이 없습니다.": "No context response observation recorded.",
+  "응답 준비됨": "Response prepared",
+  "일부 문맥만 포함": "Partial context",
+  "필수 문맥 부족": "Required context missing",
+  "마지막 문맥 응답 {0} · {1} · 근거 {2}개 · {3} B": "Last context response {0} · {1} · {2} evidence items · {3} B",
+  "저장된 작업 버전과 일치": "Matches stored work revision",
+  "현재 작업 버전의 복원은 미확인": "Restore of current work revision unverified",
+  "이 작업의 최근 문맥 응답 기록이 없습니다.": "No recent context response recorded for this work.",
+  "마지막 서버 관측입니다. 현재 연결·Codex 수신·답변 반영은 확인되지 않았습니다.": "Last server observation only. Current connection, Codex receipt and answer use are unverified.",
+  "서버 식별 정보": "Server identity details",
   "문제 해결": "Troubleshoot",
   "연결을 복구하고 진단 요약을 확인하세요.": "Recover your connection and review diagnostics.",
   "앱 연결 복구": "Recover app connection",

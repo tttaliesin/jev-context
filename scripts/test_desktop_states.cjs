@@ -1208,6 +1208,39 @@ async function closeCommands(page) {
       await assertNoModelActions(page);
     });
 
+    const runtime = { transport: 'mcp_stdio', service_version: '0.2.0', instance_id: 'runtime-fixture', build_hash: 'a'.repeat(64), code_state: 'restart_required' };
+    const receipt = { observed_at: '2026-09-27T14:00:00Z', outcome: 'partial', evidence_count: 2, wire_bytes: 4800,
+      work_id: 'work-fixture-001', work_revision: 0, runtime };
+    await scenario('memory-observation-is-not-current-host-use', fixture('idle', { connection: {
+      runtime: { ...runtime, transport: 'desktop_bridge', code_state: 'matches_disk' },
+      host_observation: { state: 'recorded', last_status: { runtime, observed_at: receipt.observed_at }, last_context: receipt },
+    } }), async page => {
+      await page.locator('#connection-details summary').first().click();
+      await waitText(page, '#connection-runtime', '앱 서버: 설치 파일과 일치');
+      assert.match(await page.locator('#connection-host-runtime').textContent(), /재연결 필요/);
+      assert.match(await page.locator('#connection-memory').textContent(), /일부 문맥만 포함/);
+      await waitText(page, '#connection-desktop', '직접 관측 안 함');
+      await page.locator('[data-work-id="work-fixture-001"]').click();
+      assert.match(await page.locator('#work-restore').textContent(), /현재 작업 버전의 복원은 미확인/);
+      await assertNoModelActions(page);
+    }, { width: 820, height: 800 });
+    await scenario('memory-missing-and-other-work', fixture('idle', { connection: {
+      host_observation: { state: 'recorded', last_context: { ...receipt, work_id: 'work-another' } },
+    } }), async page => {
+      await page.locator('[data-work-id="work-fixture-001"]').click();
+      await waitText(page, '#work-restore', '이 작업의 최근 문맥 응답 기록이 없습니다.');
+      await waitText(page, '#connection-runtime', '앱 서버: 버전 미확인');
+      await assertNoModelActions(page);
+    });
+    const completed = work(1, { status: 'completion_reported', completion_summary: '완료 요약',
+      progress: { summary: '낡은 진행', next_actions: ['다시 실행하면 안 되는 단계'] },
+      checkpoint: { summary: '최신 완료 요약', next_actions: [] } });
+    await scenario('memory-checkpoint-hides-obsolete-next-action', fixture('idle', { rows: [completed] }), async page => {
+      await page.locator('[data-work-id="work-fixture-001"]').click();
+      await waitText(page, '#work-progress', '최신 완료 요약');
+      assert.doesNotMatch(await page.locator('#work-next-actions').textContent(), /다시 실행/);
+      await assertNoModelActions(page);
+    });
     assert.deepEqual(hashes(), report.sourceHashes, 'Renderer changed during this run; rerun after edits finish');
     report.passed = report.scenarios.every(item => item.passed) && report.pageErrors.length === 0;
     if (!report.passed) process.exitCode = 1;

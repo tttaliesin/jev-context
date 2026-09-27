@@ -422,3 +422,4 @@ details[open] > summary .disclosure-icon { transform: rotate(180deg); }
 .retry-schedule { color: var(--muted); font-size: 12px; margin: 8px 24px; }
 #support-open { white-space: nowrap; }
 @media (max-width: 900px) { .connection-bar { flex-wrap: wrap; } .connection-details { min-width: 0; flex: 1 1 100%; } }
+.runtime-detail { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; }

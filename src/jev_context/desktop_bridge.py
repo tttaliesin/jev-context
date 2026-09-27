@@ -16,6 +16,7 @@ from pathlib import Path
 from .cli import prepare_engine
 from .common import DomainError, dumps, now, strict_loads, uid
 from .policy import Config
+from .runtime_observation import RuntimeIdentity, observation_status
 from .service import CONTRACT, CONTRACT_V2, Service
 
 MAX_REQUEST = 65536
@@ -35,6 +36,7 @@ def error_data(exc):
 class DesktopBridge:
     def __init__(self, config_path):
         self.engine = None
+        self.runtime = RuntimeIdentity("desktop_bridge")
         self.select(config_path)
 
     def select(self, config_path):
@@ -165,7 +167,11 @@ class DesktopBridge:
             },
             "sources": {"count": data.get("sources"), "stale_sources": data.get("stale_sources")},
             "workspace_error": workspace_error,
-            "connection": dict(self.connection),
+            "connection": {
+                **self.connection,
+                "runtime": self.runtime.snapshot(self.config.contract_version),
+                "host_observation": observation_status(self.config, self.config_path),
+            },
         }
 
     def require_engine(self):
@@ -188,6 +194,7 @@ class DesktopBridge:
         import anyio
         from mcp import ClientSession, StdioServerParameters
         from mcp.client.stdio import stdio_client
+        from mcp.types import Implementation
 
         arguments = ["-m", "jev_context", "serve", "--config", str(self.config_path)]
         # Test the MCP transport/database contract only. Model state comes from the separate
@@ -195,7 +202,12 @@ class DesktopBridge:
         environment = {**os.environ, "PYTHONPATH": str(Path(__file__).resolve().parents[1])}
         parameters = StdioServerParameters(command=sys.executable, args=arguments, env=environment)
         with anyio.fail_after(15):
-            async with stdio_client(parameters) as streams, ClientSession(*streams) as session:
+            async with (
+                stdio_client(parameters) as streams,
+                ClientSession(
+                    *streams, client_info=Implementation(name="jev-context-probe", version="1")
+                ) as session,
+            ):
                 await session.initialize()
                 listing = await session.list_tools()
                 contract = CONTRACT_V2 if self.config.contract_version == "2.0" else CONTRACT
@@ -219,6 +231,7 @@ class DesktopBridge:
                     "tools": sorted(tool.name for tool in listing.tools),
                     "project_id": self.config.project_id,
                     "wire_verified": True,
+                    "probe_runtime": data["data"].get("runtime"),
                 }
 
     def connection_check(self):
