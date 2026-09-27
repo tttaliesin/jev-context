@@ -89,6 +89,10 @@ async function launch(userData, hidden) {
   page = await application.firstWindow();
   page.setDefaultTimeout(15000);
   page.on('pageerror', error => { report.pageErrors.push(error.message); save(); });
+  try {
+    await page.locator('#setup-dialog').waitFor({ state: 'visible', timeout: 5000 });
+    await page.locator('#setup-close').click();
+  } catch (error) { if (await page.locator('#setup-dialog').isVisible()) throw error; }
   await page.waitForFunction(() => document.getElementById('connection-manager')?.textContent === '연결됨'
     && document.getElementById('work-panel')?.getAttribute('aria-busy') === 'false', null, { timeout: 25000 });
   await page.waitForFunction(() => {

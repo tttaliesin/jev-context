@@ -280,7 +280,7 @@ def run_serve(parser, config, args):
 
     engine = prepare_engine(config, background=True) if args.prepare_engine else None
     try:
-        anyio.run(serve, config, engine)
+        anyio.run(serve, config, engine, args.config)
     finally:
         if engine:
             engine.close()

@@ -1,5 +1,13 @@
 # Codex 연결
 
+## 앱에서 연결하기
+
+관리 앱 0.4.0의 **Codex 연결**에서 프로젝트 폴더 선택, 새 설정과 작업 DB 생성, MCP·Skill 미리보기와 설치, 통신 점검, 확인 문구 복사, 설치 되돌리기를 진행할 수 있다. 처음 사용하는 경우 [앱의 단계별 안내](desktop-manager.md#처음-연결하기--040)를 권장한다.
+
+Codex에서 같은 프로젝트를 열고 신뢰 여부를 확인하는 단계와 실제 확인 문구 전달은 사용자가 한다. 앱이 Codex의 계정·신뢰·승인 정책을 바꾸거나 대화를 자동 전송하지 않는다. 서버 응답만으로 Codex 연결을 완료 처리하지 않는다.
+
+## CLI로 연결하기
+
 목표는 프로젝트 하나에 고정된 로컬 MCP 서버 연결
 공식 근거는 [Codex MCP 설정](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)과 [Codex Skills](https://developers.openai.com/codex/skills)
 실행기와 설정 파일의 절대 경로는 `jev-context codex-config` 결과로 생성

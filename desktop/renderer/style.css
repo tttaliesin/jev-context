@@ -362,3 +362,48 @@ details[open] > summary .disclosure-icon { transform: rotate(180deg); }
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .preparing-indicator > span { width: 100%; }
 }
+.setup-launch { order: 3; white-space: nowrap; }
+.setup-dialog { color: var(--text); background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 0; width: min(780px, calc(100vw - 40px)); max-height: calc(100dvh - 32px); overflow: hidden; }
+.setup-dialog[open] { display: flex; flex-direction: column; }
+.setup-dialog::backdrop { background: #000a; backdrop-filter: blur(3px); }
+.setup-header { padding: 24px 28px 18px; display: flex; align-items: flex-start; gap: 16px; justify-content: space-between; }
+.setup-eyebrow { color: var(--accent); letter-spacing: .12em; font-size: 11px; margin-bottom: 8px; }
+.setup-header h2 { font-size: 23px; line-height: 1.4; margin-bottom: 6px; }
+.setup-header p:last-child, .setup-copy { color: var(--muted); font-size: 12px; line-height: 1.7; }
+.setup-steps { display: flex; gap: 0; padding: 0 28px; margin: 0; list-style: none; flex-shrink: 0; border-bottom: 1px solid var(--border); }
+.setup-steps li { flex: 1; color: var(--faint); padding: 10px 0; border-bottom: 2px solid transparent; font-size: 12px; }
+.setup-steps li.active { color: var(--accent); border-color: var(--accent); }
+.setup-body { padding: 20px 28px; overflow: auto; min-height: 0; }
+.setup-step h3 { font-size: 16px; margin-bottom: 10px; }
+.setup-step h4 { font-size: 13px; }
+.setup-project-card { margin: 16px 0; padding: 15px; border: 1px solid var(--border); border-radius: 7px; background: var(--background); }
+.setup-project-card > span { font-size: 11px; }
+.setup-project-card > strong { display: block; margin: 5px 0 13px; overflow-wrap: anywhere; font-weight: 500; }
+.setup-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.setup-dialog textarea { width: 100%; display: block; resize: vertical; border: 1px solid var(--border); border-radius: 5px; background: var(--background); color: var(--text); padding: 10px; margin: 8px 0; font: 12px/1.6 Consolas, "Malgun Gothic", monospace; min-height: 65px; }
+.setup-dialog textarea:focus-visible { outline: 2px solid var(--accent); }
+#setup-allow { margin-top: 14px; }
+#setup-allow label { font-size: 12px; }
+.setup-files { list-style: none; margin: 16px 0; padding: 0; }
+.setup-files li { display: flex; gap: 12px; align-items: baseline; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+.setup-files strong { color: var(--accent); flex: 0 0 85px; }
+.setup-files span { overflow-wrap: anywhere; min-width: 0; }
+.setup-details { border: 1px solid var(--border); margin: 10px 0; padding: 10px 12px; border-radius: 5px; font-size: 12px; }
+.setup-details summary::before { content: '+ '; color: var(--accent); }
+.setup-details[open] summary::before { content: '− '; }
+.setup-details pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; max-height: 210px; overflow: auto; color: var(--muted); }
+.setup-checks { display: grid; grid-template-columns: 1fr; border: 1px solid var(--border); padding: 0 14px; border-radius: 7px; font-size: 12px; }
+.setup-checks > div { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; }
+.setup-checks dd { color: var(--muted); margin: 0; text-align: right; }
+.setup-checks dd.confirmed { color: var(--accent); }
+.setup-instructions { margin: 16px 0; }
+.setup-instructions ol { color: var(--muted); font-size: 12px; padding-left: 19px; line-height: 1.8; margin: 6px 0; }
+.setup-footer { display: flex; align-items: center; gap: 8px; padding: 15px 28px; border-top: 1px solid var(--border); flex-shrink: 0; }
+.setup-spacer { flex: 1; }
+.setup-error { padding: 12px; color: var(--red); background: #ef9a9a0a; border: 1px solid #ef9a9a44; border-radius: 5px; margin-bottom: 12px; overflow-wrap: anywhere; font-size: 12px; }
+.setup-progress { color: var(--muted); font-size: 12px; margin-bottom: 10px; }
+.setup-progress:empty { display: none; }
+.setup-ready-mark { color: var(--accent); font-size: 36px; margin: 8px 0 16px; }
+#setup-step-4 { padding: 10px 0 25px; }
+#setup-step-4 p { margin-top: 12px; }
+@media (max-height: 650px) { .setup-header { padding: 14px 20px; } .setup-body { padding: 14px 20px; } .setup-footer { padding: 12px 20px; } .setup-header h2 { font-size: 20px; } }

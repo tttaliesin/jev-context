@@ -3,6 +3,7 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   const api = window.jev;
+  let onboarding;
   const preferenceStorage = "jev.ui.v1";
   const validWorkId = (value) => typeof value === "string" && /^work-[a-zA-Z0-9-]{1,100}$/.test(value);
   function readPreferences() {
@@ -159,6 +160,7 @@
       action("reset-width", "목록 너비 기본값으로", "기본 너비 260픽셀 복원", "", null, resetSidebarWidth),
       action("refresh", "프로젝트 상태 새로고침", "현재 상태와 작업 목록 다시 읽기", "F5", $("refresh"), () => { void refresh(); }),
       action("connection", "연결 점검", "별도 MCP 통신 확인", "", $("check-connection"), () => { void perform("checkConnection"); }),
+      action("setup", "Codex 연결 설정", "프로젝트 준비 · 설치 · 확인 · 되돌리기", "", $("setup-open"), () => { void onboarding?.open(); }),
       action("project", "프로젝트 설정 열기", "다른 프로젝트 설정 선택", "", $("select-project"), () => { void perform("selectProject"); }),
       action("shortcuts", "키보드 단축키", "사용할 수 있는 단축키 안내", "F1", null, showShortcuts),
     ];
@@ -566,6 +568,7 @@
   }
 
   async function refresh({ append = false, silent = false } = {}) {
+    if (silent && onboarding?.isOpen()) return;
     if (state.loading || state.action) return;
     const generation = state.overviewGeneration;
     state.loading = true;
@@ -745,6 +748,7 @@
     renderWorkList();
   });
   document.addEventListener("keydown", (event) => {
+    if (onboarding?.isOpen()) return;
     if (event.isComposing) return;
     const key = event.key.toLowerCase();
     const control = event.ctrlKey && !event.altKey && !event.shiftKey && !event.metaKey;
@@ -831,5 +835,12 @@
   } });
   setSidebarCollapsed(preferences.sidebarCollapsed, false);
   updateButtons();
-  void refresh().finally(scheduleRefresh);
+  onboarding = window.createJevOnboarding?.({ refresh, selectExisting: async () => {
+    ++state.overviewGeneration;
+    const snapshot = await invoke("selectProject");
+    if (!snapshot) return false;
+    applyOverview(snapshot); return true;
+  },
+    beforeOpen: () => { state.commandMenu?.close(); closeShortcuts(); closeDiagnostics(); } });
+  void refresh().finally(() => { scheduleRefresh(); void onboarding?.start(); });
 })();

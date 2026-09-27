@@ -7,6 +7,7 @@
     <title>JEV · 로컬 작업 관리자</title>
     <link rel="stylesheet" href="style.css" />
     <script src="command-menu.js" defer></script>
+    <script src="onboarding.js" defer></script>
     <script src="renderer.js" defer></script>
   </head>
   <body>
@@ -44,6 +45,7 @@
       <div id="sidebar-resize" class="sidebar-resize" role="separator" tabindex="0" aria-orientation="vertical" aria-controls="sidebar" aria-label="작업 목록 너비" aria-valuemin="220" aria-valuemax="400" aria-valuenow="260" aria-valuetext="260픽셀" title="드래그 또는 좌우 방향키로 너비 조절 · 더블클릭으로 기본 너비"></div>
 
       <header class="topbar">
+        <button id="setup-open" class="button button-secondary setup-launch" type="button">Codex 연결</button>
         <button id="sidebar-toggle" class="icon-button sidebar-toggle" type="button" aria-label="작업 목록 접기" aria-controls="sidebar" aria-expanded="true" title="작업 목록 접기 · Ctrl+B"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2"></rect><path d="M7.5 3.5v13m5-9-2 2.5 2 2.5"></path></svg></button>
         <div class="project-location">
           <button id="select-project" class="icon-button project-select" type="button" aria-label="프로젝트 설정 열기" title="프로젝트 설정 열기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10H3Z"></path><path d="m9 12 3 3 3-3"></path></svg></button>
@@ -99,6 +101,38 @@
         <footer class="main-footer"><span id="source-summary">등록 자료 확인 중</span><span id="refreshed-at">아직 조회하지 않음</span></footer>
       </main>
     </div>
+    <dialog id="setup-dialog" class="setup-dialog" aria-labelledby="setup-title" aria-describedby="setup-subtitle">
+      <header class="setup-header"><div><p class="setup-eyebrow">JEV / 시작하기</p><h2 id="setup-title">작업할 프로젝트를 연결하세요</h2><p id="setup-subtitle">프로젝트 준비부터 Codex 연결까지 한곳에서 진행합니다.</p></div><button id="setup-close" class="button button-quiet" type="button" aria-label="연결 설정 닫기">닫기</button></header>
+      <ol id="setup-steps" class="setup-steps" aria-label="연결 진행 단계"><li>1 프로젝트</li><li>2 Codex 연결</li><li>3 연결 확인</li><li>4 시작</li></ol>
+      <div id="setup-body" class="setup-body">
+        <p id="setup-error" class="setup-error" role="alert" hidden></p>
+        <p id="setup-progress" class="setup-progress" role="status" aria-live="polite"></p>
+        <section id="setup-step-1" class="setup-step">
+          <h3>프로젝트 폴더 선택</h3><p class="setup-copy">기존 설정이 있으면 그대로 사용합니다. 새 프로젝트는 모델 없이 시작합니다.</p>
+          <div class="setup-project-card"><span class="muted">선택한 프로젝트</span><strong id="setup-project">아직 선택하지 않음</strong><div class="setup-actions"><button id="setup-folder" class="button button-secondary" type="button">폴더 선택</button><button id="setup-existing" class="button button-quiet" type="button">기존 설정 파일 열기</button></div></div>
+          <p id="setup-environment" class="setup-copy">실행 환경 확인 중…</p><button id="setup-python" class="button button-quiet" type="button">Python 선택</button>
+          <div id="setup-allow"><label for="setup-paths">검색에 사용할 수 있는 파일 범위</label><textarea id="setup-paths" rows="3" spellcheck="false">README.md&#10;docs/*.md</textarea><p class="setup-copy">한 줄에 상대 경로 하나. 비우면 파일 수집을 허용하지 않습니다. 설정 시 파일을 자동으로 읽거나 등록하지 않습니다.</p></div>
+        </section>
+        <section id="setup-step-2" class="setup-step" hidden>
+          <h3>적용할 연결 설정</h3><p class="setup-copy">선택한 프로젝트의 Jev 항목만 적용합니다. 기존 연결 파일은 백업하며 다른 MCP 설정은 유지합니다.</p>
+          <ul id="setup-files" class="setup-files"></ul>
+          <details class="setup-details"><summary>Jev 연결 설정 보기</summary><pre id="setup-entry"></pre></details>
+          <details class="setup-details"><summary>설치할 Skill 보기</summary><pre id="setup-skill"></pre></details>
+          <button id="setup-preview" class="button button-quiet" type="button">변경 내용 다시 보기</button>
+        </section>
+        <section id="setup-step-3" class="setup-step" hidden>
+          <h3>연결을 단계별로 확인합니다</h3>
+          <dl class="setup-checks"><div><dt>연결 설정</dt><dd id="setup-config-status">미확인</dd></div><div><dt>MCP 서버 응답</dt><dd id="setup-transport">미확인</dd></div><div><dt>Codex 확인 요청</dt><dd id="setup-receipt">아직 받지 않음</dd></div></dl>
+          <button id="setup-check" class="button button-secondary" type="button">서버 통신 점검</button>
+          <div class="setup-instructions"><h4>Codex에서 마지막 한 단계</h4><ol><li>위에서 선택한 같은 프로젝트 폴더를 Codex에서 여세요.</li><li>프로젝트 신뢰를 확인하고 MCP 설정을 다시 읽으세요. 반영되지 않으면 Codex를 재시작하세요.</li><li>아래 확인 문구를 복사해 Codex 대화에 붙여넣으세요. 앱이 요청을 받으면 자동으로 표시합니다.</li></ol></div>
+          <div class="setup-actions"><button id="setup-challenge" class="button button-secondary" type="button">확인 문구 만들기</button><button id="setup-copy" class="button button-quiet" type="button" disabled>확인 문구 복사</button></div>
+          <textarea id="setup-prompt" rows="3" readonly aria-label="Codex에 붙여넣을 연결 확인 문구" placeholder="확인 문구를 만들면 여기에 표시됩니다."></textarea>
+          <p class="setup-copy">확인 문구는 10분간 유효합니다. 수신은 해당 도구 호출의 관측이며 현재 대화의 영구 연결을 보장하지 않습니다.</p>
+        </section>
+        <section id="setup-step-4" class="setup-step" hidden><div class="setup-ready-mark" aria-hidden="true">✓</div><h3 id="setup-result-title">프로젝트를 사용할 준비가 됐습니다</h3><p id="setup-result" class="setup-copy"></p><p class="setup-copy">코딩 대화는 Codex에서 계속하세요. 이 앱에서는 모델과 저장된 작업 기록을 관리할 수 있습니다.</p></section>
+      </div>
+      <footer class="setup-footer"><button id="setup-restore" class="button button-quiet" type="button" hidden>설정 되돌리기</button><button id="setup-back" class="button button-quiet" type="button" hidden>뒤로</button><span class="setup-spacer"></span><button id="setup-later" class="button button-quiet" type="button">나중에</button><button id="setup-next" class="button button-primary" type="button">프로젝트 준비</button></footer>
+    </dialog>
     <dialog id="command-dialog" class="command-dialog" aria-labelledby="command-title" aria-describedby="command-scope">
       <header class="command-header"><div><h2 id="command-title">빠른 실행</h2><p id="command-scope">명령과 불러온 작업에서 찾습니다. 전체 저장소 검색은 아닙니다.</p></div><button id="command-close" class="icon-button" type="button" aria-label="빠른 실행 닫기" title="닫기 · Esc"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 6 8 8M14 6l-8 8"></path></svg></button></header>
       <div class="command-search"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"></circle><path d="m13 13 4 4"></path></svg><label class="sr-only" for="command-input">명령 또는 불러온 작업 찾기</label><input id="command-input" type="text" role="combobox" aria-controls="command-results" aria-expanded="true" aria-autocomplete="list" aria-describedby="command-scope" placeholder="명령 또는 작업 이름 입력" autocomplete="off" spellcheck="false" autofocus /><span id="command-count" class="command-count" role="status" aria-live="polite"></span></div>

@@ -96,6 +96,10 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     }
 
     page.on('pageerror', error => report.consoleErrors.push(error.message));
+    try {
+      await page.locator('#setup-dialog').waitFor({ state: 'visible', timeout: 5000 });
+      await page.locator('#setup-close').click();
+    } catch (error) { if (await page.locator('#setup-dialog').isVisible()) throw error; }
     await page.waitForFunction(() => document.getElementById('connection-manager')?.textContent === '연결됨', null, { timeout: 20000 });
     await page.waitForFunction(() => {
       const mark = document.querySelector('img.brand-mark');

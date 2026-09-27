@@ -1,11 +1,12 @@
 'use strict';
 
-const { app, BrowserWindow, dialog, ipcMain, protocol, net, session, screen } = require('electron');
+const { app, BrowserWindow, dialog, clipboard, ipcMain, protocol, net, session, screen } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { BridgeClient } = require('./bridge-client.cjs');
 const { normalizeWindowState, loadWindowState, saveWindowState } = require('./window-state.cjs');
+const { createSetupController } = require('./setup-client.cjs');
 
 app.setName('Jev Context');
 const appId = 'com.jev.context.manager';
@@ -18,6 +19,7 @@ protocol.registerSchemesAsPrivileged([{ scheme: 'jev', privileges: {
 const pages = new Map([
   ['/', 'index.html'], ['/index.html', 'index.html'],
   ['/style.css', 'style.css'], ['/renderer.js', 'renderer.js'], ['/command-menu.js', 'command-menu.js'],
+  ['/onboarding.js', 'onboarding.js'],
   ['/jev-mark.svg', '../assets/jev-mark.svg'],
 ]);
 let window;
@@ -40,7 +42,7 @@ function loadSettings() {
   const override = process.argv.indexOf('--project-config');
   return {
     projectRoot,
-    pythonPath: path.resolve(base, launch.pythonPath || path.join(projectRoot, '.venv', 'Scripts', 'python.exe')),
+    pythonPath: saved.pythonPath || path.resolve(base, launch.pythonPath || path.join(projectRoot, '.venv', 'Scripts', 'python.exe')),
     configPath: override >= 0 && process.argv[override + 1] ? path.resolve(process.argv[override + 1])
       : saved.configPath || path.resolve(base, launch.configPath || path.join(projectRoot, '.local', 'project.toml')),
   };
@@ -71,6 +73,19 @@ function register(channel, handler) {
 }
 
 function registerActions() {
+  const setup = createSetupController({ dialog, clipboard, getWindow: () => window, getSettings: () => settings,
+    adopt: async next => {
+      const candidate = new BridgeClient(next);
+      try { await candidate.request('overview'); } catch (error) { candidate.close(); throw error; }
+      bridge?.close(); bridge = candidate;
+      settings = { ...settings, configPath: next.configPath, pythonPath: next.pythonPath };
+      fs.mkdirSync(app.getPath('userData'), { recursive: true });
+      fs.writeFileSync(path.join(app.getPath('userData'), 'settings.json'), JSON.stringify({ configPath: settings.configPath, pythonPath: settings.pythonPath }, null, 2), 'utf8');
+    } });
+  register('jev:setup', payload => {
+    if (!payload || typeof payload.action !== 'string' || Object.keys(payload).some(key => !['action', 'params'].includes(key))) throw new Error('잘못된 설정 요청입니다.');
+    return setup.run(payload.action, payload.params);
+  });
   register('jev:overview', options => {
     const params = {};
     if (options !== undefined && (options === null || typeof options !== 'object' || Array.isArray(options))) throw new Error('잘못된 목록 요청입니다.');

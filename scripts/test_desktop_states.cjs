@@ -17,7 +17,7 @@ const output = outputArgument >= 0
   : path.join(root, '.local', 'desktop-redesign-20260926');
 fs.mkdirSync(output, { recursive: true });
 const reportFile = path.join(output, 'fixture-state-report.json');
-const sourceFiles = ['index.html', 'style.css', 'renderer.js', 'command-menu.js', '../assets/jev-mark.svg'];
+const sourceFiles = ['index.html', 'style.css', 'renderer.js', 'command-menu.js', 'onboarding.js', '../assets/jev-mark.svg'];
 const hashes = () => Object.fromEntries(sourceFiles.map(name => [name,
   crypto.createHash('sha256').update(fs.readFileSync(path.join(renderer, name))).digest('hex')]));
 const report = {

@@ -24,6 +24,10 @@ fs.mkdirSync(scratch, { recursive: true });
         JEV_MANAGER_TEST_HIDDEN: '1' },
     });
     const page = await app.firstWindow();
+    try {
+      await page.locator('#setup-dialog').waitFor({ state: 'visible', timeout: 5000 });
+      await page.locator('#setup-close').click();
+    } catch (error) { if (await page.locator('#setup-dialog').isVisible()) throw error; }
     page.on('pageerror', error => report.errors.push(error.message));
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1280, 900));
     // A visible compositor is needed for fresh dialog frames on Windows.

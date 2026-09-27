@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import anyio
 from mcp.server.lowlevel import Server
@@ -9,7 +10,7 @@ from mcp.shared.exceptions import McpError
 from mcp.shared.message import SessionMessage
 from mcp.types import CallToolResult, ErrorData, JSONRPCMessage, TextContent, Tool, ToolAnnotations
 
-from .common import DomainError, dumps, failed, strict_loads
+from .common import DomainError, digest, dumps, failed, strict_loads
 from .service import CONTRACT, CONTRACT_V2, Service
 
 DESCRIPTIONS = {
@@ -96,7 +97,8 @@ async def strict_stdio(contract=CONTRACT):
             group.cancel_scope.cancel()
 
 
-async def serve(config, engine=None):
+async def serve(config, engine=None, config_path=None):
+    loaded_hash = digest(Path(config_path).read_bytes()) if config_path else None
     contract = CONTRACT_V2 if config.contract_version == "2.0" else CONTRACT
     server = Server("jev-context", version="0.2.0")
     limiter = anyio.CapacityLimiter(1)
@@ -142,6 +144,22 @@ async def serve(config, engine=None):
                     service.close()
 
         result = await anyio.to_thread.run_sync(invoke, limiter=limiter)
+        if config_path and name == "workspace_status":
+            from .onboarding import observe_confirmation
+
+            client = server.request_context.session.client_params
+            client_name = client.clientInfo.name if client else ""
+            await anyio.to_thread.run_sync(
+                observe_confirmation,
+                config,
+                name,
+                arguments,
+                result,
+                client_name,
+                config_path,
+                loaded_hash,
+                limiter=limiter,
+            )
         return CallToolResult(
             structuredContent=result,
             content=[TextContent(type="text", text=dumps(result))],

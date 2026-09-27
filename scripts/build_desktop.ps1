@@ -17,8 +17,8 @@ if ($pin.url -ne ($releaseBase + $pin.archive) -or
 }
 
 $uiFiles = @(
-    'package.json', 'main.cjs', 'preload.cjs', 'bridge-client.cjs', 'window-state.cjs',
-    'renderer/index.html', 'renderer/style.css', 'renderer/renderer.js', 'renderer/command-menu.js',
+    'package.json', 'main.cjs', 'preload.cjs', 'bridge-client.cjs', 'window-state.cjs', 'setup-client.cjs',
+    'renderer/index.html', 'renderer/style.css', 'renderer/renderer.js', 'renderer/command-menu.js', 'renderer/onboarding.js',
     'assets/jev-icon.ico', 'assets/jev-icon.png', 'assets/jev-mark.svg'
 )
 $configPath = Join-Path $repoRoot '.local/project.toml'
@@ -29,7 +29,7 @@ if (-not $RuntimeOnly) {
             throw "Missing desktop source: $relative"
         }
     }
-    foreach ($path in @($configPath, $pythonPath)) {
+    foreach ($path in @($pythonPath)) {
         if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
             throw "Missing local application dependency: $path"
         }

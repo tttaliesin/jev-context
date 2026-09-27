@@ -70,6 +70,12 @@ uv run --no-sync jev-context demo
 
 작업 기록을 둘러보고, 로컬 모델을 준비·종료하고, MCP 연결을 점검하는 Windows 관리 앱입니다. **`Ctrl+K`로 명령과 불러온 작업을 빠르게 찾을 수 있습니다.**
 
+**0.4.0부터 첫 연결도 앱에서 진행합니다.** 상단 **Codex 연결**을 열고 프로젝트 폴더 선택 → 설정 미리보기·적용 → 서버 점검·Codex 확인 → 작업 화면 순서로 진행하세요. 새 프로젝트 설정과 빈 작업 DB, MCP·Skill 설치, 백업·되돌리기를 지원합니다. Codex의 프로젝트 신뢰 확인과 확인 문구 전달은 Codex에서 직접 합니다.
+
+![Jev Context 0.4.0 연결 안내. 설정 적용, MCP 서버 응답, Codex 확인 요청을 별도로 표시합니다.](docs/images/desktop-onboarding.png)
+
+<p align="center"><sub>실제 앱의 새 프로젝트 검증 화면 · 서버 통신 확인 · Codex 확인 요청 대기</sub></p>
+
 ![Jev Context의 빠른 실행. 검색 입력창 아래에 화면과 연결 명령, 단축키가 표시됩니다.](docs/images/desktop-commands.png)
 
 | 단축키 | 기능 |
@@ -79,7 +85,7 @@ uv run --no-sync jev-context demo
 | `Ctrl+B` | 사이드바 접기·펼치기 |
 | `F1` | 단축키 안내 |
 
-Python 환경과 프로젝트 설정을 준비한 뒤, 프로젝트 루트에서 빌드하고 실행합니다.
+Python 환경을 준비한 뒤, 프로젝트 루트에서 빌드하고 실행합니다. 프로젝트 설정은 앱에서 만들 수 있습니다.
 
 ```powershell
 powershell.exe -NoProfile -File scripts/build_desktop.ps1
@@ -125,7 +131,7 @@ powershell.exe -NoProfile -File scripts/build_desktop.ps1
 | 구성 요소 | 버전 | 현재 범위 |
 |---|---|---|
 | Python 서비스 · MCP 서버 | 0.2.0 | 계약 1.0 기본 제공, 계약 2.0 명시 선택 |
-| Electron 관리 앱 | 0.3.4 | 프로젝트 설정을 사용하는 Windows x64 앱 |
+| Electron 관리 앱 | 0.4.0 | 프로젝트 준비·Codex 연결 안내를 포함한 Windows x64 앱 |
 | 로컬 모델 판단 | shadow | 판단 기록만 수행. active 승격 평가를 통과한 프로필 없음 |
 
 모델 판단을 선택에 반영하려면 사람이 검토한 heldout 평가를 통과해야 합니다. 현재 구성은 **SemIf OpenVINO · Qwen3.5-4B INT8 · 로컬 GPU**입니다. [모델 준비와 제한](docs/models.md)
@@ -161,6 +167,7 @@ Ruff lint·format 검사와 pytest를 순서대로 실행하고 첫 실패의 �
 |---|---|
 | 설치와 Codex 연결 | [개발 환경](docs/development.md) · [Codex 연결](docs/codex-setup.md) · [호스트 기능표](docs/host-capabilities.md) |
 | 앱 실행과 조작 | [데스크톱 앱 안내](docs/desktop-manager.md) · [디자인 기준](DESIGN.md) |
+| 처음 연결하기 | [온보딩 적용 계획](docs/desktop-onboarding-plan.md) · [검증 결과](docs/desktop-onboarding-results.md) |
 | 제품 방향과 구현 범위 | [통합 설계 2.0](docs/design/unified-design.md) · [구현과 검증](docs/implementation-v2.md) |
 | 모델 준비와 공유 실행기 | [모델 안내](docs/models.md) · [모델 수명 설계](docs/model-lifecycle-design.md) |
 | 문맥 전달 개선 | [외부 조사](docs/context-efficiency-research.md) · [적용 계획](docs/context-efficiency-implementation-plan.md) · [검증 결과](docs/context-efficiency-results.md) |
