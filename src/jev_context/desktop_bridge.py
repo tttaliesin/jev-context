@@ -17,7 +17,6 @@ from .cli import prepare_engine
 from .common import DomainError, dumps, now, strict_loads, uid
 from .policy import Config
 from .service import CONTRACT, CONTRACT_V2, Service
-from .workroom_bridge import SCHEMAS as BRIDGE_SCHEMAS
 
 MAX_REQUEST = 65536
 METHODS = {
@@ -200,9 +199,7 @@ class DesktopBridge:
                 await session.initialize()
                 listing = await session.list_tools()
                 contract = CONTRACT_V2 if self.config.contract_version == "2.0" else CONTRACT
-                if {tool.name for tool in listing.tools} != set(contract["tools"]) | set(
-                    BRIDGE_SCHEMAS
-                ):
+                if {tool.name for tool in listing.tools} != set(contract["tools"]):
                     raise DomainError(
                         "mcp_contract_mismatch", "MCP tool listing differs from the contract"
                     )

@@ -114,7 +114,7 @@ async def mcp_server(config):
         async with ClientSession(*streams, read_timeout_seconds=timedelta(seconds=8)) as session:
             initialized = await session.initialize()
             assert initialized.serverInfo.name == "jev-context"
-            assert len((await session.list_tools()).tools) == 13
+            assert len((await session.list_tools()).tools) == 10
             yield session
 
 

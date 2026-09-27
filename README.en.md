@@ -104,11 +104,7 @@ The app uses this project's `.venv` environment and the settings, models, and wo
 
 ## How it works
 
-### Optional Workroom integration — 0.6.0
-
-Jev and Workroom run independently with separate repositories and databases. Open **Connection → Export Workroom connection file** in the app, save the JSON, and select it in Workroom. Publishing a reviewed report and searching external memory for that product are explicit user actions. Exporting the connection file does not transfer work content.
-
-The model-free bridge exposes `bridge_status`, `bridge_publish`, and `bridge_search`. Existing work search, approvals, and Codex settings stay intact. See the [independent product principles](docs/independent-products.md), [contract](docs/jev-bridge-v1.md), and [launch example and validation](docs/workroom-bridge-results.md) (Korean).
+Jev and Workroom are **independent products**. An agent in Codex or Claude Desktop calls each MCP server, reads the needed results, and stores or retrieves memory through Jev's general tools. There is no direct app-to-app connection or transfer screen. Registering both servers does not create automatic memory; agent instructions define when and what to remember. See the [product boundaries](docs/independent-products.md) and [tool workflow and instructions](docs/agent-memory-workflow.md) (Korean). Native host setup and successful tool calls still require separate verification.
 
 **Codex → MCP / Skill → local Python service → SQLite work records and registered source text**
 
@@ -119,7 +115,7 @@ The model-free bridge exposes `bridge_status`, `bridge_publish`, and `bridge_sea
 Required constraints, known conflicts, failures, and counterevidence are protected. If the budget cannot fit them, the service reports insufficient capacity instead of silently dropping them. Context that omits optional evidence is marked `partial`.
 
 <details>
-<summary><strong>Ten core MCP tools and three integration tools</strong></summary>
+<summary><strong>Ten MCP tools and their interface contracts</strong></summary>
 
 Contract 2.0 removes obsolete next actions from completed work and exposes superseded criteria and verification details through references. Read stored judgment details with `work_inspect(view=judgments)`. See the [implementation plan](docs/context-efficiency-implementation-plan.md) and [results](docs/context-efficiency-results.md) (Korean).
 
@@ -145,7 +141,7 @@ The authoritative contracts are [contracts.json](src/jev_context/contracts.json)
 | Component | Version | Current scope |
 |---|---|---|
 | Python service / MCP server | 0.2.0 | Contract 1.0 by default; contract 2.0 by explicit selection |
-| Electron manager | 0.6.0 | Project setup, Codex connection guidance, Korean/English UI, and Workroom connection export |
+| Electron manager | 0.6.1 | Windows x64 app with project setup, Codex connection guidance, and Korean/English UI |
 | Local model judgment | shadow | Records judgments only; no profile has passed the active promotion gate |
 
 Model judgments must pass a human-reviewed heldout evaluation before they can affect selection. The current configuration is **SemIf OpenVINO · Qwen3.5-4B INT8 · local GPU**. [Model setup and limits](docs/models.md) (Korean).

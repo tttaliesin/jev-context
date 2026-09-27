@@ -100,11 +100,7 @@ powershell.exe -NoProfile -File scripts/build_desktop.ps1
 
 ## 동작 방식
 
-### Workroom 선택 연동 — 0.6.0
-
-Jev와 Workroom은 각각 독립적으로 실행하며 저장소와 DB를 공유하지 않습니다. 앱의 **연결 → Workroom 연결 파일 내보내기**에서 JSON을 저장한 뒤 Workroom에서 선택하세요. 사용자가 검토한 보고서를 명시적으로 전송하고, 해당 제품의 외부 기억을 직접 검색할 때만 사용합니다. 연결 파일 내보내기 자체는 작업 내용을 전송하지 않습니다.
-
-모델 없이 `bridge_status`, `bridge_publish`, `bridge_search`를 제공합니다. 기존 작업 검색·승인·Codex 설정은 유지합니다. [독립 제품 원칙](docs/independent-products.md) · [계약](docs/jev-bridge-v1.md) · [실행 예제와 검증](docs/workroom-bridge-results.md)
+Jev와 Workroom은 **독립 제품**입니다. Codex·Claude Desktop의 에이전트가 각 MCP를 호출해 필요한 결과를 읽고 Jev의 일반 기억 도구로 저장·검색합니다. 앱 간 직접 연결·전송 화면은 제공하지 않습니다. 두 서버를 등록하는 것만으로 자동 기억되지는 않으며 저장 시점과 범위는 에이전트 지침으로 정합니다. [독립 제품 원칙](docs/independent-products.md) · [도구 사용과 지침](docs/agent-memory-workflow.md)
 
 **Codex → MCP / Skill → 로컬 Python 서비스 → SQLite 작업 기록과 등록 원문**
 
@@ -115,7 +111,7 @@ Jev와 Workroom은 각각 독립적으로 실행하며 저장소와 DB를 공유
 필수 제약, 알려진 충돌, 실패와 반대 근거를 보호합니다. 예산이 부족하면 이를 조용히 버리지 않고 부족 상태를 반환합니다. 선택적 근거가 빠진 문맥은 `partial`로 표시합니다.
 
 <details>
-<summary><strong>기본 MCP 도구 10개와 연동 도구 3개</strong></summary>
+<summary><strong>MCP 도구 10개와 인터페이스 계약</strong></summary>
 
 계약 2.0은 완료된 작업의 오래된 다음 행동을 제거하고, 대체된 기준·검증 상세는 참조로 제공합니다. 저장된 판단 상세는 `work_inspect(view=judgments)`로 읽습니다. [적용 계획](docs/context-efficiency-implementation-plan.md)과 [검증 결과](docs/context-efficiency-results.md)를 참고하세요.
 
@@ -141,7 +137,7 @@ Jev와 Workroom은 각각 독립적으로 실행하며 저장소와 DB를 공유
 | 구성 요소 | 버전 | 현재 범위 |
 |---|---|---|
 | Python 서비스 · MCP 서버 | 0.2.0 | 계약 1.0 기본 제공, 계약 2.0 명시 선택 |
-| Electron 관리 앱 | 0.6.0 | 프로젝트 준비·Codex 연결·한영 전환·Workroom 연결 파일 내보내기 |
+| Electron 관리 앱 | 0.6.1 | 프로젝트 준비·Codex 연결 안내·한국어/영어 전환을 포함한 Windows x64 앱 |
 | 로컬 모델 판단 | shadow | 판단 기록만 수행. active 승격 평가를 통과한 프로필 없음 |
 
 모델 판단을 선택에 반영하려면 사람이 검토한 heldout 평가를 통과해야 합니다. 현재 구성은 **SemIf OpenVINO · Qwen3.5-4B INT8 · 로컬 GPU**입니다. [모델 준비와 제한](docs/models.md)

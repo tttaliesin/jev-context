@@ -4,12 +4,6 @@
 (function (root) {
   'use strict';
   const en = {
-  "Workroom 연결 파일 내보내기": "Export Workroom connection file",
-  "같은 이름의 파일이 있습니다. 다른 이름으로 내보내세요.": "A file with this name already exists. Export with another name.",
-  "파일을 Workroom에서 선택하면 연결할 수 있습니다. 내보내기는 데이터를 전송하지 않습니다.": "Select this file in Workroom to connect. Exporting does not send any data.",
-  "다른 앱에서 선택할 연결 파일 저장": "Save a connection file to select in the other app",
-  "연결 파일을 저장했습니다. Workroom에서 선택하세요. 작업 내용은 전송하지 않았습니다.": "Connection file saved. Select it in Workroom. No work content was sent.",
-  "연결 파일 내보내기 실패": "Could not export connection file",
   "요청 실패": "Request failed",
   "프로젝트 열기 실패": "Could not open project",
   "연결 점검 실패": "Connection check failed",

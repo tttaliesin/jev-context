@@ -23,8 +23,8 @@ def test_real_mcp_client_restart_and_all_tools(tmp_path):
             result = await session.initialize()
             assert result.serverInfo.name == "jev-context"
             listing = await session.list_tools()
-            assert len(listing.tools) == 11
-            assert all(t.outputSchema for t in listing.tools if not t.name.startswith("bridge_"))
+            assert len(listing.tools) == 8
+            assert all(t.outputSchema for t in listing.tools)
             status = await session.call_tool("workspace_status", {"request_id": "status"})
             assert status.structuredContent["data"]["sources"] == 0
             created = await session.call_tool(

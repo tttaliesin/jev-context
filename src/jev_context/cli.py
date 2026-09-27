@@ -169,19 +169,9 @@ def build_parser():
     setup.add_argument("--project-root", required=True)
     setup.add_argument("--data-root", required=True)
     setup.add_argument("--allow", action="append", default=[])
-    for name in ("serve", "status", "codex-config", "bridge-config", "migrate", "call", "schema"):
+    for name in ("serve", "status", "codex-config", "migrate", "call", "schema"):
         command = commands.add_parser(name)
         command.add_argument("--config", required=True)
-        if name == "bridge-config":
-            command.add_argument(
-                "--output", type=Path, help="Create a new launch JSON file; default stdout"
-            )
-        if name == "serve":
-            command.add_argument(
-                "--bridge-only",
-                action="store_true",
-                help="Expose only the model-free Workroom bridge",
-            )
         if name in {"serve", "call"}:
             command.add_argument(
                 "--prepare-engine",
@@ -226,15 +216,6 @@ def main():
         except DomainError as exc:
             print(dumps({"error": {"code": exc.code, "message": exc.message}}))
             raise SystemExit(1) from exc
-    elif args.command == "bridge-config":
-        from .workroom_bridge import launch_description
-
-        value = dumps(launch_description(args.config))
-        if args.output:
-            with args.output.open("x", encoding="utf-8") as file:
-                file.write(value + "\n")
-        else:
-            print(value)
     else:
         CONFIGURED_COMMANDS[args.command](parser, Config.load(args.config), args)
 
@@ -297,11 +278,9 @@ def run_serve(parser, config, args):
 
     from .server import serve
 
-    if args.bridge_only and args.prepare_engine:
-        parser.error("--bridge-only cannot be combined with --prepare-engine")
     engine = prepare_engine(config, background=True) if args.prepare_engine else None
     try:
-        anyio.run(serve, config, engine, args.config, args.bridge_only)
+        anyio.run(serve, config, engine, args.config)
     finally:
         if engine:
             engine.close()

@@ -169,7 +169,7 @@ def test_official_stdio_check_is_verified_without_claiming_native_host_connectio
     result = call(bridge, "connection_check")["result"]
     assert result["connection"]["mcp_stdio"] == "verified", result["connection"]
     assert result["connection"]["wire_verified"] is True
-    assert len(result["connection"]["tools"]) == 13
+    assert len(result["connection"]["tools"]) == 10
     assert result["connection"]["desktop_current_session"] == "not_observed"
     assert result["engine"]["state"] == ("idle" if enabled else "disabled")
     assert engine.preparations == 0

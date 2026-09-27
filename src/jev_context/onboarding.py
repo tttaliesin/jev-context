@@ -476,10 +476,6 @@ def main():
             result = restore(path)
         elif action == "challenge":
             result = challenge(path)
-        elif action == "bridge_export":
-            from .workroom_bridge import launch_description
-
-            result = launch_description(path)
         else:
             raise DomainError("invalid_action", "지원하지 않는 설정 작업입니다.")
         print(dumps({"result": result}))

@@ -164,7 +164,6 @@
       action("refresh", t("프로젝트 상태 새로고침"), t("현재 상태와 작업 목록 다시 읽기"), "F5", $("refresh"), () => { void refresh(); }),
       action("connection", t("연결 점검"), t("별도 MCP 통신 확인"), "", $("check-connection"), () => { void perform("checkConnection"); }),
       action("setup", t("Codex 연결 설정"), t("프로젝트 준비 · 설치 · 확인 · 되돌리기"), "", $("setup-open"), () => { void onboarding?.open(); }),
-      action("bridge-export", t("Workroom 연결 파일 내보내기"), t("다른 앱에서 선택할 연결 파일 저장"), "", $("export-bridge"), () => { void perform("exportBridge"); }),
       action("project", t("프로젝트 설정 열기"), t("다른 프로젝트 설정 선택"), "", $("select-project"), () => { void perform("selectProject"); }),
       action("shortcuts", t("키보드 단축키"), t("사용할 수 있는 단축키 안내"), "F1", null, showShortcuts),
     ];
@@ -246,7 +245,6 @@
     $("prepare-model").disabled = !available || busy || state.stale || engine.can_prepare !== true;
     $("stop-model").disabled = !available || busy || state.stale || engine.can_stop !== true || !engine.worker_pid;
     $("check-connection").disabled = !available || busy || !state.snapshot?.project;
-    $("export-bridge").disabled = !api?.exportBridge || busy || state.stale || !state.snapshot?.project;
     $("load-more").disabled = !available || busy || state.loading;
     $("load-more").textContent = state.loadingVisible && state.nextCursor ? t("불러오는 중…") : t("작업 더 보기");
     $("list-loading").hidden = !state.loadingVisible;
@@ -642,10 +640,6 @@
         return; // A dismissed project chooser leaves the current project intact.
       }
       if (generation !== state.overviewGeneration) return;
-      if (method === "exportBridge") {
-        notify(t("연결 파일을 저장했습니다. Workroom에서 선택하세요. 작업 내용은 전송하지 않았습니다."));
-        return;
-      }
       applyOverview(snapshot);
       const messages = {
         prepareModel: snapshot.engine?.state === "preparing" ? t("모델 준비를 요청했습니다.") : t("모델 상태를 확인했습니다."),
@@ -655,7 +649,7 @@
       };
       notify(messages[method] || t("상태를 갱신했습니다."));
     } catch (error) {
-      const titles = { prepareModel: t("모델 준비 요청 실패"), stopModel: t("모델 종료 요청 실패"), checkConnection: t("연결 점검 실패"), selectProject: t("프로젝트 열기 실패"), exportBridge: t("연결 파일 내보내기 실패") };
+      const titles = { prepareModel: t("모델 준비 요청 실패"), stopModel: t("모델 종료 요청 실패"), checkConnection: t("연결 점검 실패"), selectProject: t("프로젝트 열기 실패") };
       showError(titles[method] || t("요청 실패"), error);
       if (state.selectedId && !state.selectedWork && state.workLoadingId !== state.selectedId) void selectWork(state.selectedId);
     } finally {
@@ -711,7 +705,6 @@
   $("prepare-model").addEventListener("click", () => { void perform("prepareModel"); });
   $("stop-model").addEventListener("click", () => { void perform("stopModel"); });
   $("check-connection").addEventListener("click", () => { void perform("checkConnection"); });
-  $("export-bridge").addEventListener("click", () => { void perform("exportBridge"); });
   $("refresh").addEventListener("click", () => { void refresh(); });
   $("retry").addEventListener("click", () => { void refresh(); });
   $("load-more").addEventListener("click", () => { void refresh({ append: true }); });

@@ -1,12 +1,8 @@
 # 데스크톱 관리 앱 실행 안내
 
-탐색기에서 프로젝트 폴더의 `dist\JevContext\JevContext.exe`를 더블클릭합니다. Windows x64용 Electron 관리 앱 **0.6.0**입니다. 기존 **Python 서비스 0.2.0**과 같은 프로젝트 설정·모델·작업 기록을 사용합니다.
+탐색기에서 프로젝트 폴더의 `dist\JevContext\JevContext.exe`를 더블클릭합니다. Windows x64용 Electron 관리 앱 **0.6.1**입니다. 기존 **Python 서비스 0.2.0**과 같은 프로젝트 설정·모델·작업 기록을 사용합니다.
 
-## Workroom 선택 연동 — 0.6.0
-
-**연결 → Workroom 연결 파일 내보내기** 또는 `Ctrl+K`의 같은 명령을 선택해 JSON 파일을 저장합니다. Workroom에서 같은 프로젝트 폴더를 선택하고 이 파일을 불러옵니다. 기존 파일은 덮어쓰지 않으므로 새 이름을 사용하세요. Jev 설치 위치나 Python 환경을 옮기면 다시 내보냅니다.
-
-내보내기는 절대 실행 경로와 프로젝트 식별에 필요한 설정 경로만 담습니다. 작업 내용을 전송하거나 모델을 시작하지 않습니다. 검토한 보고서 전송과 외부 기억 검색은 Workroom에서 직접 실행합니다. 저장소·DB는 독립적으로 유지되며 기존 검색·승인 상태와 자동 동기화하지 않습니다. [계약](jev-bridge-v1.md) · [CLI 예제와 검증](workroom-bridge-results.md)
+0.6.0에서 추가한 Workroom 직접 연결 파일 내보내기는 제거했습니다. Codex·Claude Desktop의 에이전트가 각 제품 MCP를 독립적으로 사용합니다. 기존 전용 저장 파일은 자동 삭제·이관하지 않습니다. [독립 제품 원칙](independent-products.md) · [일반 기억 도구 사용](agent-memory-workflow.md)
 
 앱에서 모델 상태와 저장된 작업을 관리하고, 코딩 대화와 작업 지시는 Codex에서 계속합니다.
 
