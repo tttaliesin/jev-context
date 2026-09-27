@@ -150,6 +150,47 @@ async function uiKorean(selector, excluded = []) {
     await language('en', false);
     await capture('desktop-work-en.png');
     report.stages.push({ name: 'dashboard', originalWorkPreserved: true, commands: true, shortcuts: true, noModelOrCollection: true });
+    // The support flow uses the real preload IPC, main process and Python bridge.
+    const savedBeforeReconnect = fs.readFileSync(path.join(userData, 'settings.json'), 'utf8');
+    await page.locator('#support-open').click();
+    await page.waitForFunction(() => !document.getElementById('support-copy').disabled);
+    assert.equal(await page.locator('#support-title').textContent(), 'Troubleshoot');
+    const diagnosticPreview = await page.locator('#support-report').textContent();
+    assert.equal(JSON.parse(diagnosticPreview).app.version, '0.7.0');
+    for (const privateValue of [project, config, userData, before.title, before.goal, '한글 폴더']) {
+      assert.ok(!diagnosticPreview.includes(privateValue), `Private content in diagnostic report: ${privateValue}`);
+    }
+    await page.locator('#support-copy').click();
+    assert.equal(await app.evaluate(({ clipboard }) => clipboard.readText()), diagnosticPreview);
+    await page.locator('#support-dialog [data-language-select]').selectOption('ko');
+    await page.waitForFunction(() => document.documentElement.lang === 'ko');
+    assert.equal(await page.locator('#support-report').textContent(), diagnosticPreview);
+    await page.locator('#support-dialog [data-language-select]').selectOption('en');
+    await page.waitForFunction(() => document.documentElement.lang === 'en');
+    fs.mkdirSync(pending);
+    try {
+      await page.locator('#support-reconnect').click();
+      await page.waitForFunction(() => !document.getElementById('support-reconnect').disabled && !document.getElementById('support-copy').disabled);
+      assert.equal(await page.locator('#support-error').isVisible(), false);
+      assert.equal(fs.readFileSync(path.join(userData, 'settings.json'), 'utf8'), savedBeforeReconnect);
+      await page.locator('#support-dialog [data-language-select]').selectOption('ko');
+      await page.waitForFunction(() => document.querySelector('#support-dialog [data-language-error]').textContent.length > 0);
+      assert.equal(await page.locator('html').getAttribute('lang'), 'en');
+    } finally { fs.rmdirSync(pending); }
+    await page.locator('#support-dialog [data-language-select]').selectOption('en');
+    await page.waitForFunction(() => !document.querySelector('#support-dialog [data-language-select]').disabled);
+    await page.locator('#support-dialog .setup-details summary').click();
+    await capture('desktop-support-en.png');
+    assert.deepEqual(await uiKorean('#support-dialog'), []);
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('#support-open').evaluate(el => el === document.activeElement), true);
+    assert.equal(await page.locator('#work-filter').inputValue(), '작업');
+    assert.equal(await page.locator('#work-title').textContent(), before.title);
+    const reconnected = await page.evaluate(() => window.jev.overview());
+    assert.equal(reconnected.engine.worker_pid, null); assert.equal(reconnected.engine.broker_pid, null);
+    assert.equal(reconnected.sources.count, 0);
+    report.stages.push({ name: 'support', exactClipboard: true, privateContentExcluded: true,
+      reconnectWithoutSettingsWrite: true, preservedWorkAndFilter: true, noModelOrCollection: true });
     await app.close(); app = null; await launch();
     await page.waitForFunction(() => document.documentElement.lang === 'en' && document.getElementById('work-title').textContent === '작업 기록');
     assert.equal(await page.locator('#work-filter').inputValue(), '작업');

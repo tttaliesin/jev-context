@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { BridgeClient } = require('./bridge-client.cjs');
+const { diagnosticReport, errorCode } = require('./diagnostics.cjs');
 const { normalizeWindowState, loadWindowState, saveWindowState } = require('./window-state.cjs');
 const { createSetupController } = require('./setup-client.cjs');
 const locale = require('./locales.js');
@@ -28,6 +29,11 @@ const pages = new Map([
 let window;
 let bridge;
 let settings;
+let switching = false;
+let diagnosticPreview = null;
+let lastOverview = null;
+let lastOverviewAt = null;
+let lastFailure = null;
 const entryURL = 'jev://app/index.html';
 
 function readJSON(filename) {
@@ -60,7 +66,9 @@ function saveSettings(next) {
   fs.renameSync(pending, filename);
 }
 
-async function switchProject(next) {
+async function switchProject(next, { persist = true } = {}) {
+  if (switching) throw Object.assign(new Error('연결 변경이 진행 중입니다. 완료 후 다시 시도해 주세요.'), { code: 'connection_busy' });
+  switching = true;
   const candidate = new BridgeClient(next);
   let snapshot;
   let committed;
@@ -68,19 +76,24 @@ async function switchProject(next) {
     snapshot = await candidate.request('overview');
     // Language may have changed while the candidate was being checked.
     committed = { ...settings, configPath: next.configPath, pythonPath: next.pythonPath };
-    saveSettings(committed);
+    if (persist) saveSettings(committed);
   } catch (error) {
     candidate.close();
     throw error;
+  } finally {
+    switching = false;
   }
   const previous = bridge;
   settings = committed;
   bridge = candidate;
+  lastOverview = snapshot;
+  lastOverviewAt = new Date().toISOString();
   previous?.close();
   return snapshot;
 }
 
 function client() {
+  if (switching) throw Object.assign(new Error('연결 변경이 진행 중입니다. 완료 후 다시 시도해 주세요.'), { code: 'connection_busy' });
   if (!fs.existsSync(settings.pythonPath) || !fs.existsSync(path.join(settings.projectRoot, 'src', 'jev_context', 'desktop_bridge.py')))
     throw new Error('Python 실행 환경을 찾지 못했습니다. 실행 파일 옆 launch-config.json의 프로젝트 경로를 확인해 주세요.');
   if (!fs.existsSync(settings.configPath)) throw new Error('프로젝트 설정을 찾지 못했습니다. ‘프로젝트 열기’에서 project.toml을 선택해 주세요.');
@@ -99,12 +112,40 @@ function trusted(event) {
 function register(channel, handler) {
   ipcMain.handle(channel, async (event, payload) => {
     if (!trusted(event)) return { ok: false, error: { code: 'untrusted_sender', message: '허용되지 않은 화면 요청입니다.' } };
-    try { return { ok: true, value: await handler(payload) }; }
-    catch (error) { return { ok: false, error: { code: error.code || 'manager_error', message: error.message } }; }
+    try {
+      const value = await handler(payload);
+      if (value?.project && value?.engine && value.config_path === settings.configPath) {
+        lastOverview = value;
+        lastOverviewAt = new Date().toISOString();
+      }
+      return { ok: true, value };
+    } catch (error) {
+      if (!channel.startsWith('jev:diagnostics:')) lastFailure = {
+        at: new Date().toISOString(), operation: channel.slice(4), code: errorCode(error.code),
+      };
+      return { ok: false, error: { code: error.code || 'manager_error', message: error.message } };
+    }
   });
 }
 
 function registerActions() {
+  register('jev:diagnostics:get', () => {
+    diagnosticPreview = diagnosticReport({ appVersion: app.getVersion(), versions: process.versions,
+      platform: process.platform, arch: process.arch, bridge, snapshot: lastOverview,
+      observedAt: lastOverviewAt, lastFailure,
+      files: { python: fs.existsSync(settings.pythonPath), config: fs.existsSync(settings.configPath),
+        module: fs.existsSync(path.join(settings.projectRoot, 'src', 'jev_context', 'desktop_bridge.py')) } });
+    return diagnosticPreview;
+  });
+  register('jev:diagnostics:copy', () => {
+    if (!diagnosticPreview) throw new Error('먼저 진단 요약을 열어 주세요.');
+    clipboard.writeText(diagnosticPreview);
+    return { copied: true };
+  });
+  register('jev:reconnect', () => {
+    if (bridge?.pending.size) throw Object.assign(new Error('요청을 처리 중입니다. 완료 후 다시 연결해 주세요.'), { code: 'connection_busy' });
+    return switchProject(settings, { persist: false });
+  });
   register('jev:language:get', () => settings.language);
   register('jev:language:set', language => {
     if (!['ko', 'en'].includes(language)) throw new Error('지원하지 않는 언어입니다.');

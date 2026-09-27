@@ -38,6 +38,9 @@
     loading: false,
     loadingVisible: false,
     stale: false,
+    refreshFailures: 0,
+    supportBusy: false,
+    supportReturnFocus: null,
     projectGeneration: 0,
     overviewGeneration: 0,
     workRequest: 0,
@@ -146,6 +149,44 @@
     target.focus({ preventScroll: true });
   }
 
+  async function readDiagnostics() {
+    state.supportBusy = true;
+    $("support-copy").disabled = true;
+    $("support-error").hidden = true;
+    setText("support-status", t("진단 요약을 읽는 중…"));
+    updateButtons();
+    try {
+      const report = await invoke("getDiagnostics");
+      setText("support-report", report);
+      const info = JSON.parse(report);
+      setText("support-status", t("앱 {0} · 진단 생성 {1}", info.app.version, dateLabel(info.generated_at)));
+      $("support-copy").disabled = false;
+    } catch (error) {
+      setText("support-report", "");
+      setText("support-status", "");
+      setText("support-error", errorMessage(error));
+      $("support-error").hidden = false;
+    } finally { state.supportBusy = false; updateButtons(); }
+  }
+
+  function showSupport() {
+    if ($("support-dialog").open) return;
+    state.commandMenu?.close();
+    closeShortcuts();
+    closeDiagnostics();
+    state.supportReturnFocus = document.activeElement;
+    $("support-dialog").showModal();
+    $("support-close").focus();
+    void readDiagnostics();
+  }
+
+  function closeSupport() {
+    $("support-dialog").close();
+    const previous = state.supportReturnFocus;
+    const target = previous?.isConnected && previous.getClientRects().length && !previous.disabled ? previous : $("support-open");
+    target.focus({ preventScroll: true });
+  }
+
   function commandItems() {
     const action = (id, label, description, shortcut, button, run) => {
       let unavailable = button?.title || t("현재 사용할 수 없습니다.");
@@ -163,6 +204,7 @@
       action("reset-width", t("목록 너비 기본값으로"), t("기본 너비 260픽셀 복원"), "", null, resetSidebarWidth),
       action("refresh", t("프로젝트 상태 새로고침"), t("현재 상태와 작업 목록 다시 읽기"), "F5", $("refresh"), () => { void refresh(); }),
       action("connection", t("연결 점검"), t("별도 MCP 통신 확인"), "", $("check-connection"), () => { void perform("checkConnection"); }),
+      action("support", t("문제 해결"), t("연결 복구와 진단 요약"), "", null, showSupport),
       action("setup", t("Codex 연결 설정"), t("프로젝트 준비 · 설치 · 확인 · 되돌리기"), "", $("setup-open"), () => { void onboarding?.open(); }),
       action("project", t("프로젝트 설정 열기"), t("다른 프로젝트 설정 선택"), "", $("select-project"), () => { void perform("selectProject"); }),
       action("shortcuts", t("키보드 단축키"), t("사용할 수 있는 단축키 안내"), "F1", null, showShortcuts),
@@ -196,11 +238,14 @@
   }
 
   function showError(title, error, kind = "action") {
+    const message = errorMessage(error);
+    const changed = $("error-banner").hidden || state.errorKind !== kind
+      || $("error-title").textContent !== title || $("error-message").textContent !== message;
     state.errorKind = kind;
     setText("error-title", title);
-    setText("error-message", errorMessage(error));
+    setText("error-message", message);
     $("error-banner").hidden = false;
-    announce(title);
+    if (changed) announce(title);
   }
 
   function clearError(kind) {
@@ -239,6 +284,9 @@
     const engine = state.snapshot?.engine || {};
     const available = !!api;
     const busy = !!state.action;
+    $("support-reconnect").disabled = !api?.reconnect || busy || state.loading || !!state.workLoadingId || state.supportBusy;
+    $("support-reconnect").textContent = state.action === "reconnect" ? t("다시 연결 중…") : t("앱 연결 다시 연결");
+    $("support-refresh").disabled = state.supportBusy || busy;
     $("select-project").disabled = !available || busy;
     $("refresh").disabled = !available || busy || state.loading;
     $("retry").disabled = !available || busy || state.loading;
@@ -503,6 +551,7 @@
     state.snapshot = snapshot;
     state.refreshedAt = new Date();
     state.stale = false;
+    state.refreshFailures = 0;
     const project = snapshot.project;
     const root = text(project.project_root, t("프로젝트 경로 미확인"));
     const name = projectName(project.project_root);
@@ -600,6 +649,7 @@
   async function refresh({ append = false, silent = false } = {}) {
     if (silent && onboarding?.isOpen()) return;
     if (state.loading || state.action) return;
+    clearTimeout(state.timer);
     const generation = state.overviewGeneration;
     state.loading = true;
     state.loadingVisible = !silent || !state.snapshot;
@@ -617,12 +667,14 @@
     } catch (error) {
       if (generation !== state.overviewGeneration) return;
       state.stale = true;
+      state.refreshFailures += 1;
       showError(state.snapshot ? t("상태를 갱신하지 못했습니다") : t("프로젝트 설정을 확인해 주세요"), error, "overview");
       renderUnavailable();
     } finally {
       state.loading = false;
       state.loadingVisible = false;
       updateButtons();
+      scheduleRefresh();
     }
   }
 
@@ -646,11 +698,16 @@
         stopModel: snapshot.engine?.worker_pid ? t("모델 종료 요청 후 상태를 확인합니다.") : t("모델 메모리가 해제되었습니다."),
         checkConnection: snapshot.connection?.mcp_stdio === "verified" ? t("별도 MCP 통신을 확인했습니다. Codex 대화 연결은 직접 관측하지 않습니다.") : t("연결 점검 결과를 확인해 주세요."),
         selectProject: t("프로젝트를 열었습니다."),
+        reconnect: t("앱 연결을 복구했습니다. Codex 연결은 별도로 확인하세요."),
       };
       notify(messages[method] || t("상태를 갱신했습니다."));
     } catch (error) {
-      const titles = { prepareModel: t("모델 준비 요청 실패"), stopModel: t("모델 종료 요청 실패"), checkConnection: t("연결 점검 실패"), selectProject: t("프로젝트 열기 실패") };
+      const titles = { prepareModel: t("모델 준비 요청 실패"), stopModel: t("모델 종료 요청 실패"), checkConnection: t("연결 점검 실패"), selectProject: t("프로젝트 열기 실패"), reconnect: t("앱 연결 복구 실패") };
       showError(titles[method] || t("요청 실패"), error);
+      if (method === "reconnect") {
+        setText("support-error", errorMessage(error));
+        $("support-error").hidden = false;
+      }
       if (state.selectedId && !state.selectedWork && state.workLoadingId !== state.selectedId) void selectWork(state.selectedId);
     } finally {
       state.action = null;
@@ -661,7 +718,11 @@
 
   function scheduleRefresh() {
     clearTimeout(state.timer);
-    const delay = state.snapshot?.engine?.state === "preparing" ? 2500 : 12000;
+    const delay = state.refreshFailures ? Math.min(60000, 12000 * 2 ** Math.min(state.refreshFailures - 1, 3))
+      : state.snapshot?.engine?.state === "preparing" ? 2500 : 12000;
+    $("retry-schedule").hidden = !state.refreshFailures;
+    setText("retry-schedule", t("자동 재시도 간격 {0}초 · 새로고침으로 바로 확인할 수 있습니다.", delay / 1000));
+    if (document.hidden) return;
     state.timer = setTimeout(async () => {
       if (!document.hidden && api) await refresh({ silent: true });
       scheduleRefresh();
@@ -670,7 +731,8 @@
 
   window.addEventListener("jev:languagechange", () => {
     // Translate only app-owned transient messages. Never transform work text or paths.
-    for (const id of ["error-title", "error-message", "action-message"]) setText(id, i18n.message($(id).textContent));
+    for (const id of ["error-title", "error-message", "action-message", "support-status", "support-error"]) setText(id, i18n.message($(id).textContent));
+    scheduleRefresh();
     setSidebarCollapsed(preferences.sidebarCollapsed, false);
     state.filter = $("work-filter").value.trim().toLocaleLowerCase(i18n.locale);
     renderWorkList();
@@ -707,6 +769,20 @@
   $("check-connection").addEventListener("click", () => { void perform("checkConnection"); });
   $("refresh").addEventListener("click", () => { void refresh(); });
   $("retry").addEventListener("click", () => { void refresh(); });
+  $("support-open").addEventListener("click", showSupport);
+  $("error-support").addEventListener("click", showSupport);
+  $("support-close").addEventListener("click", closeSupport);
+  $("support-dialog").addEventListener("cancel", event => { event.preventDefault(); closeSupport(); });
+  $("support-refresh").addEventListener("click", () => { void readDiagnostics(); });
+  $("support-reconnect").addEventListener("click", async () => {
+    $("support-error").hidden = true;
+    await perform("reconnect");
+    if ($("support-error").hidden) await readDiagnostics();
+  });
+  $("support-copy").addEventListener("click", async () => {
+    try { await invoke("copyDiagnostics"); setText("support-status", t("표시된 진단 요약을 복사했습니다.")); }
+    catch (error) { setText("support-error", errorMessage(error)); $("support-error").hidden = false; }
+  });
   $("load-more").addEventListener("click", () => { void refresh({ append: true }); });
   $("work-retry").addEventListener("click", () => { void selectWork(state.selectedId, { force: true }); });
   $("sidebar-toggle").addEventListener("click", () => setSidebarCollapsed(!preferences.sidebarCollapsed));
@@ -790,6 +866,10 @@
   });
   document.addEventListener("keydown", (event) => {
     if (onboarding?.isOpen()) return;
+    if ($("support-dialog").open) {
+      if (event.key === "F5" || ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "r")) event.preventDefault();
+      return;
+    }
     if (event.isComposing) return;
     const key = event.key.toLowerCase();
     const control = event.ctrlKey && !event.altKey && !event.shiftKey && !event.metaKey;
@@ -863,7 +943,10 @@
     buttons[index].scrollIntoView({ block: "nearest" });
   });
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) void refresh({ silent: true });
+    clearTimeout(state.timer);
+    state.stale = true;
+    updateButtons();
+    if (!document.hidden) { renderUnavailable(); void refresh({ silent: true }).finally(scheduleRefresh); }
   });
   window.addEventListener("beforeunload", () => {
     rememberProject();

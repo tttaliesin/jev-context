@@ -43,7 +43,8 @@ pytest는 약 250개 테스트를 1분 20초 정도에 실행합니다. `test_co
 Python 검사에는 포함되지 않습니다. Node가 필요합니다.
 
 - `node --test scripts\test_window_state.cjs`: 창 위치·크기 저장 로직. Node만 있으면 실행됩니다.
-- `node --test scripts\test_locales.cjs scripts\test_project_switch.cjs scripts\test_bridge_client.cjs`: 번역, 설정 쓰기/rename 실패, Python 시작 실패와 재시도, 이전 프로세스의 늦은 이벤트를 검사합니다. Node만 있으면 실행됩니다.
+- `node --test scripts\test_locales.cjs scripts\test_project_switch.cjs scripts\test_bridge_client.cjs scripts\test_diagnostics.cjs`: 번역, 설정 쓰기/rename 실패, Python 시작 실패와 재시도, 이전 프로세스의 늦은 이벤트, 재연결과 진단 정보 필드 제한을 검사합니다. Node만 있으면 실행됩니다.
+- `node scripts\test_desktop_language.cjs`: 실제 Electron에서 한영 전환·연결 안내·작업 원문 보존·진단 복사·앱 재연결·재실행 후 설정 유지를 검사합니다. 임시 프로젝트를 쓰고 모델은 시작하지 않습니다.
 - `node scripts\test_desktop_recovery.cjs`: 격리 프로젝트와 userData로 실제 Electron의 프로젝트 선택·온보딩 저장 실패, 재시도, 재실행 후 선택 유지, 실제 Python 연결 복구를 검사합니다. 모델을 시작하지 않습니다.
 - `scripts\test_desktop.cjs`, `test_desktop_ux.cjs`: 빌드된 `dist\JevContext`를 Playwright로 실제 실행하는 화면 검사입니다.
 - `scripts\test_desktop_states.cjs`: 실제 렌더러를 fixture로 띄워 상태별 화면을 검사합니다. Electron main, Python, DB, 모델은 쓰지 않습니다.

@@ -39,7 +39,7 @@ class BridgeClient {
       if (this.child !== child) return;
       buffer += chunk;
       if (Buffer.byteLength(buffer, 'utf8') > 2 * 1024 * 1024) {
-        retire(new Error('서버 응답 크기 제한을 초과했습니다.'));
+        retire(Object.assign(new Error('서버 응답 크기 제한을 초과했습니다.'), { code: 'bridge_invalid_response' }));
         return;
       }
       let split;
@@ -49,7 +49,7 @@ class BridgeClient {
         if (!line) continue;
         let response;
         try { response = JSON.parse(line); }
-        catch { retire(new Error('서버가 올바른 응답을 보내지 않았습니다.')); return; }
+        catch { retire(Object.assign(new Error('서버가 올바른 응답을 보내지 않았습니다.'), { code: 'bridge_invalid_response' })); return; }
         const pending = this.pending.get(response.id);
         if (!pending) continue;
         this.pending.delete(response.id);
@@ -61,11 +61,11 @@ class BridgeClient {
         } else pending.resolve(response.result);
       }
     });
-    child.on('error', error => retire(new Error(`Python 서버를 시작하지 못했습니다: ${error.message}`)));
-    const exited = (code, signal) => retire(new Error(`프로젝트 서버가 종료됐습니다 (${signal || code}). ${this.stderr.trim()}`));
+    child.on('error', error => retire(Object.assign(new Error(`Python 서버를 시작하지 못했습니다: ${error.message}`), { code: 'bridge_start_failed' })));
+    const exited = (code, signal) => retire(Object.assign(new Error(`프로젝트 서버가 종료됐습니다 (${signal || code}). ${this.stderr.trim()}`), { code: 'bridge_exited' }));
     child.on('exit', exited);
     child.on('close', exited);
-    child.stdin.on('error', error => retire(new Error(`서버 연결 오류: ${error.message}`)));
+    child.stdin.on('error', error => retire(Object.assign(new Error(`서버 연결 오류: ${error.message}`), { code: 'bridge_io_error' })));
   }
 
   request(method, params = {}) {
@@ -74,7 +74,7 @@ class BridgeClient {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
-        reject(new Error('서버 응답을 기다리는 시간이 초과됐습니다. 상태를 다시 확인해 주세요.'));
+        reject(Object.assign(new Error('서버 응답을 기다리는 시간이 초과됐습니다. 상태를 다시 확인해 주세요.'), { code: 'bridge_timeout' }));
       }, method === 'connection_check' ? 30000 : 12000);
       this.pending.set(id, { resolve, reject, timer });
       try { this.child.stdin.write(JSON.stringify({ id, method, params }) + '\n'); }

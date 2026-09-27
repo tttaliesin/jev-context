@@ -414,3 +414,11 @@ details[open] > summary .disclosure-icon { transform: rotate(180deg); }
 .language-error { color: #f2a7a0; font-size: 12px; }
 .language-error:empty { display: none; }
 .setup-header > div { min-width: 0; flex: 1; }
+.support-dialog { width: min(700px, calc(100vw - 32px)); }
+.support-card { border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin: 14px 0; }
+.support-card h3 { font-size: 15px; margin-bottom: 8px; }
+.support-card > button { margin-top: 12px; }
+.support-dialog .setup-body > p { overflow-wrap: anywhere; }
+.retry-schedule { color: var(--muted); font-size: 12px; margin: 8px 24px; }
+#support-open { white-space: nowrap; }
+@media (max-width: 900px) { .connection-bar { flex-wrap: wrap; } .connection-details { min-width: 0; flex: 1 1 100%; } }

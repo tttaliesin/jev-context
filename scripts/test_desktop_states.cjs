@@ -86,6 +86,20 @@ function installFixture(data) {
     } };
   };
   window.jev = {
+    getDiagnostics: async () => {
+      fixture.calls.push({ method: 'getDiagnostics' });
+      if (fixture.failDiagnostics) throw new Error('fixture diagnostics unavailable');
+      fixture.preview = JSON.stringify({ format: 'jev-diagnostics-v1', app: { version: '0.7.0' },
+        generated_at: '2026-09-27T13:00:00.000Z', manager: { process_present: true } }, null, 2);
+      return fixture.preview;
+    },
+    copyDiagnostics: async () => { fixture.copied = fixture.preview; return { copied: true }; },
+    reconnect: async () => {
+      fixture.calls.push({ method: 'reconnect' });
+      if (fixture.failReconnect) throw new Error('fixture reconnect unavailable');
+      fixture.failOverview = false;
+      return overview();
+    },
     overview: async (options) => {
       fixture.calls.push({ method: 'overview', options });
       if (fixture.holdOverview) await new Promise(resolve => fixture.pendingOverview.push(resolve));
@@ -1115,6 +1129,83 @@ async function closeCommands(page) {
       await page.locator('.topbar [data-language-select]').selectOption('ko');
       await waitText(page, '#model-state', '현재 상태 미확인');
       assert.equal(await page.locator('#prepare-model').isDisabled(), true);
+    });
+
+    await scenario('support-preview-reconnect-language-and-focus', fixture(), async page => {
+      await waitText(page, '#work-title', '검증 작업 001');
+      await page.locator('#work-filter').fill('검증');
+      await page.locator('#support-open').click();
+      await waitText(page, '#support-status', '0.7.0');
+      const preview = await page.locator('#support-report').textContent();
+      await page.locator('#support-copy').click();
+      assert.equal(await page.evaluate(() => window.__fixture.copied), preview);
+      await page.locator('#support-dialog [data-language-select]').selectOption('en');
+      await waitText(page, '#support-title', 'Troubleshoot');
+      assert.equal(await page.locator('#support-report').textContent(), preview);
+      await page.locator('#support-reconnect').click();
+      await waitText(page, '#support-status', 'App 0.7.0');
+      assert.equal(await page.locator('#work-filter').inputValue(), '검증');
+      assert.equal(await page.locator('#work-title').textContent(), '검증 작업 001');
+      await page.keyboard.press('Escape');
+      assert.equal(await page.locator('#support-open').evaluate(el => el === document.activeElement), true);
+      await assertNoModelActions(page);
+    }, { width: 760, height: 600 });
+
+    await scenario('support-failure-retains-preview-and-retries', fixture(), async page => {
+      await page.locator('#support-open').click();
+      await waitText(page, '#support-status', '0.7.0');
+      await page.evaluate(() => { window.__fixture.failReconnect = true; });
+      await page.locator('#support-reconnect').click();
+      await waitText(page, '#support-error', 'fixture reconnect unavailable');
+      await page.evaluate(() => { window.__fixture.failReconnect = false; });
+      await page.locator('#support-reconnect').click();
+      await waitText(page, '#support-status', '0.7.0');
+      assert.equal(await page.locator('#support-error').isVisible(), false);
+      await page.evaluate(() => { window.__fixture.failDiagnostics = true; });
+      await page.locator('#support-refresh').click();
+      await waitText(page, '#support-error', 'fixture diagnostics unavailable');
+      assert.equal(await page.locator('#support-copy').isDisabled(), true);
+      await assertNoModelActions(page);
+    });
+
+    await scenario('retry-backoff-and-recovery', fixture('preparing'), async page => {
+      await page.clock.install();
+      await page.evaluate(() => { window.__fixture.failOverview = true; });
+      await page.locator('#refresh').click();
+      await waitText(page, '#retry-schedule', '12초');
+      for (const [delay, next] of [[12001, 24], [24001, 48], [48001, 60], [60001, 60]]) {
+        await page.clock.fastForward(delay);
+        await waitText(page, '#retry-schedule', `${next}초`);
+      }
+      assert.equal(await page.locator('#prepare-model').isDisabled(), true);
+      await page.evaluate(() => { window.__fixture.failOverview = false; });
+      await page.locator('#retry').click();
+      await waitIdle(page);
+      assert.equal(await page.locator('#retry-schedule').isVisible(), false);
+      assert.equal(await page.locator('#error-banner').isVisible(), false);
+      await assertNoModelActions(page);
+    });
+
+    await scenario('hidden-window-pauses-polling-and-resume-gates-model-controls', fixture(), async page => {
+      await page.clock.install();
+      await page.locator('#refresh').click(); await waitIdle(page);
+      await page.evaluate(() => {
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      const before = await page.evaluate(() => window.__fixture.calls.filter(c => c.method === 'overview').length);
+      await page.clock.fastForward(65000);
+      assert.equal(await page.evaluate(() => window.__fixture.calls.filter(c => c.method === 'overview').length), before);
+      await page.evaluate(() => {
+        window.__fixture.holdOverview = true;
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      assert.equal(await page.locator('#prepare-model').isDisabled(), true);
+      await page.evaluate(() => { window.__fixture.holdOverview = false; window.__fixture.pendingOverview.splice(0).forEach(done => done()); });
+      await waitIdle(page);
+      assert.equal(await page.locator('#prepare-model').isDisabled(), false);
+      await assertNoModelActions(page);
     });
 
     assert.deepEqual(hashes(), report.sourceHashes, 'Renderer changed during this run; rerun after edits finish');

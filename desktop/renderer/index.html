@@ -58,7 +58,8 @@
       </header>
 
       <main id="main" class="main" tabindex="-1"><p class="language-error" data-language-error role="alert"></p>
-        <div id="error-banner" class="notice notice-error" role="alert" hidden><div><strong id="error-title"><span data-i18n="프로젝트를 불러오지 못했습니다">프로젝트를 불러오지 못했습니다</span></strong><p id="error-message"></p></div><button id="retry" class="button button-quiet" type="button"><span data-i18n="다시 시도">다시 시도</span></button></div>
+        <div id="error-banner" class="notice notice-error" role="alert" hidden><div><strong id="error-title"><span data-i18n="프로젝트를 불러오지 못했습니다">프로젝트를 불러오지 못했습니다</span></strong><p id="error-message"></p></div><button id="error-support" class="button button-quiet" type="button" data-i18n="문제 해결">문제 해결</button><button id="retry" class="button button-quiet" type="button"><span data-i18n="다시 시도">다시 시도</span></button></div>
+        <p id="retry-schedule" class="retry-schedule" hidden></p>
         <div id="action-notice" class="notice notice-info" role="status" aria-live="polite" hidden><span id="action-message"></span><button id="action-dismiss" class="icon-button" type="button" aria-label="알림 닫기" title="알림 닫기" data-i18n-aria-label="알림 닫기" data-i18n-title="알림 닫기"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 6 8 8M14 6l-8 8"></path></svg></button></div>
 
         <section class="model-band" aria-labelledby="model-heading">
@@ -84,6 +85,7 @@
             <div class="connection-explanation"><p id="connection-description"><span data-i18n="MCP 통신 점검과 현재 Codex 대화의 연결은 별도로 확인합니다.">MCP 통신 점검과 현재 Codex 대화의 연결은 별도로 확인합니다.</span></p><p id="connection-checked"><span data-i18n="연결 점검은 모델을 로드하지 않습니다.">연결 점검은 모델을 로드하지 않습니다.</span></p></div>
           </details>
           <button id="check-connection" class="button button-quiet connection-check" type="button" disabled><span data-i18n="연결 점검">연결 점검</span></button>
+          <button id="support-open" class="button button-quiet" type="button" aria-haspopup="dialog"><span data-i18n="문제 해결">문제 해결</span></button>
         </section>
 
         <section id="work-panel" class="work-panel" aria-labelledby="detail-heading" aria-busy="true" tabindex="0">
@@ -103,6 +105,17 @@
         <footer class="main-footer"><span id="source-summary"><span data-i18n="등록 자료 확인 중">등록 자료 확인 중</span></span><span id="refreshed-at"><span data-i18n="아직 조회하지 않음">아직 조회하지 않음</span></span></footer>
       </main>
     </div>
+    <dialog id="support-dialog" class="setup-dialog support-dialog" aria-labelledby="support-title" aria-describedby="support-subtitle">
+      <header class="setup-header"><div><p class="setup-eyebrow">JEV / SUPPORT</p><h2 id="support-title" data-i18n="문제 해결">문제 해결</h2><p id="support-subtitle" data-i18n="연결을 복구하고 진단 요약을 확인하세요.">연결을 복구하고 진단 요약을 확인하세요.</p></div><label class="language-control"><span class="sr-only" data-i18n="언어">언어</span><select data-language-select aria-label="Language / 언어"><option value="ko" lang="ko">한국어</option><option value="en" lang="en">English</option></select></label><button id="support-close" class="button button-quiet" type="button" data-i18n="닫기">닫기</button></header>
+      <div class="setup-body">
+        <p class="language-error" data-language-error role="alert"></p>
+        <p id="support-status" class="setup-copy" role="status" aria-live="polite"></p>
+        <p id="support-error" class="setup-error" role="alert" hidden></p>
+        <section class="support-card"><h3 data-i18n="앱 연결 복구">앱 연결 복구</h3><p class="setup-copy" data-i18n="현재 프로젝트에 새로 연결합니다. 설정과 작업 기록은 유지됩니다.">현재 프로젝트에 새로 연결합니다. 설정과 작업 기록은 유지됩니다.</p><p class="setup-copy" data-i18n="공유 모델과 Codex의 MCP 서버는 재시작하지 않습니다.">공유 모델과 Codex의 MCP 서버는 재시작하지 않습니다.</p><button id="support-reconnect" class="button button-secondary" type="button" data-i18n="앱 연결 다시 연결">앱 연결 다시 연결</button></section>
+        <section class="support-card"><h3 data-i18n="진단 요약">진단 요약</h3><p class="setup-copy" data-i18n="버전과 마지막 연결 상태만 담습니다. 경로·작업 내용·환경 변수는 포함하지 않습니다.">버전과 마지막 연결 상태만 담습니다. 경로·작업 내용·환경 변수는 포함하지 않습니다.</p><details class="setup-details"><summary data-i18n="복사할 내용 보기">복사할 내용 보기</summary><pre id="support-report" tabindex="0"></pre></details><div class="setup-actions"><button id="support-refresh" class="button button-quiet" type="button" data-i18n="진단 새로 읽기">진단 새로 읽기</button><button id="support-copy" class="button button-secondary" type="button" disabled data-i18n="진단 요약 복사">진단 요약 복사</button></div></section>
+        <p class="setup-copy" data-i18n="Codex가 이전 서버 코드를 사용한다면 Codex의 MCP 연결을 재시작한 뒤 실제 도구 호출로 확인하세요.">Codex가 이전 서버 코드를 사용한다면 Codex의 MCP 연결을 재시작한 뒤 실제 도구 호출로 확인하세요.</p>
+      </div>
+    </dialog>
     <dialog id="setup-dialog" class="setup-dialog" aria-labelledby="setup-title" aria-describedby="setup-subtitle">
       <header class="setup-header"><div><p class="setup-eyebrow"><span data-i18n="JEV / 시작하기">JEV / 시작하기</span></p><h2 id="setup-title"><span data-i18n="작업할 프로젝트를 연결하세요">작업할 프로젝트를 연결하세요</span></h2><p id="setup-subtitle"><span data-i18n="프로젝트 준비부터 Codex 연결까지 한곳에서 진행합니다.">프로젝트 준비부터 Codex 연결까지 한곳에서 진행합니다.</span></p></div><label class="language-control"><span class="sr-only" data-i18n="언어">언어</span><select data-language-select aria-label="Language / 언어"><option value="ko" lang="ko">한국어</option><option value="en" lang="en">English</option></select></label><button id="setup-close" class="button button-quiet" type="button" aria-label="연결 설정 닫기" data-i18n-aria-label="연결 설정 닫기"><span data-i18n="닫기">닫기</span></button></header>
       <ol id="setup-steps" class="setup-steps" aria-label="연결 진행 단계" data-i18n-aria-label="연결 진행 단계"><li><span data-i18n="1 프로젝트">1 프로젝트</span></li><li><span data-i18n="2 Codex 연결">2 Codex 연결</span></li><li><span data-i18n="3 연결 확인">3 연결 확인</span></li><li><span data-i18n="4 시작">4 시작</span></li></ol>

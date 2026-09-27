@@ -19,6 +19,9 @@ contextBridge.exposeInMainWorld('jev', Object.freeze({
   prepareModel: () => invoke('jev:prepare'),
   stopModel: () => invoke('jev:stop'),
   checkConnection: () => invoke('jev:connection'),
+  reconnect: () => invoke('jev:reconnect'),
+  getDiagnostics: () => invoke('jev:diagnostics:get'),
+  copyDiagnostics: () => invoke('jev:diagnostics:copy'),
   selectProject: () => invoke('jev:project'),
   setup: (action, params = {}) => invoke('jev:setup', { action, params }),
 }));
