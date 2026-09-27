@@ -2,6 +2,8 @@
 
 조사일: 2026-09-27. 대상: Jev 0.6.2. 목적은 사용자가 연결 문제를 구분하고 앱 안에서 복구·진단할 수 있게 하는 것이다. 공식 문서와 공개 소스를 읽었으며 타사 제품을 직접 설치해 사용성 실험을 한 것은 아니다.
 
+에이전트 기억·문맥 복원이라는 제품 목적이 겹치는 Mem0·Zep/Graphiti·Supermemory·Letta·Basic Memory·LangMem·MCP Memory 비교는 [별도 연구](agent-memory-competitive-research.md)에 정리했다. 이 문서는 운영 UX 비교와 0.7.0 적용 기록이다.
+
 ## 비교 근거
 
 | 제품·프로젝트 | 확인한 동작 / 1차 출처 | Jev에 대한 판단 |
