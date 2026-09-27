@@ -23,6 +23,18 @@ from jev_context.shared_engine import SharedLocalEngine
 runtime_factory = shared.runtime_factory
 
 
+@pytest.mark.parametrize("stopping", [False, True])
+def test_worker_exit_during_intentional_shutdown_is_idle(runtime_factory, stopping):
+    runtime = runtime_factory()
+    broker = shared_engine.Broker(runtime.profile)
+    broker.engine = SimpleNamespace(process=SimpleNamespace(pid=123, poll=lambda: 0), startup=None)
+    broker.state = "shadow"
+    broker.stopping = stopping
+    snapshot = broker.snapshot()
+    assert snapshot["state"] == ("idle" if stopping else "unavailable")
+    assert snapshot["preparation_error"] == (None if stopping else "engine_worker_exited")
+
+
 @pytest.mark.parametrize("winerror", [5, 32, 33, None])
 def test_endpoint_publication_retry_is_bounded_and_specific(monkeypatch, winerror):
     elapsed = [0.0]

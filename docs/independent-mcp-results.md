@@ -37,3 +37,9 @@
 `shared_engine.publish_endpoint`가 Windows 접근·공유 오류(5/32/33)만 최대 0.5초 동안 재시도하도록 수정했다. 기존 파일은 원자적 교체가 성공할 때까지 유지하고 영구 권한 오류는 한도 후 실패한다. 다른 종류의 권한 오류는 즉시 실패한다. 시간 기준을 완화하거나 오류 응답을 성공으로 취급하지 않았다.
 
 수정 후 실제 열린 파일을 닫았을 때 새 broker와 worker가 복구하고 판단을 수행하는 검사, 재시도 한도/오류 구분 검사, 공유 엔진·MCP 회귀는 **18 passed**였다. 최종 `scripts/check.py`도 lint·format 및 **295 passed / 2 skipped**, 89.23초로 통과했다. 이 수치가 위 구조 정정 직후의 290개 통과 결과를 갱신한다. 수정 커밋의 원격 CI는 푸시 후 별도로 확인한다.
+
+이어진 `68f758b`의 [원격 검사](https://github.com/tttaliesin/jev-context/actions/runs/36317306635)는 파일 교체/강제 종료 복구 검사를 통과했지만 정상 유휴 종료의 상태 조회 검사에서 실패했다(296 passed / 1 failed). 정상 종료가 `stopping=True`로 시작된 뒤 worker가 닫히는 순간, 아직 처리 중인 status 요청이 이를 `engine_worker_exited`로 표시했다. 상태 전이 검사에서 정상 종료만 수정 전 실패하며 비정상 종료는 기존 오류로 표시됨을 재현했다.
+
+`Broker.snapshot`은 정상 종료가 이미 시작됐으면 `idle`로 표시하고, 예상하지 못한 worker 종료는 계속 `unavailable / engine_worker_exited`로 표시하도록 수정했다. 유휴 종료 조건·모델 기동·외부 MCP 계약은 변경하지 않는다.
+
+이 상태 수정 후 공유 실행기·복구·MCP 검사 **20 passed**, 38.79초 및 Ruff lint·format 통과를 확인했다. 전체 회귀는 이 수정이 포함된 후속 커밋의 CI에서 다시 실행한다.

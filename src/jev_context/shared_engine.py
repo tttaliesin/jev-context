@@ -357,7 +357,11 @@ class Broker:
     def snapshot(self):
         with self.mutex:
             process = self.engine.process
-            if self.state == "shadow" and process and process.poll() is not None:
+            if self.stopping:
+                # Normal idle/explicit shutdown may close the worker while a
+                # status handler is still draining. Its exit is expected.
+                self.state, self.error = "idle", None
+            elif self.state == "shadow" and process and process.poll() is not None:
                 self.state, self.error = "unavailable", "engine_worker_exited"
             return {
                 "state": self.state,
