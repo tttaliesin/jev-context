@@ -137,7 +137,7 @@ Jev와 Workroom은 **독립 제품**입니다. Codex·Claude Desktop의 에이�
 | 구성 요소 | 버전 | 현재 범위 |
 |---|---|---|
 | Python 서비스 · MCP 서버 | 0.2.0 | 계약 1.0 기본 제공, 계약 2.0 명시 선택 |
-| Electron 관리 앱 | 0.6.1 | 프로젝트 준비·Codex 연결 안내·한국어/영어 전환을 포함한 Windows x64 앱 |
+| Electron 관리 앱 | 0.6.2 | 프로젝트 준비·Codex 연결 안내·한국어/영어 전환을 포함한 Windows x64 앱 |
 | 로컬 모델 판단 | shadow | 판단 기록만 수행. active 승격 평가를 통과한 프로필 없음 |
 
 모델 판단을 선택에 반영하려면 사람이 검토한 heldout 평가를 통과해야 합니다. 현재 구성은 **SemIf OpenVINO · Qwen3.5-4B INT8 · 로컬 GPU**입니다. [모델 준비와 제한](docs/models.md)

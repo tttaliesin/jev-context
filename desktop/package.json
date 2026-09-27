@@ -1,7 +1,7 @@
 {
   "name": "jev-context-manager",
   "productName": "Jev Context",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Local model and work record manager for Jev Context",
   "private": true,
   "main": "main.cjs",

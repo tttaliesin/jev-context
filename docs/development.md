@@ -32,7 +32,7 @@ mise 없이 설치할 때는 `--python`으로 Python 3.12 실행 파일을 지�
 
 검사 명령은 의존성을 설치하거나 lock을 바꾸지 않고, 첫 실패의 종료 코드를 그대로 돌려줍니다. build 도구(hatchling)는 dev 의존성에 고정돼 있어 offline build 중 추가로 내려받지 않습니다.
 
-GitHub Actions([check.yml](../.github/workflows/check.yml))는 `master` push와 pull request마다 Windows 러너에서 같은 순서로 검사하고, `test_window_state.cjs`도 실행합니다.
+GitHub Actions([check.yml](../.github/workflows/check.yml))는 `master` push와 pull request마다 Windows 러너에서 같은 순서로 검사하고, 창 상태·언어·프로젝트 전환·bridge 복구 Node 테스트도 실행합니다.
 
 pytest는 약 250개 테스트를 1분 20초 정도에 실행합니다. `test_coding_benchmark.py`는 격리된 pytest를 프로젝트의 `.t/` 아래에서 실행하고, 끝나면 그 임시 폴더를 지웁니다.
 
@@ -43,6 +43,8 @@ pytest는 약 250개 테스트를 1분 20초 정도에 실행합니다. `test_co
 Python 검사에는 포함되지 않습니다. Node가 필요합니다.
 
 - `node --test scripts\test_window_state.cjs`: 창 위치·크기 저장 로직. Node만 있으면 실행됩니다.
+- `node --test scripts\test_locales.cjs scripts\test_project_switch.cjs scripts\test_bridge_client.cjs`: 번역, 설정 쓰기/rename 실패, Python 시작 실패와 재시도, 이전 프로세스의 늦은 이벤트를 검사합니다. Node만 있으면 실행됩니다.
+- `node scripts\test_desktop_recovery.cjs`: 격리 프로젝트와 userData로 실제 Electron의 프로젝트 선택·온보딩 저장 실패, 재시도, 재실행 후 선택 유지, 실제 Python 연결 복구를 검사합니다. 모델을 시작하지 않습니다.
 - `scripts\test_desktop.cjs`, `test_desktop_ux.cjs`: 빌드된 `dist\JevContext`를 Playwright로 실제 실행하는 화면 검사입니다.
 - `scripts\test_desktop_states.cjs`: 실제 렌더러를 fixture로 띄워 상태별 화면을 검사합니다. Electron main, Python, DB, 모델은 쓰지 않습니다.
 

@@ -23,15 +23,23 @@ class BridgeClient {
       '--config', configPath], { cwd: projectRoot, env, shell: false, windowsHide: true,
       stdio: ['pipe', 'pipe', 'pipe'] });
     this.child = child;
+    this.stderr = '';
+    // A retired process may emit close/exit/stream events after a retry starts.
+    const retire = error => {
+      if (this.child !== child) return;
+      this.child = null;
+      this.fail(error);
+      child.kill();
+    };
     let buffer = '';
     child.stdout.setEncoding('utf8');
     child.stderr.setEncoding('utf8');
-    child.stderr.on('data', data => { this.stderr = (this.stderr + data).slice(-4000); });
+    child.stderr.on('data', data => { if (this.child === child) this.stderr = (this.stderr + data).slice(-4000); });
     child.stdout.on('data', chunk => {
+      if (this.child !== child) return;
       buffer += chunk;
       if (Buffer.byteLength(buffer, 'utf8') > 2 * 1024 * 1024) {
-        this.fail(new Error('서버 응답 크기 제한을 초과했습니다.'));
-        child.kill();
+        retire(new Error('서버 응답 크기 제한을 초과했습니다.'));
         return;
       }
       let split;
@@ -41,7 +49,7 @@ class BridgeClient {
         if (!line) continue;
         let response;
         try { response = JSON.parse(line); }
-        catch { this.fail(new Error('서버가 올바른 응답을 보내지 않았습니다.')); child.kill(); return; }
+        catch { retire(new Error('서버가 올바른 응답을 보내지 않았습니다.')); return; }
         const pending = this.pending.get(response.id);
         if (!pending) continue;
         this.pending.delete(response.id);
@@ -53,12 +61,11 @@ class BridgeClient {
         } else pending.resolve(response.result);
       }
     });
-    child.on('error', error => this.fail(new Error(`Python 서버를 시작하지 못했습니다: ${error.message}`)));
-    child.on('exit', (code, signal) => {
-      if (this.child === child) this.child = null;
-      this.fail(new Error(`프로젝트 서버가 종료됐습니다 (${signal || code}). ${this.stderr.trim()}`));
-    });
-    child.stdin.on('error', error => this.fail(new Error(`서버 연결 오류: ${error.message}`)));
+    child.on('error', error => retire(new Error(`Python 서버를 시작하지 못했습니다: ${error.message}`)));
+    const exited = (code, signal) => retire(new Error(`프로젝트 서버가 종료됐습니다 (${signal || code}). ${this.stderr.trim()}`));
+    child.on('exit', exited);
+    child.on('close', exited);
+    child.stdin.on('error', error => retire(new Error(`서버 연결 오류: ${error.message}`)));
   }
 
   request(method, params = {}) {
@@ -70,7 +77,12 @@ class BridgeClient {
         reject(new Error('서버 응답을 기다리는 시간이 초과됐습니다. 상태를 다시 확인해 주세요.'));
       }, method === 'connection_check' ? 30000 : 12000);
       this.pending.set(id, { resolve, reject, timer });
-      this.child.stdin.write(JSON.stringify({ id, method, params }) + '\n');
+      try { this.child.stdin.write(JSON.stringify({ id, method, params }) + '\n'); }
+      catch (error) {
+        this.pending.delete(id);
+        clearTimeout(timer);
+        reject(error);
+      }
     });
   }
 
@@ -89,6 +101,7 @@ class BridgeClient {
     const timer = setTimeout(() => { if (child.exitCode === null) child.kill(); }, 1500);
     timer.unref();
     child.once('exit', () => clearTimeout(timer));
+    child.once('close', () => clearTimeout(timer));
     // The shared model broker is deliberately not owned by this GUI connection.
   }
 }

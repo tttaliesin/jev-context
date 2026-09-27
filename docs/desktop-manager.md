@@ -1,6 +1,8 @@
 # 데스크톱 관리 앱 실행 안내
 
-탐색기에서 프로젝트 폴더의 `dist\JevContext\JevContext.exe`를 더블클릭합니다. Windows x64용 Electron 관리 앱 **0.6.1**입니다. 기존 **Python 서비스 0.2.0**과 같은 프로젝트 설정·모델·작업 기록을 사용합니다.
+탐색기에서 프로젝트 폴더의 `dist\JevContext\JevContext.exe`를 더블클릭합니다. Windows x64용 Electron 관리 앱 **0.6.2**입니다. 기존 **Python 서비스 0.2.0**과 같은 프로젝트 설정·모델·작업 기록을 사용합니다.
+
+프로젝트 전환은 새 연결 확인과 설정 저장이 모두 성공한 뒤 반영합니다. 저장에 실패하면 기존 프로젝트를 유지하므로 파일 접근 문제를 해결한 뒤 다시 선택할 수 있습니다. Python 시작 실패 뒤 상태를 다시 조회하면 새 프로세스로 연결을 시도합니다.
 
 0.6.0에서 추가한 Workroom 직접 연결 파일 내보내기는 제거했습니다. Codex·Claude Desktop의 에이전트가 각 제품 MCP를 독립적으로 사용합니다. 기존 전용 저장 파일은 자동 삭제·이관하지 않습니다. [독립 제품 원칙](independent-products.md) · [일반 기억 도구 사용](agent-memory-workflow.md)
 

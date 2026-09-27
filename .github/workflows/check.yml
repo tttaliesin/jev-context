@@ -42,5 +42,5 @@ jobs:
         with:
           node-version: "24"
 
-      - name: Desktop window state tests
-        run: node --test scripts/test_window_state.cjs scripts/test_locales.cjs
+      - name: Desktop state and failure recovery tests
+        run: node --test scripts/test_window_state.cjs scripts/test_locales.cjs scripts/test_project_switch.cjs scripts/test_bridge_client.cjs

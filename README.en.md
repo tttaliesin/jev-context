@@ -141,7 +141,7 @@ The authoritative contracts are [contracts.json](src/jev_context/contracts.json)
 | Component | Version | Current scope |
 |---|---|---|
 | Python service / MCP server | 0.2.0 | Contract 1.0 by default; contract 2.0 by explicit selection |
-| Electron manager | 0.6.1 | Windows x64 app with project setup, Codex connection guidance, and Korean/English UI |
+| Electron manager | 0.6.2 | Windows x64 app with project setup, Codex connection guidance, and Korean/English UI |
 | Local model judgment | shadow | Records judgments only; no profile has passed the active promotion gate |
 
 Model judgments must pass a human-reviewed heldout evaluation before they can affect selection. The current configuration is **SemIf OpenVINO · Qwen3.5-4B INT8 · local GPU**. [Model setup and limits](docs/models.md) (Korean).

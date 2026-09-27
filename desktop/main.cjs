@@ -60,6 +60,26 @@ function saveSettings(next) {
   fs.renameSync(pending, filename);
 }
 
+async function switchProject(next) {
+  const candidate = new BridgeClient(next);
+  let snapshot;
+  let committed;
+  try {
+    snapshot = await candidate.request('overview');
+    // Language may have changed while the candidate was being checked.
+    committed = { ...settings, configPath: next.configPath, pythonPath: next.pythonPath };
+    saveSettings(committed);
+  } catch (error) {
+    candidate.close();
+    throw error;
+  }
+  const previous = bridge;
+  settings = committed;
+  bridge = candidate;
+  previous?.close();
+  return snapshot;
+}
+
 function client() {
   if (!fs.existsSync(settings.pythonPath) || !fs.existsSync(path.join(settings.projectRoot, 'src', 'jev_context', 'desktop_bridge.py')))
     throw new Error('Python 실행 환경을 찾지 못했습니다. 실행 파일 옆 launch-config.json의 프로젝트 경로를 확인해 주세요.');
@@ -94,13 +114,7 @@ function registerActions() {
     return language;
   });
   const setup = createSetupController({ dialog, clipboard, getWindow: () => window, getSettings: () => settings,
-    adopt: async next => {
-      const candidate = new BridgeClient(next);
-      try { await candidate.request('overview'); } catch (error) { candidate.close(); throw error; }
-      bridge?.close(); bridge = candidate;
-      settings = { ...settings, configPath: next.configPath, pythonPath: next.pythonPath };
-      saveSettings(settings);
-    } });
+    adopt: switchProject });
   register('jev:setup', payload => {
     if (!payload || typeof payload.action !== 'string' || Object.keys(payload).some(key => !['action', 'params'].includes(key))) throw new Error('잘못된 설정 요청입니다.');
     return setup.run(payload.action, payload.params);
@@ -132,15 +146,7 @@ function registerActions() {
     });
     if (selected.canceled || !selected.filePaths[0]) return null;
     const next = { ...settings, configPath: path.resolve(selected.filePaths[0]) };
-    const candidate = new BridgeClient(next);
-    let snapshot;
-    try { snapshot = await candidate.request('overview'); }
-    catch (error) { candidate.close(); throw error; }
-    bridge?.close();
-    bridge = candidate;
-    settings = { ...next, language: settings.language };
-    saveSettings(settings);
-    return snapshot;
+    return switchProject(next);
   });
 }
 
