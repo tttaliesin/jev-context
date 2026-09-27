@@ -232,6 +232,10 @@ class Service:
     def work_open(self, args):
         if "work_id" in args:
             body = self.work(args["work_id"])
+            if self.config.contract_version == "2.0":
+                from .projection import work_summary
+
+                body = work_summary(body)
             return {
                 **body,
                 "decisions": self.objects("decisions", args["work_id"]),
@@ -410,6 +414,7 @@ class Service:
             from .completion import coverage
 
             body.update(
+                progress={"summary": event["summary"], "next_actions": []},
                 completion_coverage=coverage(self, body, event["target_revision"]),
                 completion_target_revision=event["target_revision"],
                 completion_reason="Coverage uses agent-reported evidence; it is not independent host verification",
@@ -420,6 +425,8 @@ class Service:
         if record.body["status"] != "completion_reported":
             raise DomainError("invalid_argument", "Only a reported-complete work can be reopened")
         record.body.update(status="active", completion_coverage="incomplete")
+        if self.config.contract_version == "2.0":
+            record.body["progress"] = {"summary": record.event["reason"], "next_actions": []}
 
     def paginate(self, items, args, revision, scope, default):
         offset = 0

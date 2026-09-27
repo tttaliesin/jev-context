@@ -441,7 +441,8 @@ def test_required_judgment_with_unjudged_candidates_is_not_success(v2):
         sync(v2, f"로그인 실패 사례 {index}: 연결 오류", f"case{index}.md")
     v2.config.engine = {"state": "shadow"}
     v2.engine = Judge(choice="relevant")
-    args = {"work_id": wid, "query": "로그인"}
+    # Isolate unjudged-candidate handling from whole-envelope budget truncation.
+    args = {"work_id": wid, "query": "로그인", "budget_bytes": 65536}
     optional = call(v2, "context_prepare", **args)
     assert optional["data"]["judgment"]["status"] == "observed"
     assert optional["data"]["judgment"]["unjudged_candidates"] > 0

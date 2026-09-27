@@ -190,7 +190,15 @@ def test_two_real_mcp_hosts_share_demand_started_model_and_status_does_not_keep_
                 warming = await call(first, "context_prepare", **context, judge_mode="required")
                 assert time.monotonic() - started < 2
                 assert warming["outcome"] == "insufficient"
-                judgments = warming["data"]["judgment"]["evaluations"]
+                judgments = (
+                    await call(
+                        first,
+                        "work_inspect",
+                        work_id=work_id,
+                        view="judgments",
+                        packet_id=warming["data"]["packet_id"],
+                    )
+                )["data"]["items"]
                 assert judgments and all(
                     row.get("reason") == "engine_preparing" for row in judgments
                 )

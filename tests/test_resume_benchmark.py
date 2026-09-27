@@ -270,3 +270,99 @@ def test_stdout_does_not_guess_thread_from_other_events():
     )
     assert result["thread_id"] is None
     assert result["completed_turns"] == 1
+
+
+def result_fixture(seconds=100, **execution):
+    return {
+        "condition": "e0",
+        "passed": True,
+        "scope_violations": [],
+        "grading_seconds": 2,
+        "code_plus_grading_seconds": seconds + 2,
+        "execution": {
+            "exit_code": 0,
+            "completed_turns": 1,
+            "timed_out": False,
+            "answer_present": True,
+            "measurement_complete": True,
+            "elapsed_seconds": seconds,
+            "total_token_usage": {
+                "total_tokens": 100,
+                "cached_input_tokens": 20,
+                "output_tokens": 10,
+            },
+            "uncached_input_tokens": 70,
+            "tool_call_count": 4,
+            **execution,
+        },
+    }
+
+
+def summarize_fixture(trials):
+    return benchmark.summarize_trials({"task": "test", "context_generation": {}}, trials)
+
+
+def test_failed_execution_time_and_partial_tokens_do_not_become_performance():
+    limited = result_fixture(4, exit_code=1, completed_turns=0)
+    limited["execution"].update(
+        benchmark.observed_stdout(
+            '{"type":"turn.failed","error":{"message":"You have hit your usage limit"}}'
+        )
+    )
+    limited["passed"] = False
+    result = summarize_fixture({"01": limited})
+    condition = result["conditions"]["e0"]
+    assert result["attempted_trials"] == 1
+    assert result["completed_trials"] == 0
+    assert not result["comparison_complete"]
+    assert condition["execution_status_counts"] == {"usage_limited": 1}
+    assert condition["median_attempt_seconds"] == 4
+    assert condition["median_code_seconds"] is None
+    assert condition["median_total_tokens"] is None
+    assert condition["estimated_context_call_plus_replay_seconds"] is None
+
+
+def test_normal_but_incorrect_repairs_remain_in_performance_denominator():
+    good = result_fixture(100)
+    incorrect = result_fixture(300)
+    incorrect["passed"] = False
+    crashed = result_fixture(4, exit_code=1)
+    crashed["passed"] = False
+    escaped = result_fixture(1)
+    escaped.update(passed=False, scope_violations=["tests/changed.py"])
+    result = summarize_fixture({"01": good, "02": incorrect, "03": crashed, "04": escaped})
+    condition = result["conditions"]["e0"]
+    assert condition["completed_trials"] == 3
+    assert condition["performance_trials"] == 2
+    assert condition["passed_trials"] == 1
+    assert condition["median_code_seconds"] == 200
+    assert condition["median_code_plus_grading_seconds"] == 202
+    assert condition["measurement_complete_trials"] == 2
+
+
+@pytest.mark.parametrize(
+    "changes,status",
+    [
+        ({"timed_out": True}, "timed_out"),
+        ({"answer_present": False}, "missing_answer"),
+        ({"completed_turns": 0}, "execution_failed"),
+    ],
+)
+def test_incomplete_execution_is_never_completed(changes, status):
+    assert benchmark.execution_status(result_fixture(**changes)["execution"]) == status
+
+
+def test_usage_limit_stops_next_trial_before_starting_another_process(tmp_path, monkeypatch):
+    prior = tmp_path / "runs/01/result.json"
+    prior.parent.mkdir(parents=True)
+    limited = result_fixture(exit_code=1, errors=[{"message": "usage limit"}])
+    benchmark.write_json(prior, limited)
+    monkeypatch.setattr(
+        benchmark,
+        "verify_freeze",
+        lambda _: {"execution_order": ["01", "02"], "trials": {"01": {}, "02": {}}},
+    )
+    with pytest.raises(RuntimeError, match="Usage limit interrupted"):
+        benchmark.execute(tmp_path, "02")
+    assert not (tmp_path / "runs/02").exists()
+    assert not (tmp_path / "execution.lock").exists()

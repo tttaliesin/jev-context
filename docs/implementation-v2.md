@@ -2,6 +2,8 @@
 
 아래는 초기 0.2.0 구현 기록이다. 이후 Desktop 연결 시연은 [호스트 기능표](host-capabilities.md), 현재 로컬 엔진과 프로젝트 이동 복구 결과는 [2026-09-26 검증](recovery-validation.md)을 따른다.
 
+2026-09-27의 [문맥 전달 개선](context-efficiency-results.md)은 현재 상태·이력 분리와 예산 누락 표시를 추가한다. 저장 가능한 판단 상세는 크기와 무관하게 별도 조회하며, read-only에서는 조회할 수 없는 packet 참조를 만들지 않고 판단 상세를 본문에 유지한다. 계약 입력과 DB schema는 변경하지 않는다.
+
 [통합 설계 2.0](design/unified-design.md)을 구현하는 두 번째 개발 버전
 실제 로컬 추론과 MCP 호출 연결, 자동 선별 승격 기준은 미충족 상태
 후속 [영어 번역 입력 비교](translation-evaluation.md)에서도 현재 모델의 자동 선별 품질 미달 확인

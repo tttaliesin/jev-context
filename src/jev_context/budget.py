@@ -22,6 +22,7 @@ def bounded(result, limit, removable_key=None):
         "used_bytes": 0,
         "measurement": "UTF-8 MCP CallToolResult JSON; excludes JSON-RPC framing",
     }
+    _coverage(result, removable_key)
     for _ in range(8):
         data["wire_budget"]["used_bytes"] = measure(result)
     if measure(result) <= limit:
@@ -42,6 +43,7 @@ def bounded(result, limit, removable_key=None):
             data["wire_budget"]["omitted_optional"] = (
                 data["wire_budget"].get("omitted_optional", 0) + 1
             )
+            _coverage(result, removable_key)
             data["wire_budget"]["used_bytes"] = measure(result)
     for _ in range(8):
         data["wire_budget"]["used_bytes"] = measure(result)
@@ -63,3 +65,28 @@ def bounded(result, limit, removable_key=None):
     for _ in range(8):
         reduced["data"]["wire_budget"]["used_bytes"] = measure(reduced)
     return reduced
+
+
+def _coverage(result, removable_key):
+    if removable_key != "evidence":
+        return
+    data = result["data"]
+    coverage = data.get("coverage", {})
+    omitted = coverage.get("omitted_candidates", 0) + data["wire_budget"].get("omitted_optional", 0)
+    coverage["returned_evidence"] = len(data.get("evidence", []))
+    coverage["budget_omitted_candidates"] = omitted
+    coverage["retrieval_status"] = (
+        "budget_limited"
+        if omitted
+        else "evidence_returned"
+        if data.get("evidence")
+        else "no_evidence"
+    )
+    if omitted and result["outcome"] == "ok":
+        result["outcome"] = "partial"
+    if "budget" in data:
+        data["budget"]["used_bytes"] = (
+            len(dumps({k: data[k] for k in ("scope", "protected", "evidence")}).encode())
+            if data.get("scope")
+            else 0
+        )

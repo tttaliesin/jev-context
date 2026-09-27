@@ -41,7 +41,8 @@ def test_optional_evidence_is_removed_before_required_evidence():
         1024,
         "evidence",
     )
-    assert result["outcome"] == "ok"
+    # Contract 2.0 now exposes optional evidence lost to the budget as partial.
+    assert result["outcome"] == "partial"
     assert result["data"]["evidence"] == [{"role": "required_evidence", "text": "must preserve"}]
     assert result["data"]["wire_budget"]["omitted_optional"] == 1
     assert wire_bytes(result) <= 1024

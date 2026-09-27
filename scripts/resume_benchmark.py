@@ -477,6 +477,7 @@ def observed_stdout(raw):
     ids.discard(None)
     usage = [event.get("usage") for event in events if event.get("type") == "turn.completed"]
     return {
+        "errors": [event for event in events if event.get("type") in {"error", "turn.failed"}],
         "thread_id": next(iter(ids)) if len(ids) == 1 else None,
         "completed_turns": len(usage),
         "stdout_turn_usage": usage,
@@ -651,6 +652,11 @@ def execute(directory, number, timeout=480):
                 break
             if not (directory / "runs" / preceding / "result.json").is_file():
                 raise RuntimeError(f"Latin order requires trial {preceding} before {number}")
+            previous_result = read_json(directory / "runs" / preceding / "result.json")
+            if execution_status(previous_result["execution"]) == "usage_limited":
+                raise RuntimeError(
+                    "Usage limit interrupted this batch; preserve it and start a new batch"
+                )
         for key, item in manifest["trials"].items():
             previous = directory / "runs" / key / "result.json"
             expected = read_json(previous)["final_hashes"] if previous.exists() else item["files"]
@@ -728,6 +734,19 @@ def median(values):
     return statistics.median(values) if values else None
 
 
+def execution_status(execution):
+    errors = json.dumps(execution.get("errors", []), ensure_ascii=False).lower()
+    if "usage limit" in errors or "rate_limit_exceeded" in errors:
+        return "usage_limited"
+    if execution.get("timed_out"):
+        return "timed_out"
+    if execution.get("exit_code") != 0 or execution.get("completed_turns", 0) < 1:
+        return "execution_failed"
+    if not execution.get("answer_present"):
+        return "missing_answer"
+    return "completed"
+
+
 def report(directory):
     manifest = verify_freeze(directory)
     trials = {}
@@ -739,26 +758,45 @@ def report(directory):
                 result["scope_violations"].append("completed_trial_changed_later")
                 result["passed"] = False
             trials[number] = result
+    value = summarize_trials(manifest, trials)
+    write_json(directory / "results.json", value)
+    return value
+
+
+def summarize_trials(manifest, trials):
+    """Summarize attempts without mistaking infrastructure failures for task performance.
+
+    Normally completed repairs that fail grading remain in the timing denominator.
+    Raw attempts, including incomplete token observations, remain in trials.
+    """
     conditions = {}
     for condition in ("e0", "e1", "e2"):
         runs = [result for result in trials.values() if result["condition"] == condition]
-        measured = [result for result in runs if result["execution"]["measurement_complete"]]
+        completed = [r for r in runs if execution_status(r["execution"]) == "completed"]
+        eligible = [r for r in completed if not r["scope_violations"]]
+        measured = [r for r in eligible if r["execution"]["measurement_complete"]]
         generation = manifest["context_generation"]
         generation_entry = generation.get(condition, {}) if isinstance(generation, dict) else {}
         generation_seconds = 0.0 if condition == "e0" else generation_entry.get("elapsed_seconds")
-        replay_seconds = median([r["code_plus_grading_seconds"] for r in runs])
+        replay_seconds = median([r["code_plus_grading_seconds"] for r in eligible])
         conditions[condition] = {
-            "completed_trials": len(runs),
+            "attempted_trials": len(runs),
+            "completed_trials": len(completed),
+            "performance_trials": len(eligible),
+            "execution_status_counts": {
+                status: sum(execution_status(r["execution"]) == status for r in runs)
+                for status in sorted({execution_status(r["execution"]) for r in runs})
+            },
+            "scope_violation_trials": sum(bool(r["scope_violations"]) for r in runs),
             "passed_trials": sum(run["passed"] for run in runs),
             "measurement_complete_trials": len(measured),
-            "median_code_seconds": median([r["execution"]["elapsed_seconds"] for r in runs]),
-            "median_grading_seconds": median([r["grading_seconds"] for r in runs]),
-            "median_code_plus_grading_seconds": median(
-                [r["code_plus_grading_seconds"] for r in runs]
-            ),
+            "median_attempt_seconds": median([r["execution"]["elapsed_seconds"] for r in runs]),
+            "median_code_seconds": median([r["execution"]["elapsed_seconds"] for r in eligible]),
+            "median_grading_seconds": median([r["grading_seconds"] for r in eligible]),
+            "median_code_plus_grading_seconds": replay_seconds,
             "context_generation_seconds_once": generation_seconds,
             "median_context_replay_code_plus_grading_seconds": replay_seconds,
-            "estimated_first_use_seconds": replay_seconds + generation_seconds
+            "estimated_context_call_plus_replay_seconds": replay_seconds + generation_seconds
             if isinstance(generation_seconds, (int, float)) and replay_seconds is not None
             else None,
             "median_total_tokens": median(
@@ -784,16 +822,21 @@ def report(directory):
         "limitations": [
             "One task does not establish general benefit or statistical significance",
             "Context generation is measured separately and reused across three trials",
-            "First-use time adds one generation observation to replay median; it is not measured end-to-end",
+            "Context-call plus replay estimate excludes model preparation; full setup is reported separately",
+            "Performance medians exclude incomplete executions and scope violations, but retain graded failures",
             "Read isolation relies on instructions plus project roots, not a sealed filesystem",
         ],
         "planned_trials": 9,
-        "completed_trials": len(trials),
+        "attempted_trials": len(trials),
+        "completed_trials": sum(c["completed_trials"] for c in conditions.values()),
+        "comparison_complete": all(
+            c["performance_trials"] == 3 and c["measurement_complete_trials"] == 3
+            for c in conditions.values()
+        ),
         "conditions": conditions,
         "context_generation": manifest["context_generation"],
         "trials": trials,
     }
-    write_json(directory / "results.json", value)
     return value
 
 

@@ -136,12 +136,20 @@ def _work_state(service, args):
                 else:
                     required += service.store.inherited_refs(table, item["id"])
     if service.config.contract_version == "2.0":
+        from .projection import checkpoint, criterion_summary, observation_summary
+
+        scope["checkpoint"] = checkpoint(work)
+        scope["inspection"] = {
+            "work_id": args["work_id"],
+            "views": ["events", "criteria", "evidence"],
+        }
         for item in service.objects("evidence", args["work_id"]):
             if item.get("role") in {"counterevidence", "failure"}:
-                protected.append({"role": "protected_observation", **item})
+                protected.append(observation_summary(item))
                 required += service.store.inherited_refs("evidence", item["id"])
         protected += [
-            {"role": "completion_criterion", **c} for c in work.get("criteria", {}).values()
+            {"role": "completion_criterion", **criterion_summary(c)}
+            for c in work.get("criteria", {}).values()
         ]
     return revision, scope, protected, required, missing
 
@@ -226,6 +234,8 @@ def _evidence_for(sources, freshness, ref, mandatory=False):
         origin=json.loads(original["origin"]),
         origin_kind=source["kind"],
     )
+    if sources.config.contract_version == "2.0":
+        value["locator"] = source["locator"]
     if "byte_start" in ref:
         value.update(
             byte_start=ref["byte_start"],
@@ -253,7 +263,12 @@ def _collect_evidence(sources, freshness, required, candidates, missing, warning
         if key in seen:
             continue
         try:
-            evidence.append(_evidence_for(sources, freshness, chunk))
+            value = _evidence_for(sources, freshness, chunk)
+            if sources.config.contract_version == "2.0" and any(
+                _contains(existing, value) for existing in required_evidence + evidence
+            ):
+                continue
+            evidence.append(value)
         except DomainError as exc:
             warnings.append(
                 dict(
@@ -263,6 +278,19 @@ def _collect_evidence(sources, freshness, required, candidates, missing, warning
                 )
             )
     return required_evidence, evidence
+
+
+def _contains(outer, inner):
+    if (outer["source_id"], outer["revision"]) != (inner["source_id"], inner["revision"]):
+        return False
+    if outer.get("complete_lines", True):
+        return outer["start_line"] <= inner["start_line"] and outer["end_line"] >= inner["end_line"]
+    return (
+        "byte_start" in outer
+        and "byte_start" in inner
+        and outer["byte_start"] <= inner["byte_start"]
+        and outer["byte_end"] >= inner["byte_end"]
+    )
 
 
 def _reverify_files(service, items, freshness, deadline):
@@ -436,6 +464,10 @@ def _store_packet(service, args, packet, outcome, warnings, budget, revision, so
                     "view": "judgments",
                     "packet_id": packet["packet_id"],
                 }
+                if "evaluations" in packet["judgment"]:
+                    packet["judgment"]["evaluation_count"] = len(
+                        packet["judgment"].pop("evaluations")
+                    )
             final = bounded(
                 response(args["request_id"], packet, outcome, warnings), budget, "evidence"
             )

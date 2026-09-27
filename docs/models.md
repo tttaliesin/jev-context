@@ -30,7 +30,7 @@
 - 입력이 IR의 고정 길이(1024 token)를 넘으면 잘라내지 않고 판단을 거절합니다.
 - 질문 하나마다 forward pass가 한 번씩 필요합니다. 아직 반영하지 않는 목적은 프로필의 `omit_shadow_purposes`로 건너뛸 수 있고, 현재 구성은 `presentation`을 건너뜁니다. active로 승격된 목적은 항상 묻습니다.
 
-**준비 시간.** OpenVINO GPU 컴파일에 캐시가 없으면 약 4분(237초), 캐시가 맞으면 약 20초가 걸립니다. 컴파일에 실패한 캐시는 격리한 뒤 새 캐시로 한 번만 다시 시도합니다. 근거는 [모델 시작 지연 조사](model-startup-performance.md)에 있습니다.
+**준비 시간.** 캐시 없는 준비는 과거 237초, 캐시를 사용한 준비는 과거 약 20초였으나 9월 26일 45.360초, 27일 45.391초도 관측했습니다. Python/런타임 import와 ready 조회 간격을 포함한 시작 지연이므로 20초를 상한으로 보장하지 않습니다. 컴파일에 실패한 캐시는 격리한 뒤 새 캐시로 한 번만 다시 시도합니다. 근거는 [모델 시작 지연 조사](model-startup-performance.md)와 [작업 재개 비교](resume-evaluation-results.md)에 있습니다.
 
 **환경.** 전용 Python 환경을 [semif-requirements.txt](../models/semif-requirements.txt)로 만듭니다 ([개발 환경](development.md#모델-환경)). 모델 가중치 다운로드와 OpenVINO IR 변환은 별도 단계입니다. 변환 도구 중 저장소에는 [prepare_rank3_constants.py](../scripts/prepare_rank3_constants.py)만 있고, 원 변환 스크립트는 이 PC의 `.local`에만 있습니다.
 
@@ -121,4 +121,4 @@ profile_file = "semif-ov-profile.json"
 
 - 공개 코드 확인 기준은 [SemIf 23cf1f39](https://github.com/TheoLeeCJ/SemIf), [OpenJev e04794a](https://github.com/razorback16/openjev/tree/e04794ab36e4f7e6040c2547baecdb2737ce2e79), [Laya 573e5b6](https://github.com/NandhaKishorM/laya/tree/573e5b62696ba441230cd6be71d593331b5d23af)입니다.
 - 모델 우열, 한국어 정확도, RAM·GPU 요구 충족은 이 구현의 단위 테스트로 증명하지 않습니다. 어댑터 테스트는 모의 worker와 모의 서버로 통신 계약만 검사합니다.
-- SemIf 구성의 사람 검토 heldout 품질 평가와 실제 코딩 작업 효율 측정은 아직 없습니다. 준비 시간 측정의 30문항 비교는 설정 변경 전후의 **답 일치** 확인이며 정확도가 아닙니다.
+- SemIf 구성의 사람 검토 heldout 품질 평가는 아직 없습니다. 동일 결함을 세 조건에서 각 3회 시도한 [작업 재개 비교](resume-evaluation-results.md)는 개발 관측이며 일반 코딩 효율 개선을 증명하지 않습니다. 준비 시간 측정의 30문항 비교는 설정 변경 전후의 **답 일치** 확인이며 정확도가 아닙니다.
