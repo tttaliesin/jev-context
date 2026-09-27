@@ -191,6 +191,7 @@ The detailed guides and historical reports below are currently **in Korean**. Th
 | Product direction and scope | [Unified design 2.0](docs/design/unified-design.md) · [Implementation and verification](docs/implementation-v2.md) |
 | Comparable products and improvement priorities | [Agent memory research](docs/agent-memory-competitive-research.md) · [Operations research](docs/desktop-operations-research.md) |
 | Models and shared runtime | [Models](docs/models.md) · [Model lifecycle](docs/model-lifecycle-design.md) |
+| External decision-model runtime | [Ollaya research and integration requirements](docs/ollaya-research.md) |
 | Context delivery | [Research](docs/context-efficiency-research.md) · [Plan](docs/context-efficiency-implementation-plan.md) · [Results](docs/context-efficiency-results.md) |
 | README design and actual captures | [References and capture notes](docs/readme-design-references.md) |
 
