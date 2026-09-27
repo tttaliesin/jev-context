@@ -3,6 +3,7 @@
 const { spawn } = require('node:child_process');
 const path = require('node:path');
 const fs = require('node:fs');
+const locale = require('./locales.js');
 
 function requestSetup(settings, action, values = {}) {
   if (!fs.existsSync(settings.pythonPath)) return Promise.reject(new Error('Python 실행 환경을 찾지 못했습니다. Python 선택에서 Jev 의존성이 설치된 실행기를 선택하세요.'));
@@ -41,6 +42,7 @@ function requestSetup(settings, action, values = {}) {
 }
 
 function createSetupController({ dialog, clipboard, getWindow, getSettings, adopt }) {
+  const t = key => locale.translate(getSettings().language, key);
   let draft = null, busy = false, lastPrompt = '';
   async function run(action, params = {}) {
     if (busy) throw new Error('설정 작업이 진행 중입니다. 잠시 기다려 주세요.');
@@ -52,11 +54,11 @@ function createSetupController({ dialog, clipboard, getWindow, getSettings, adop
     const requestedAction = action, previousDraft = draft;
     try {
       if (!draft || action === 'begin') draft = { ...getSettings() };
-      if (action === 'copy') { if (!lastPrompt) throw new Error('먼저 확인 문구를 만들어 주세요.'); clipboard.writeText(lastPrompt); return { copied: true }; }
+      if (action === 'copy') { if (!lastPrompt) throw new Error('먼저 확인 문구를 만들어 주세요.'); clipboard.writeText(locale.prompt(getSettings().language, lastPrompt)); return { copied: true }; }
       if (action === 'folder' || action === 'python') {
         const choice = await dialog.showOpenDialog(getWindow(), action === 'folder'
-          ? { title: '작업할 프로젝트 폴더 선택', properties: ['openDirectory'] }
-          : { title: 'Jev 환경의 Python 3.12 선택', properties: ['openFile'], filters: [{ name: 'Python', extensions: ['exe'] }] });
+          ? { title: t('작업할 프로젝트 폴더 선택'), properties: ['openDirectory'] }
+          : { title: t('Jev 환경의 Python 3.12 선택'), properties: ['openFile'], filters: [{ name: 'Python', extensions: ['exe'] }] });
         if (choice.canceled || !choice.filePaths[0]) return null;
         if (action === 'folder') {
           draft = { ...draft, selectedRoot: path.resolve(choice.filePaths[0]), configPath: path.join(path.resolve(choice.filePaths[0]), '.local', 'project.toml') };

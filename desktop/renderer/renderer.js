@@ -1,6 +1,9 @@
 "use strict";
 
-(() => {
+(async () => {
+  const i18n = window.jevI18n;
+  await i18n.ready;
+  const { t } = i18n;
   const $ = (id) => document.getElementById(id);
   const api = window.jev;
   let onboarding;
@@ -49,12 +52,12 @@
     sidebarDrag: null,
   };
 
-  const text = (value, fallback = "미확인") =>
+  const text = (value, fallback = t("미확인")) =>
     typeof value === "string" && value.trim() ? value : fallback;
   const number = (value) => typeof value === "number" && Number.isFinite(value);
   const setText = (id, value) => { $(id).textContent = String(value); };
   const announce = (message) => { setText("announcement", message); };
-  const projectName = (path) => text(path, "프로젝트 미선택").split(/[\\/]/).filter(Boolean).pop() || "프로젝트";
+  const projectName = (path) => text(path, t("프로젝트 미선택")).split(/[\\/]/).filter(Boolean).pop() || t("프로젝트");
   const projectKey = (snapshot) => `${snapshot.project?.project_id || ""}|${snapshot.config_path || snapshot.project?.project_root || ""}`.replaceAll("\\", "/").toLowerCase();
 
   function savePreferences() {
@@ -77,7 +80,7 @@
     $("sidebar").inert = collapsed;
     $("sidebar").setAttribute("aria-hidden", String(collapsed));
     $("sidebar-toggle").setAttribute("aria-expanded", String(!collapsed));
-    const label = collapsed ? "작업 목록 펼치기" : "작업 목록 접기";
+    const label = collapsed ? t("작업 목록 펼치기") : t("작업 목록 접기");
     $("sidebar-toggle").setAttribute("aria-label", label);
     $("sidebar-toggle").title = `${label} · Ctrl+B`;
     preferences.sidebarCollapsed = collapsed;
@@ -94,7 +97,7 @@
     $("app-shell").style.setProperty("--sidebar-expanded-width", `${actual}px`);
     $("sidebar-resize").setAttribute("aria-valuemax", String(maximum));
     $("sidebar-resize").setAttribute("aria-valuenow", String(actual));
-    $("sidebar-resize").setAttribute("aria-valuetext", `${actual}픽셀`);
+    $("sidebar-resize").setAttribute("aria-valuetext", t("{0}픽셀", actual));
     return actual;
   }
 
@@ -107,7 +110,7 @@
     preferences.sidebarWidth = 260;
     applySidebarWidth();
     savePreferences();
-    announce("작업 목록 너비를 기본값으로 복원했습니다.");
+    announce(t("작업 목록 너비를 기본값으로 복원했습니다."));
   }
 
   function focusSearch() {
@@ -145,51 +148,51 @@
 
   function commandItems() {
     const action = (id, label, description, shortcut, button, run) => {
-      let unavailable = button?.title || "현재 사용할 수 없습니다.";
-      if (!api) unavailable = "관리 도구 연결이 필요합니다.";
-      else if (state.action) unavailable = "다른 요청을 처리 중입니다. 완료 후 사용할 수 있습니다.";
-      else if (state.loading && ["refresh", "load-more"].includes(id)) unavailable = "프로젝트 상태를 조회 중입니다.";
-      else if (id === "connection" && !state.snapshot?.project) unavailable = "프로젝트를 먼저 열어 주세요.";
-      return { id, group: "화면과 연결", label, description: button?.disabled ? unavailable : description,
+      let unavailable = button?.title || t("현재 사용할 수 없습니다.");
+      if (!api) unavailable = t("관리 도구 연결이 필요합니다.");
+      else if (state.action) unavailable = t("다른 요청을 처리 중입니다. 완료 후 사용할 수 있습니다.");
+      else if (state.loading && ["refresh", "load-more"].includes(id)) unavailable = t("프로젝트 상태를 조회 중입니다.");
+      else if (id === "connection" && !state.snapshot?.project) unavailable = t("프로젝트를 먼저 열어 주세요.");
+      return { id, group: t("화면과 연결"), label, description: button?.disabled ? unavailable : description,
         shortcut, disabled: button?.disabled === true, run };
     };
     const items = [
-      action("filter", "불러온 작업 필터", "현재 목록의 제목과 목표에서 찾기", "Ctrl F", null, focusSearch),
-      action("sidebar", preferences.sidebarCollapsed ? "작업 목록 펼치기" : "작업 목록 접기", "기록을 읽을 공간 조절", "Ctrl B", null,
+      action("filter", t("불러온 작업 필터"), t("현재 목록의 제목과 목표에서 찾기"), "Ctrl F", null, focusSearch),
+      action("sidebar", preferences.sidebarCollapsed ? t("작업 목록 펼치기") : t("작업 목록 접기"), t("기록을 읽을 공간 조절"), "Ctrl B", null,
         () => setSidebarCollapsed(!preferences.sidebarCollapsed)),
-      action("reset-width", "목록 너비 기본값으로", "기본 너비 260픽셀 복원", "", null, resetSidebarWidth),
-      action("refresh", "프로젝트 상태 새로고침", "현재 상태와 작업 목록 다시 읽기", "F5", $("refresh"), () => { void refresh(); }),
-      action("connection", "연결 점검", "별도 MCP 통신 확인", "", $("check-connection"), () => { void perform("checkConnection"); }),
-      action("setup", "Codex 연결 설정", "프로젝트 준비 · 설치 · 확인 · 되돌리기", "", $("setup-open"), () => { void onboarding?.open(); }),
-      action("project", "프로젝트 설정 열기", "다른 프로젝트 설정 선택", "", $("select-project"), () => { void perform("selectProject"); }),
-      action("shortcuts", "키보드 단축키", "사용할 수 있는 단축키 안내", "F1", null, showShortcuts),
+      action("reset-width", t("목록 너비 기본값으로"), t("기본 너비 260픽셀 복원"), "", null, resetSidebarWidth),
+      action("refresh", t("프로젝트 상태 새로고침"), t("현재 상태와 작업 목록 다시 읽기"), "F5", $("refresh"), () => { void refresh(); }),
+      action("connection", t("연결 점검"), t("별도 MCP 통신 확인"), "", $("check-connection"), () => { void perform("checkConnection"); }),
+      action("setup", t("Codex 연결 설정"), t("프로젝트 준비 · 설치 · 확인 · 되돌리기"), "", $("setup-open"), () => { void onboarding?.open(); }),
+      action("project", t("프로젝트 설정 열기"), t("다른 프로젝트 설정 선택"), "", $("select-project"), () => { void perform("selectProject"); }),
+      action("shortcuts", t("키보드 단축키"), t("사용할 수 있는 단축키 안내"), "F1", null, showShortcuts),
     ];
-    if (state.nextCursor) items.push(action("load-more", "작업 더 불러오기", "이전 기록을 추가한 뒤 필터로 찾기", "", $("load-more"), () => { void refresh({ append: true }); }));
-    for (const [id, label, method] of [["prepare", "모델 준비", "prepareModel"], ["stop", "모델 종료", "stopModel"]]) {
+    if (state.nextCursor) items.push(action("load-more", t("작업 더 불러오기"), t("이전 기록을 추가한 뒤 필터로 찾기"), "", $("load-more"), () => { void refresh({ append: true }); }));
+    for (const [id, label, method] of [["prepare", t("모델 준비"), "prepareModel"], ["stop", t("모델 종료"), "stopModel"]]) {
       const button = $(id === "prepare" ? "prepare-model" : "stop-model");
-      items.push({ ...action(id, label, button.title, "", button, () => { void perform(method); }), group: "모델" });
+      items.push({ ...action(id, label, button.title, "", button, () => { void perform(method); }), group: t("모델") });
     }
     for (const work of state.works) {
       if (!work.work_id || work.redacted) continue;
-      items.push({ id: `work:${work.work_id}`, group: "불러온 작업", label: text(work.title, "제목 없는 작업"),
-        description: `${work.work_id === state.selectedId ? "현재 기록 · " : ""}${text(work.goal, "목표 없음").slice(0, 160)}`,
+      items.push({ id: `work:${work.work_id}`, group: t("불러온 작업"), label: text(work.title, t("제목 없는 작업")),
+        description: `${work.work_id === state.selectedId ? t("현재 기록 · ") : ""}${text(work.goal, t("목표 없음")).slice(0, 160)}`,
         keywords: `${work.work_id} ${work.goal || ""}`, run: () => { void selectWork(work.work_id); } });
     }
     return items;
   }
 
   function dateLabel(value, short = false) {
-    if (!value) return "갱신 시각 미확인";
+    if (!value) return t("갱신 시각 미확인");
     const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return "갱신 시각 미확인";
-    return new Intl.DateTimeFormat("ko-KR", short
+    if (Number.isNaN(parsed.getTime())) return t("갱신 시각 미확인");
+    return new Intl.DateTimeFormat(i18n.locale, short
       ? { month: "short", day: "numeric" }
       : { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(parsed);
   }
 
   function errorMessage(error) {
-    if (typeof error === "string") return error;
-    return text(error?.message, text(error?.error?.message, "요청을 처리하지 못했습니다. 다시 시도해 주세요."));
+    if (typeof error === "string") return i18n.message(error);
+    return i18n.message(text(error?.message, text(error?.error?.message, t("요청을 처리하지 못했습니다. 다시 시도해 주세요."))));
   }
 
   function showError(title, error, kind = "action") {
@@ -215,7 +218,7 @@
 
   async function invoke(method, ...args) {
     if (!api || typeof api[method] !== "function") {
-      throw new Error("관리 도구 API에 연결할 수 없습니다. JEV 데스크톱 앱에서 이 화면을 열어 주세요.");
+      throw new Error(t("관리 도구 API에 연결할 수 없습니다. JEV 데스크톱 앱에서 이 화면을 열어 주세요."));
     }
     const response = await api[method](...args);
     if (response?.ok === false) throw new Error(errorMessage(response.error));
@@ -243,83 +246,83 @@
     $("stop-model").disabled = !available || busy || state.stale || engine.can_stop !== true || !engine.worker_pid;
     $("check-connection").disabled = !available || busy || !state.snapshot?.project;
     $("load-more").disabled = !available || busy || state.loading;
-    $("load-more").textContent = state.loadingVisible && state.nextCursor ? "불러오는 중…" : "작업 더 보기";
+    $("load-more").textContent = state.loadingVisible && state.nextCursor ? t("불러오는 중…") : t("작업 더 보기");
     $("list-loading").hidden = !state.loadingVisible;
     $("work-list").setAttribute("aria-busy", String(state.loading));
     $("work-loading").hidden = !state.workLoadingId;
     $("work-panel").setAttribute("aria-busy", String(!!state.workLoadingId));
     $("work-retry").disabled = !available || !!state.workLoadingId;
     $("prepare-model").querySelector("span").textContent = state.action === "prepareModel"
-      ? "요청 중…" : engine.state === "preparing" ? "준비 중" : "모델 준비";
-    $("stop-model").querySelector("span").textContent = state.action === "stopModel" ? "종료 중…" : "모델 종료";
-    $("check-connection").textContent = state.action === "checkConnection" ? "점검 중…" : "연결 점검";
-    $("prepare-model").title = state.stale ? "현재 상태를 새로고침한 뒤 준비할 수 있습니다."
-      : engine.can_prepare ? "로컬 모델을 준비합니다." : "현재 상태에서는 모델을 준비할 수 없습니다.";
-    $("stop-model").title = state.stale ? "현재 상태를 새로고침한 뒤 종료할 수 있습니다."
-      : engine.state === "preparing" ? "모델 준비가 끝난 뒤 종료할 수 있습니다."
-      : Number(engine.active_requests) > 0 ? "판단 요청을 처리 중입니다. 끝난 뒤 종료할 수 있습니다."
-      : engine.can_stop && engine.worker_pid ? "공유 모델을 종료하고 메모리를 해제합니다." : "종료할 모델이 없습니다.";
+      ? t("요청 중…") : engine.state === "preparing" ? t("준비 중") : t("모델 준비");
+    $("stop-model").querySelector("span").textContent = state.action === "stopModel" ? t("종료 중…") : t("모델 종료");
+    $("check-connection").textContent = state.action === "checkConnection" ? t("점검 중…") : t("연결 점검");
+    $("prepare-model").title = state.stale ? t("현재 상태를 새로고침한 뒤 준비할 수 있습니다.")
+      : engine.can_prepare ? t("로컬 모델을 준비합니다.") : t("현재 상태에서는 모델을 준비할 수 없습니다.");
+    $("stop-model").title = state.stale ? t("현재 상태를 새로고침한 뒤 종료할 수 있습니다.")
+      : engine.state === "preparing" ? t("모델 준비가 끝난 뒤 종료할 수 있습니다.")
+      : Number(engine.active_requests) > 0 ? t("판단 요청을 처리 중입니다. 끝난 뒤 종료할 수 있습니다.")
+      : engine.can_stop && engine.worker_pid ? t("공유 모델을 종료하고 메모리를 해제합니다.") : t("종료할 모델이 없습니다.");
     state.commandMenu?.refresh();
   }
 
   function renderModel(engine) {
-    const revision = text(engine.model_revision, "모델 프로필 미확인");
+    const revision = text(engine.model_revision, t("모델 프로필 미확인"));
     setText("model-identity", `${revision.split("@")[0]}${engine.device ? ` · ${engine.device}` : ""}`);
     $("model-identity").title = revision;
     const active = Number(engine.active_requests) > 0;
     const statuses = {
-      idle: ["대기", "필요할 때 모델을 준비합니다. 현재 모델 메모리는 해제되어 있습니다.", ""],
-      preparing: ["준비 중", "모델을 메모리에 올리고 있습니다. 준비가 끝나면 상태가 갱신됩니다.", "working"],
-      shadow: [active ? "판단 중" : "준비 완료", active ? "판단을 처리하고 있습니다. 완료 후 종료할 수 있습니다." : "판단 요청을 받을 수 있습니다. 사용하지 않으면 자동으로 해제됩니다.", "positive"],
-      active: [active ? "판단 중" : "준비 완료", active ? "판단을 처리하고 있습니다. 완료 후 종료할 수 있습니다." : "판단 요청을 받을 수 있습니다. 사용하지 않으면 자동으로 해제됩니다.", "positive"],
-      disabled: ["모델 사용 안 함", "이 프로젝트 설정에서 모델 판단이 비활성화되어 있습니다. 저장된 작업 기록은 계속 볼 수 있습니다.", ""],
-      unavailable: ["모델 준비 불가", "모델 프로필과 실행 환경을 확인해 주세요. 설정을 확인한 뒤 다시 준비할 수 있습니다.", "warning"],
-      degraded: ["모델 확인 필요", "모델 실행 중 문제가 발생했습니다. 오류 내용을 확인한 뒤 다시 준비해 주세요.", "error"],
-      unconfigured: ["모델 설정 필요", "이 프로젝트에 사용할 모델 프로필이 없습니다. 프로젝트 설정을 확인해 주세요.", "warning"],
+      idle: [t("대기"), t("필요할 때 모델을 준비합니다. 현재 모델 메모리는 해제되어 있습니다."), ""],
+      preparing: [t("준비 중"), t("모델을 메모리에 올리고 있습니다. 준비가 끝나면 상태가 갱신됩니다."), "working"],
+      shadow: [active ? t("판단 중") : t("준비 완료"), active ? t("판단을 처리하고 있습니다. 완료 후 종료할 수 있습니다.") : t("판단 요청을 받을 수 있습니다. 사용하지 않으면 자동으로 해제됩니다."), "positive"],
+      active: [active ? t("판단 중") : t("준비 완료"), active ? t("판단을 처리하고 있습니다. 완료 후 종료할 수 있습니다.") : t("판단 요청을 받을 수 있습니다. 사용하지 않으면 자동으로 해제됩니다."), "positive"],
+      disabled: [t("모델 사용 안 함"), t("이 프로젝트 설정에서 모델 판단이 비활성화되어 있습니다. 저장된 작업 기록은 계속 볼 수 있습니다."), ""],
+      unavailable: [t("모델 준비 불가"), t("모델 프로필과 실행 환경을 확인해 주세요. 설정을 확인한 뒤 다시 준비할 수 있습니다."), "warning"],
+      degraded: [t("모델 확인 필요"), t("모델 실행 중 문제가 발생했습니다. 오류 내용을 확인한 뒤 다시 준비해 주세요."), "error"],
+      unconfigured: [t("모델 설정 필요"), t("이 프로젝트에 사용할 모델 프로필이 없습니다. 프로젝트 설정을 확인해 주세요."), "warning"],
     };
-    const [label, description, tone] = statuses[engine.state] || ["상태 미확인", "모델의 현재 실행 상태를 확인하지 못했습니다.", ""];
+    const [label, description, tone] = statuses[engine.state] || [t("상태 미확인"), t("모델의 현재 실행 상태를 확인하지 못했습니다."), ""];
     setText("model-state", label);
     setText("model-description", engine.profile_error
-      ? "모델 프로필을 사용할 수 없습니다. 프로젝트 설정을 확인해 주세요. 저장된 작업 기록은 계속 볼 수 있습니다."
+      ? t("모델 프로필을 사용할 수 없습니다. 프로젝트 설정을 확인해 주세요. 저장된 작업 기록은 계속 볼 수 있습니다.")
       : description);
     $("model-dot").className = `status-dot large ${tone}`.trim();
     $("preparing-indicator").hidden = engine.state !== "preparing";
     const mode = engine.configured_mode;
-    badge("model-mode", mode === "shadow" ? "관찰 모드" : mode === "active" ? "활성 모드" : mode === "disabled" ? "비활성" : "설정 미확인");
-    setText("model-memory", engine.state === "preparing" ? "로드 중" : engine.worker_pid ? "모델 로드됨" : engine.state === "idle" || engine.state === "disabled" ? "해제됨" : "미확인");
-    setText("model-idle", number(engine.idle_timeout_seconds) ? `${engine.idle_timeout_seconds}초 후` : "미확인");
+    badge("model-mode", mode === "shadow" ? t("관찰 모드") : mode === "active" ? t("활성 모드") : mode === "disabled" ? t("비활성") : t("설정 미확인"));
+    setText("model-memory", engine.state === "preparing" ? t("로드 중") : engine.worker_pid ? t("모델 로드됨") : engine.state === "idle" || engine.state === "disabled" ? t("해제됨") : t("미확인"));
+    setText("model-idle", number(engine.idle_timeout_seconds) ? t("{0}초 후", engine.idle_timeout_seconds) : t("미확인"));
     const startup = engine.startup;
-    setText("model-startup", number(startup?.total_seconds) ? `${startup.total_seconds.toFixed(1)}초` : "기록 없음");
+    setText("model-startup", number(startup?.total_seconds) ? t("{0}초", startup.total_seconds.toFixed(1)) : t("기록 없음"));
     const details = [];
     if (engine.profile_error) details.push(errorMessage(engine.profile_error));
-    if (engine.preparation_error) details.push(`준비 오류: ${errorMessage(engine.preparation_error)}`);
-    if (startup?.fallback) details.push("캐시를 다시 만들어 준비했습니다.");
-    else if (startup?.loaded_from_cache === true) details.push("최근 준비에서 캐시를 사용했습니다.");
-    if (!details.length) details.push("상태 조회는 모델을 시작하지 않습니다.");
+    if (engine.preparation_error) details.push(t("준비 오류: {0}", errorMessage(engine.preparation_error)));
+    if (startup?.fallback) details.push(t("캐시를 다시 만들어 준비했습니다."));
+    else if (startup?.loaded_from_cache === true) details.push(t("최근 준비에서 캐시를 사용했습니다."));
+    if (!details.length) details.push(t("상태 조회는 모델을 시작하지 않습니다."));
     setText("model-detail", details.join(" · "));
   }
 
   function renderConnection(connection) {
     const connected = connection.manager_bridge === "connected";
-    connectionValue("connection-manager", connected ? "연결됨" : "연결 미확인", connected ? "positive" : "");
+    connectionValue("connection-manager", connected ? t("연결됨") : t("연결 미확인"), connected ? "positive" : "");
     $("bridge-dot").className = `status-dot ${connected ? "positive" : ""}`.trim();
-    setText("bridge-label", connected ? "관리 도구 연결됨" : "관리 도구 연결 미확인");
+    setText("bridge-label", connected ? t("관리 도구 연결됨") : t("관리 도구 연결 미확인"));
     const mcp = connection.mcp_stdio;
-    connectionValue("connection-mcp", mcp === "verified" ? "통신 확인" : mcp === "failed" ? "점검 실패" : "아직 점검 안 함", mcp === "verified" ? "positive" : mcp === "failed" ? "error" : "");
+    connectionValue("connection-mcp", mcp === "verified" ? t("통신 확인") : mcp === "failed" ? t("점검 실패") : t("아직 점검 안 함"), mcp === "verified" ? "positive" : mcp === "failed" ? "error" : "");
     const observed = ["observed", "verified"].includes(connection.desktop_current_session);
-    connectionValue("connection-desktop", observed ? "연결 관측됨" : "직접 관측 안 함", observed ? "positive" : "");
+    connectionValue("connection-desktop", observed ? t("연결 관측됨") : t("직접 관측 안 함"), observed ? "positive" : "");
     setText("connection-description", connection.error
       ? errorMessage(connection.error)
-      : "MCP 통신 점검과 현재 Codex 대화의 연결은 별도로 확인합니다.");
+      : t("MCP 통신 점검과 현재 Codex 대화의 연결은 별도로 확인합니다."));
     setText("connection-checked", connection.checked_at
-      ? `마지막 점검 ${dateLabel(connection.checked_at)}`
-      : "연결 점검은 모델을 로드하지 않습니다.");
+      ? t("마지막 점검 {0}", dateLabel(connection.checked_at))
+      : t("연결 점검은 모델을 로드하지 않습니다."));
   }
 
   function renderWorkList() {
     const listScroll = $("work-list").scrollTop;
     const focusedId = $("work-list").contains(document.activeElement) ? document.activeElement.dataset.workId : null;
-    const filtered = state.works.filter((work) => `${work.title || ""} ${work.goal || ""}`.toLocaleLowerCase("ko").includes(state.filter));
+    const filtered = state.works.filter((work) => `${work.title || ""} ${work.goal || ""}`.toLocaleLowerCase(i18n.locale).includes(state.filter));
     const tabStop = filtered.find((work) => work.work_id === focusedId && !work.redacted)
       || filtered.find((work) => work.work_id === state.selectedId && !work.redacted)
       || filtered.find((work) => work.work_id && !work.redacted);
@@ -337,11 +340,11 @@
       button.tabIndex = work.work_id === tabStop?.work_id ? 0 : -1;
       const title = document.createElement("span");
       title.className = "work-item-title";
-      title.textContent = work.redacted ? "접근이 제한된 기록" : text(work.title, "제목 없는 작업");
+      title.textContent = work.redacted ? t("접근이 제한된 기록") : text(work.title, t("제목 없는 작업"));
       button.title = title.textContent;
       const meta = document.createElement("span");
       meta.className = "work-item-meta";
-      const conflict = Number(work.unresolved_conflicts) > 0 ? ` · 충돌 ${work.unresolved_conflicts}건` : "";
+      const conflict = Number(work.unresolved_conflicts) > 0 ? t(" · 충돌 {0}건", work.unresolved_conflicts) : "";
       meta.textContent = `${dateLabel(work.updated_at, true)}${number(work.revision) ? ` · r${work.revision}` : ""}${conflict}`;
       button.append(title, meta);
       button.addEventListener("click", () => { void selectWork(work.work_id); });
@@ -355,11 +358,11 @@
       button?.focus({ preventScroll: true });
     }
     setText("work-count", `${state.filter ? `${filtered.length} / ` : ""}${state.works.length}${state.nextCursor ? "+" : ""}`);
-    $("work-count").title = state.filter ? `검색 결과 ${filtered.length}개 · 불러온 작업 ${state.works.length}개` : `불러온 작업 ${state.works.length}개`;
-    setText("search-scope", `불러온 ${state.works.length}개에서 찾기${state.nextCursor ? " · 더 있음" : ""}`);
-    setText("command-scope", `기록 검색은 불러온 ${state.works.length}개 기준${state.nextCursor ? " · 이전 기록은 더 불러오기" : ""}`);
+    $("work-count").title = state.filter ? t("검색 결과 {0}개 · 불러온 작업 {1}개", filtered.length, state.works.length) : t("불러온 작업 {0}개", state.works.length);
+    setText("search-scope", t("불러온 {0}개에서 찾기{1}", state.works.length, state.nextCursor ? t(" · 더 있음") : ""));
+    setText("command-scope", t("기록 검색은 불러온 {0}개 기준{1}", state.works.length, state.nextCursor ? t(" · 이전 기록은 더 불러오기") : ""));
     $("work-list-empty").hidden = filtered.length > 0;
-    setText("work-list-empty", state.filter ? "불러온 작업 중 검색 결과가 없습니다." : "저장된 작업이 없습니다. Codex에서 작업을 시작하면 여기에 표시됩니다.");
+    setText("work-list-empty", state.filter ? t("불러온 작업 중 검색 결과가 없습니다.") : t("저장된 작업이 없습니다. Codex에서 작업을 시작하면 여기에 표시됩니다."));
     $("load-more").hidden = !state.nextCursor;
     $("search-clear").hidden = !state.filter;
     $("search-shortcut").hidden = !!state.filter;
@@ -385,30 +388,30 @@
   }
 
   function renderWork(work) {
-    setText("location-work", work ? text(work.title, "제목 없는 작업") : "작업 기록");
-    $("location-work").title = work ? text(work.title, "제목 없는 작업") : "저장된 작업 기록";
+    setText("location-work", work ? text(work.title, t("제목 없는 작업")) : t("작업 기록"));
+    $("location-work").title = work ? text(work.title, t("제목 없는 작업")) : t("저장된 작업 기록");
     $("work-empty").hidden = !!work;
     $("work-detail").hidden = !work;
     $("work-status").hidden = !work;
     $("work-retry").hidden = true;
     if (!work) {
-      $("work-empty").querySelector("h3").textContent = state.works.length ? "작업 기록을 선택하세요" : "아직 저장된 작업이 없습니다";
-      $("work-empty").querySelector("p").textContent = state.works.length ? "목표와 최근 진행 내용을 여기에서 확인합니다." : "Codex에서 작업을 시작하면 기록을 여기에서 볼 수 있습니다.";
+      $("work-empty").querySelector("h3").textContent = state.works.length ? t("작업 기록을 선택하세요") : t("아직 저장된 작업이 없습니다");
+      $("work-empty").querySelector("p").textContent = state.works.length ? t("목표와 최근 진행 내용을 여기에서 확인합니다.") : t("Codex에서 작업을 시작하면 기록을 여기에서 볼 수 있습니다.");
       return;
     }
     const completed = work.completion_coverage === "reported_complete";
-    badge("work-status", completed ? "완료 보고됨" : work.status === "active" ? "진행 중인 기록" : "저장된 기록", completed ? "positive" : "neutral");
-    setText("work-title", text(work.title, "제목 없는 작업"));
-    const modes = { implement: "구현", investigate: "조사", design: "설계", plan: "계획", review: "검토" };
+    badge("work-status", completed ? t("완료 보고됨") : work.status === "active" ? t("진행 중인 기록") : t("저장된 기록"), completed ? "positive" : "neutral");
+    setText("work-title", text(work.title, t("제목 없는 작업")));
+    const modes = { implement: t("구현"), investigate: t("조사"), design: t("설계"), plan: t("계획"), review: t("검토") };
     const mode = modes[work.scope?.mode];
-    setText("work-meta", `${dateLabel(work.updated_at)} 갱신${mode ? ` · ${mode}` : ""}`);
-    setText("work-revision", number(work.revision) ? `기록 r${work.revision}` : "기록 버전 미확인");
+    setText("work-meta", t("{0} 갱신{1}", dateLabel(work.updated_at), mode ? ` · ${mode}` : ""));
+    setText("work-revision", number(work.revision) ? t("기록 r{0}", work.revision) : t("기록 버전 미확인"));
     setText("work-provenance", work.provenance === "agent_reported"
-      ? "에이전트가 남긴 작업 기록 · 현재 모델 상태와 별도입니다."
-      : "저장된 작업 기록입니다. 기록의 출처와 현재 검증 여부는 확인되지 않았습니다.");
-    setText("work-goal", text(work.goal, "등록된 목표가 없습니다."));
-    renderList("work-constraints", work.scope?.constraints, "등록된 제약이 없습니다.");
-    setText("work-progress", text(work.progress?.summary, text(work.completion_summary, "아직 진행 보고가 없습니다.")));
+      ? t("에이전트가 남긴 작업 기록 · 현재 모델 상태와 별도입니다.")
+      : t("저장된 작업 기록입니다. 기록의 출처와 현재 검증 여부는 확인되지 않았습니다."));
+    setText("work-goal", text(work.goal, t("등록된 목표가 없습니다.")));
+    renderList("work-constraints", work.scope?.constraints, t("등록된 제약이 없습니다."));
+    setText("work-progress", text(work.progress?.summary, text(work.completion_summary, t("아직 진행 보고가 없습니다."))));
     renderList("work-next-actions", work.progress?.next_actions);
     const openIssues = (Array.isArray(work.issues) ? work.issues : []).filter((issue) => issue.status === "open");
     const issues = [...(Array.isArray(work.open_items) ? work.open_items : []), ...openIssues];
@@ -431,14 +434,14 @@
     renderWorkList();
     if (!preserveDetail) {
       renderWork(null);
-      $("work-empty").querySelector("h3").textContent = "작업 기록을 불러오는 중";
-      $("work-empty").querySelector("p").textContent = "저장된 목표와 최근 진행 내용을 확인합니다.";
+      $("work-empty").querySelector("h3").textContent = t("작업 기록을 불러오는 중");
+      $("work-empty").querySelector("p").textContent = t("저장된 목표와 최근 진행 내용을 확인합니다.");
     }
     updateButtons();
     try {
       const work = await invoke("openWork", id);
       if (request !== state.workRequest || generation !== state.projectGeneration) return;
-      if (!work || work.redacted || work.work_id !== id) throw new Error("이 작업 기록을 확인할 수 없습니다. 프로젝트와 접근 설정을 확인해 주세요.");
+      if (!work || work.redacted || work.work_id !== id) throw new Error(t("이 작업 기록을 확인할 수 없습니다. 프로젝트와 접근 설정을 확인해 주세요."));
       state.selectedWork = work;
       // A restored selection can be outside the latest page. Add it only after a fresh read.
       if (!state.works.some((item) => item.work_id === id)) {
@@ -457,16 +460,16 @@
         $("main").scrollTop = 0;
         window.scrollTo(0, 0);
       }
-      announce(`${text(work.title, "작업")} 기록을 불러왔습니다.`);
+      announce(t("{0} 기록을 불러왔습니다.", text(work.title, t("작업"))));
     } catch (error) {
       if (request !== state.workRequest || generation !== state.projectGeneration) return;
       state.selectedWork = null;
       state.detailError = { id, message: errorMessage(error) };
       renderWork(null);
-      $("work-empty").querySelector("h3").textContent = "작업 기록을 불러오지 못했습니다";
+      $("work-empty").querySelector("h3").textContent = t("작업 기록을 불러오지 못했습니다");
       $("work-empty").querySelector("p").textContent = state.detailError.message;
       $("work-retry").hidden = false;
-      announce("작업 기록 조회 실패. 이 작업을 다시 불러올 수 있습니다.");
+      announce(t("작업 기록 조회 실패. 이 작업을 다시 불러올 수 있습니다."));
     } finally {
       if (request === state.workRequest) {
         state.workLoadingId = null;
@@ -476,7 +479,7 @@
   }
 
   function applyOverview(snapshot, appendWorks = false) {
-    if (!snapshot || typeof snapshot !== "object" || !snapshot.project) throw new Error("프로젝트 상태 응답을 확인할 수 없습니다.");
+    if (!snapshot || typeof snapshot !== "object" || !snapshot.project) throw new Error(t("프로젝트 상태 응답을 확인할 수 없습니다."));
     const key = projectKey(snapshot);
     if (key !== state.preferenceKey) {
       rememberProject();
@@ -492,22 +495,23 @@
       const saved = preferences.projects[key];
       state.selectedId = saved?.selectedId || null;
       $("work-filter").value = saved?.query || "";
-      state.filter = $("work-filter").value.trim().toLocaleLowerCase("ko");
+      state.filter = $("work-filter").value.trim().toLocaleLowerCase(i18n.locale);
       $("work-list").scrollTop = 0;
       closeDiagnostics();
       renderWork(null);
     }
     state.snapshot = snapshot;
+    state.refreshedAt = new Date();
     state.stale = false;
     const project = snapshot.project;
-    const root = text(project.project_root, "프로젝트 경로 미확인");
+    const root = text(project.project_root, t("프로젝트 경로 미확인"));
     const name = projectName(project.project_root);
     setText("sidebar-project", name);
     $("sidebar-project").title = root;
     setText("project-name", name);
     setText("project-path", root);
     $("project-path").title = root;
-    badge("project-access", project.read_only ? "기록 읽기 전용" : "로컬 프로젝트");
+    badge("project-access", project.read_only ? t("기록 읽기 전용") : t("로컬 프로젝트"));
     renderModel(snapshot.engine || {});
     renderConnection(snapshot.connection || {});
     const rows = snapshot.workspace_error ? [] : Array.isArray(snapshot.works?.items) ? snapshot.works.items : [];
@@ -532,17 +536,17 @@
       state.nextCursor = null;
       renderWork(null);
       $("load-more").hidden = true;
-      showError("작업 저장소를 확인해 주세요", snapshot.workspace_error, "overview");
-      setText("work-list-empty", "작업 저장소를 읽지 못했습니다. 위의 오류 내용을 확인해 주세요.");
-      $("work-empty").querySelector("h3").textContent = "작업 기록을 확인할 수 없습니다";
-      $("work-empty").querySelector("p").textContent = "저장소 연결을 확인한 뒤 다시 시도해 주세요.";
+      showError(t("작업 저장소를 확인해 주세요"), snapshot.workspace_error, "overview");
+      setText("work-list-empty", t("작업 저장소를 읽지 못했습니다. 위의 오류 내용을 확인해 주세요."));
+      $("work-empty").querySelector("h3").textContent = t("작업 기록을 확인할 수 없습니다");
+      $("work-empty").querySelector("p").textContent = t("저장소 연결을 확인한 뒤 다시 시도해 주세요.");
     }
     const count = snapshot.sources?.count;
     const stale = snapshot.sources?.stale_sources?.count;
     setText("source-summary", number(count)
-      ? `등록 자료 ${count}개${number(stale) ? ` · 현재 파일과 차이 ${stale}개` : ""}`
-      : "등록 자료 수 미확인");
-    setText("refreshed-at", `${new Intl.DateTimeFormat("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date())} 조회`);
+      ? t("등록 자료 {0}개{1}", count, number(stale) ? t(" · 현재 파일과 차이 {0}개", stale) : "")
+      : t("등록 자료 수 미확인"));
+    setText("refreshed-at", t("{0} 조회", new Intl.DateTimeFormat(i18n.locale, { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(state.refreshedAt)));
     updateButtons();
     if (snapshot.workspace_error) return;
     if (!state.selectedId) {
@@ -567,6 +571,32 @@
     }
   }
 
+  function renderUnavailable() {
+    if (state.snapshot) {
+      badge("model-mode", t("이전 조회"), "warning");
+      setText("model-state", t("현재 상태 미확인"));
+      setText("model-description", t("마지막 조회 이후 상태를 확인하지 못했습니다. 새로고침 후 제어할 수 있습니다."));
+      setText("model-memory", t("미확인"));
+      $("model-dot").className = "status-dot large warning";
+      $("preparing-indicator").hidden = true;
+      connectionValue("connection-manager", t("연결 미확인"));
+      $("bridge-dot").className = "status-dot warning";
+      setText("bridge-label", t("현재 연결 미확인"));
+      setText("model-detail", t("마지막 조회 결과입니다. 현재 모델 상태는 미확인이며, 새로고침 후 제어할 수 있습니다."));
+    }
+    if (!state.snapshot) {
+      setText("sidebar-project", t("프로젝트 미선택"));
+      setText("project-name", t("프로젝트를 열어 주세요"));
+      setText("project-path", t("상단의 프로젝트 열기에서 설정을 선택할 수 있습니다."));
+      setText("model-state", t("프로젝트 미연결"));
+      setText("model-description", t("프로젝트를 선택하면 모델 상태와 저장된 작업 기록을 확인할 수 있습니다."));
+      setText("bridge-label", t("프로젝트 연결 필요"));
+      setText("work-list-empty", t("프로젝트를 선택하면 작업 기록이 표시됩니다."));
+      setText("source-summary", t("프로젝트 미선택"));
+      renderWork(null);
+    }
+  }
+
   async function refresh({ append = false, silent = false } = {}) {
     if (silent && onboarding?.isOpen()) return;
     if (state.loading || state.action) return;
@@ -583,34 +613,12 @@
       if (generation !== state.overviewGeneration) return;
       clearError("overview");
       applyOverview(snapshot, append);
-      if (!silent) announce("프로젝트 상태를 새로고침했습니다.");
+      if (!silent) announce(t("프로젝트 상태를 새로고침했습니다."));
     } catch (error) {
       if (generation !== state.overviewGeneration) return;
       state.stale = true;
-      showError(state.snapshot ? "상태를 갱신하지 못했습니다" : "프로젝트 설정을 확인해 주세요", error, "overview");
-      if (state.snapshot) {
-        badge("model-mode", "이전 조회", "warning");
-        setText("model-state", "현재 상태 미확인");
-        setText("model-description", "마지막 조회 이후 상태를 확인하지 못했습니다. 새로고침 후 제어할 수 있습니다.");
-        setText("model-memory", "미확인");
-        $("model-dot").className = "status-dot large warning";
-        $("preparing-indicator").hidden = true;
-        connectionValue("connection-manager", "연결 미확인");
-        $("bridge-dot").className = "status-dot warning";
-        setText("bridge-label", "현재 연결 미확인");
-        setText("model-detail", "마지막 조회 결과입니다. 현재 모델 상태는 미확인이며, 새로고침 후 제어할 수 있습니다.");
-      }
-      if (!state.snapshot) {
-        setText("sidebar-project", "프로젝트 미선택");
-        setText("project-name", "프로젝트를 열어 주세요");
-        setText("project-path", "상단의 프로젝트 열기에서 설정을 선택할 수 있습니다.");
-        setText("model-state", "프로젝트 미연결");
-        setText("model-description", "프로젝트를 선택하면 모델 상태와 저장된 작업 기록을 확인할 수 있습니다.");
-        setText("bridge-label", "프로젝트 연결 필요");
-        setText("work-list-empty", "프로젝트를 선택하면 작업 기록이 표시됩니다.");
-        setText("source-summary", "프로젝트 미선택");
-        renderWork(null);
-      }
+      showError(state.snapshot ? t("상태를 갱신하지 못했습니다") : t("프로젝트 설정을 확인해 주세요"), error, "overview");
+      renderUnavailable();
     } finally {
       state.loading = false;
       state.loadingVisible = false;
@@ -634,15 +642,15 @@
       if (generation !== state.overviewGeneration) return;
       applyOverview(snapshot);
       const messages = {
-        prepareModel: snapshot.engine?.state === "preparing" ? "모델 준비를 요청했습니다." : "모델 상태를 확인했습니다.",
-        stopModel: snapshot.engine?.worker_pid ? "모델 종료 요청 후 상태를 확인합니다." : "모델 메모리가 해제되었습니다.",
-        checkConnection: snapshot.connection?.mcp_stdio === "verified" ? "별도 MCP 통신을 확인했습니다. Codex 대화 연결은 직접 관측하지 않습니다." : "연결 점검 결과를 확인해 주세요.",
-        selectProject: "프로젝트를 열었습니다.",
+        prepareModel: snapshot.engine?.state === "preparing" ? t("모델 준비를 요청했습니다.") : t("모델 상태를 확인했습니다."),
+        stopModel: snapshot.engine?.worker_pid ? t("모델 종료 요청 후 상태를 확인합니다.") : t("모델 메모리가 해제되었습니다."),
+        checkConnection: snapshot.connection?.mcp_stdio === "verified" ? t("별도 MCP 통신을 확인했습니다. Codex 대화 연결은 직접 관측하지 않습니다.") : t("연결 점검 결과를 확인해 주세요."),
+        selectProject: t("프로젝트를 열었습니다."),
       };
-      notify(messages[method] || "상태를 갱신했습니다.");
+      notify(messages[method] || t("상태를 갱신했습니다."));
     } catch (error) {
-      const titles = { prepareModel: "모델 준비 요청 실패", stopModel: "모델 종료 요청 실패", checkConnection: "연결 점검 실패", selectProject: "프로젝트 열기 실패" };
-      showError(titles[method] || "요청 실패", error);
+      const titles = { prepareModel: t("모델 준비 요청 실패"), stopModel: t("모델 종료 요청 실패"), checkConnection: t("연결 점검 실패"), selectProject: t("프로젝트 열기 실패") };
+      showError(titles[method] || t("요청 실패"), error);
       if (state.selectedId && !state.selectedWork && state.workLoadingId !== state.selectedId) void selectWork(state.selectedId);
     } finally {
       state.action = null;
@@ -659,6 +667,39 @@
       scheduleRefresh();
     }, delay);
   }
+
+  window.addEventListener("jev:languagechange", () => {
+    // Translate only app-owned transient messages. Never transform work text or paths.
+    for (const id of ["error-title", "error-message", "action-message"]) setText(id, i18n.message($(id).textContent));
+    setSidebarCollapsed(preferences.sidebarCollapsed, false);
+    state.filter = $("work-filter").value.trim().toLocaleLowerCase(i18n.locale);
+    renderWorkList();
+    renderWork(state.selectedWork);
+    if (state.workLoadingId && !state.selectedWork) {
+      $("work-empty").querySelector("h3").textContent = t("작업 기록을 불러오는 중");
+      $("work-empty").querySelector("p").textContent = t("저장된 목표와 최근 진행 내용을 확인합니다.");
+    } else if (state.detailError) {
+      $("work-empty").querySelector("h3").textContent = t("작업 기록을 불러오지 못했습니다");
+      $("work-empty").querySelector("p").textContent = i18n.message(state.detailError.message);
+      $("work-retry").hidden = false;
+    }
+    if (state.snapshot) {
+      badge("project-access", state.snapshot.project.read_only ? t("기록 읽기 전용") : t("로컬 프로젝트"));
+      renderModel(state.snapshot.engine || {});
+      renderConnection(state.snapshot.connection || {});
+      const count = state.snapshot.sources?.count, stale = state.snapshot.sources?.stale_sources?.count;
+      setText("source-summary", number(count) ? t("등록 자료 {0}개{1}", count, number(stale) ? t(" · 현재 파일과 차이 {0}개", stale) : "") : t("등록 자료 수 미확인"));
+      setText("refreshed-at", t("{0} 조회", new Intl.DateTimeFormat(i18n.locale, { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(state.refreshedAt)));
+      if (state.snapshot.workspace_error) {
+        setText("work-list-empty", t("작업 저장소를 읽지 못했습니다. 위의 오류 내용을 확인해 주세요."));
+        $("work-empty").querySelector("h3").textContent = t("작업 기록을 확인할 수 없습니다");
+        $("work-empty").querySelector("p").textContent = t("저장소 연결을 확인한 뒤 다시 시도해 주세요.");
+      }
+    }
+    if (state.stale) renderUnavailable();
+    updateButtons();
+    state.commandMenu?.refresh();
+  });
 
   $("select-project").addEventListener("click", () => { void perform("selectProject"); });
   $("prepare-model").addEventListener("click", () => { void perform("prepareModel"); });
@@ -742,7 +783,7 @@
   $("shortcuts-open").setAttribute("aria-keyshortcuts", "F1");
   $("command-open").setAttribute("aria-keyshortcuts", "Control+K");
   $("work-filter").addEventListener("input", (event) => {
-    state.filter = event.target.value.trim().toLocaleLowerCase("ko");
+    state.filter = event.target.value.trim().toLocaleLowerCase(i18n.locale);
     $("work-list").scrollTop = 0;
     rememberProject();
     renderWorkList();

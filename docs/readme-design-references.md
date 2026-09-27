@@ -59,3 +59,9 @@ node scripts/capture_readme.cjs
 `marked`로 변환한 로컬 Markdown 미리보기를 Edge에서 1152px와 390px 너비로 열어 확인했다. 최종본의 로고·스크린샷 3개가 모두 로드됐고, README의 링크 67개 중 로컬 파일 대상과 내부 섹션 링크에 누락이 없었다. 390px 너비에서 페이지 전체의 가로 넘침은 없었다. 촬영 스크립트의 `node --check`와 수정 문서의 `git diff --check`도 통과했다.
 
 미리보기는 GitHub와 유사한 간단한 스타일을 적용한 로컬 표시 검사다. GitHub에 게시한 최종 렌더링을 검증한 것은 아니다. 이 작업에서는 앱 기능이나 모델 성능을 변경하지 않았다.
+
+## 0.5.0 영문 README 추가 — 2026-09-27
+
+`README.en.md`는 기존 한국어 README의 구성과 검증 한계를 유지한 영문판이다. 두 README 상단에서 서로 이동할 수 있다. 상세 기술 문서가 한국어라는 점을 영문판에 명시했다.
+
+영문 연결 화면 `images/desktop-onboarding-en.png`는 실제 0.5.0 앱의 격리된 테스트 프로젝트에서 촬영했다. 설정 적용과 MCP 서버 응답은 확인됐고 Codex 요청 수신은 대기 상태다. 원본 PNG의 SHA-256은 `eb33c1401ab0bb41b3f72d38e2cf440bc9a320462e3f24f4327fedc6edac8e1c`. 촬영·검증 방법은 [언어 전환 기록](desktop-language-plan.md)에 정리했다. 기존 0.3.4/0.4.0 이미지는 해당 버전 표기를 유지한다.

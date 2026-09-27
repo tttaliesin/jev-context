@@ -43,4 +43,4 @@ jobs:
           node-version: "24"
 
       - name: Desktop window state tests
-        run: node --test scripts/test_window_state.cjs
+        run: node --test scripts/test_window_state.cjs scripts/test_locales.cjs

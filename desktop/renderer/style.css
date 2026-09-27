@@ -407,3 +407,10 @@ details[open] > summary .disclosure-icon { transform: rotate(180deg); }
 #setup-step-4 { padding: 10px 0 25px; }
 #setup-step-4 p { margin-top: 12px; }
 @media (max-height: 650px) { .setup-header { padding: 14px 20px; } .setup-body { padding: 14px 20px; } .setup-footer { padding: 12px 20px; } .setup-header h2 { font-size: 20px; } }
+/* The native select keeps keyboard and assistive-technology behavior in both languages. */
+.language-control { display: inline-flex; flex: 0 0 auto; align-items: center; }
+.language-control select { color-scheme: dark; font: inherit; font-size: 12px; color: var(--text, #e7e9e5); background: #1c201c; border: 1px solid #3a4038; border-radius: 6px; padding: 6px 4px; max-width: 100px; cursor: pointer; }
+.language-control select:focus-visible { outline: 2px solid #c5f080; outline-offset: 2px; }
+.language-error { color: #f2a7a0; font-size: 12px; }
+.language-error:empty { display: none; }
+.setup-header > div { min-width: 0; flex: 1; }

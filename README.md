@@ -4,6 +4,8 @@
 
 <h1 align="center">Jev Context</h1>
 
+<p align="center"><strong>한국어</strong> · <a href="README.en.md">English</a></p>
+
 <p align="center">
   <strong>대화가 바뀌어도, 작업의 맥락은 이어지도록.</strong><br>
   Codex를 위한 로컬 작업 기억 · 한국어 근거 검색 · 모델 관리
@@ -70,6 +72,8 @@ uv run --no-sync jev-context demo
 
 작업 기록을 둘러보고, 로컬 모델을 준비·종료하고, MCP 연결을 점검하는 Windows 관리 앱입니다. **`Ctrl+K`로 명령과 불러온 작업을 빠르게 찾을 수 있습니다.**
 
+**0.5.0부터 한국어 / English 전환을 지원합니다.** 상단과 첫 연결 창의 언어 선택에서 바로 변경할 수 있으며 재실행 후에도 유지됩니다. 메뉴·상태·연결 안내·앱 오류·날짜 표시에 적용하고, 작업 원문·경로·설정 미리보기·설치할 Skill은 유지합니다. 운영체제 대화상자의 기본 버튼은 Windows 언어 설정을 따릅니다. [구현·검증 기록](docs/desktop-language-plan.md)
+
 **0.4.0부터 첫 연결도 앱에서 진행합니다.** 상단 **Codex 연결**을 열고 프로젝트 폴더 선택 → 설정 미리보기·적용 → 서버 점검·Codex 확인 → 작업 화면 순서로 진행하세요. 새 프로젝트 설정과 빈 작업 DB, MCP·Skill 설치, 백업·되돌리기를 지원합니다. Codex의 프로젝트 신뢰 확인과 확인 문구 전달은 Codex에서 직접 합니다.
 
 ![Jev Context 0.4.0 연결 안내. 설정 적용, MCP 서버 응답, Codex 확인 요청을 별도로 표시합니다.](docs/images/desktop-onboarding.png)
@@ -131,7 +135,7 @@ powershell.exe -NoProfile -File scripts/build_desktop.ps1
 | 구성 요소 | 버전 | 현재 범위 |
 |---|---|---|
 | Python 서비스 · MCP 서버 | 0.2.0 | 계약 1.0 기본 제공, 계약 2.0 명시 선택 |
-| Electron 관리 앱 | 0.4.0 | 프로젝트 준비·Codex 연결 안내를 포함한 Windows x64 앱 |
+| Electron 관리 앱 | 0.5.0 | 프로젝트 준비·Codex 연결 안내·한국어/영어 전환을 포함한 Windows x64 앱 |
 | 로컬 모델 판단 | shadow | 판단 기록만 수행. active 승격 평가를 통과한 프로필 없음 |
 
 모델 판단을 선택에 반영하려면 사람이 검토한 heldout 평가를 통과해야 합니다. 현재 구성은 **SemIf OpenVINO · Qwen3.5-4B INT8 · 로컬 GPU**입니다. [모델 준비와 제한](docs/models.md)

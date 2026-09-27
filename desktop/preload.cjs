@@ -12,6 +12,8 @@ async function invoke(channel, payload) {
 }
 
 contextBridge.exposeInMainWorld('jev', Object.freeze({
+  getLanguage: () => invoke('jev:language:get'),
+  setLanguage: language => invoke('jev:language:set', language),
   overview: options => invoke('jev:overview', options),
   openWork: id => invoke('jev:work', id),
   prepareModel: () => invoke('jev:prepare'),

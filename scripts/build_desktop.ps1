@@ -17,8 +17,8 @@ if ($pin.url -ne ($releaseBase + $pin.archive) -or
 }
 
 $uiFiles = @(
-    'package.json', 'main.cjs', 'preload.cjs', 'bridge-client.cjs', 'window-state.cjs', 'setup-client.cjs',
-    'renderer/index.html', 'renderer/style.css', 'renderer/renderer.js', 'renderer/command-menu.js', 'renderer/onboarding.js',
+    'package.json', 'main.cjs', 'preload.cjs', 'bridge-client.cjs', 'window-state.cjs', 'setup-client.cjs', 'locales.js',
+    'renderer/index.html', 'renderer/style.css', 'renderer/renderer.js', 'renderer/command-menu.js', 'renderer/onboarding.js', 'renderer/i18n.js',
     'assets/jev-icon.ico', 'assets/jev-icon.png', 'assets/jev-mark.svg'
 )
 $configPath = Join-Path $repoRoot '.local/project.toml'

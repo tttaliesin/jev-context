@@ -17,7 +17,7 @@ const output = outputArgument >= 0
   : path.join(root, '.local', 'desktop-redesign-20260926');
 fs.mkdirSync(output, { recursive: true });
 const reportFile = path.join(output, 'fixture-state-report.json');
-const sourceFiles = ['index.html', 'style.css', 'renderer.js', 'command-menu.js', 'onboarding.js', '../assets/jev-mark.svg'];
+const sourceFiles = ['index.html', 'style.css', 'renderer.js', 'command-menu.js', 'onboarding.js', 'i18n.js', '../locales.js', '../assets/jev-mark.svg'];
 const hashes = () => Object.fromEntries(sourceFiles.map(name => [name,
   crypto.createHash('sha256').update(fs.readFileSync(path.join(renderer, name))).digest('hex')]));
 const report = {
@@ -182,6 +182,7 @@ async function closeCommands(page) {
   const server = http.createServer((request, response) => {
     const route = new URL(request.url, 'http://localhost').pathname;
     const name = route === '/jev-mark.svg' ? '../assets/jev-mark.svg'
+      : route === '/locales.js' ? '../locales.js'
       : route === '/' ? 'index.html' : route.slice(1);
     if (!sourceFiles.includes(name)) { response.writeHead(404); response.end(); return; }
     response.setHeader('Content-Type', name.endsWith('.js') ? 'text/javascript; charset=utf-8'
@@ -1077,6 +1078,43 @@ async function closeCommands(page) {
         `A new command query must start at its first result: expected=0, actual=${resetScroll}`);
       await closeCommands(page);
       await assertNoModelActions(page);
+    });
+
+    for (const modelState of ['idle', 'preparing', 'shadow', 'active', 'disabled', 'unavailable', 'degraded', 'unconfigured']) {
+      await scenario(`english-${modelState}`, fixture(modelState), async page => {
+        await waitIdle(page);
+        const calls = await page.evaluate(() => window.__fixture.calls.length);
+        await page.locator('.topbar [data-language-select]').selectOption('en');
+        await page.waitForFunction(() => document.documentElement.lang === 'en');
+        assert.equal(await page.locator('#model-heading').textContent(), 'Local model');
+        for (const selector of ['.model-band', '.connection-bar', '.main-footer']) {
+          const copy = await page.locator(selector).evaluate(element => {
+            const clone = element.cloneNode(true);
+            clone.querySelectorAll('#project-path').forEach(node => node.remove());
+            return clone.textContent;
+          });
+          assert.doesNotMatch(copy, /[가-힣]/u);
+        }
+        assert.match(await page.locator('#project-path').textContent(), /한국어 작업 공간/);
+        assert.equal(await page.evaluate(() => window.__fixture.calls.length), calls, 'Language changes must not call the service');
+        assert.equal(await page.locator('#work-title').textContent(), '검증 작업 001');
+        await page.locator('.topbar [data-language-select]').selectOption('ko');
+        await waitText(page, '#model-heading', '로컬 모델');
+        await assertNoModelActions(page);
+      }, { width: 940, height: 690 });
+    }
+    await scenario('language-switch-preserves-stale-state', fixture(), async page => {
+      await waitIdle(page);
+      await page.evaluate(() => { window.__fixture.failOverview = true; });
+      await page.locator('#refresh').click();
+      await waitText(page, '#model-state', '현재 상태 미확인');
+      await page.locator('.topbar [data-language-select]').selectOption('en');
+      await waitText(page, '#model-state', 'Current status unknown');
+      assert.equal(await page.locator('#prepare-model').isDisabled(), true);
+      assert.equal(await page.locator('#error-banner').isVisible(), true);
+      await page.locator('.topbar [data-language-select]').selectOption('ko');
+      await waitText(page, '#model-state', '현재 상태 미확인');
+      assert.equal(await page.locator('#prepare-model').isDisabled(), true);
     });
 
     assert.deepEqual(hashes(), report.sourceHashes, 'Renderer changed during this run; rerun after edits finish');

@@ -1,6 +1,8 @@
 "use strict";
 
 (() => {
+  const i18n = window.jevI18n;
+  const { t } = i18n;
   let instance = 0;
 
   window.createJevCommandMenu = ({ getItems, onBeforeOpen } = {}) => {
@@ -24,7 +26,7 @@
     let options = [];
     let composing = false;
 
-    const searchText = value => String(value ?? "").normalize("NFKC").toLocaleLowerCase("ko");
+    const searchText = value => String(value ?? "").normalize("NFKC").toLocaleLowerCase(i18n.locale);
     const enabled = item => item && !item.disabled && typeof item.run === "function";
 
     function readItems() {
@@ -76,8 +78,8 @@
       if (!selected) input.removeAttribute("aria-activedescendant");
       if (current) current.textContent = selected
         ? `${selected.label}${selected.description ? ` · ${selected.description}` : ""}`
-        : "실행 가능한 항목이 없습니다.";
-      if (submitLabel) submitLabel.textContent = selected ? "실행" : "실행 불가";
+        : t("실행 가능한 항목이 없습니다.");
+      if (submitLabel) submitLabel.textContent = selected ? t("실행") : t("실행 불가");
     }
 
     function execute(id) {
@@ -89,8 +91,8 @@
       close();
       try {
         // Application actions own their user-facing error handling.
-        Promise.resolve(item.run()).catch(error => console.error("빠른 실행 실패", error));
-      } catch (error) { console.error("빠른 실행 실패", error); }
+        Promise.resolve(item.run()).catch(error => console.error(t("빠른 실행 실패"), error));
+      } catch (error) { console.error(t("빠른 실행 실패"), error); }
     }
 
     function render(resetSelection = false) {
@@ -107,7 +109,7 @@
       let group;
       let groupName;
       visibleItems.forEach((item, index) => {
-        const name = String(item.group || "명령");
+        const name = String(item.group || t("명령"));
         if (!group || name !== groupName) {
           groupName = name;
           group = document.createElement("div");
@@ -138,7 +140,7 @@
         if (item.description || !enabled(item)) {
           const description = document.createElement("span");
           description.className = "command-item-description";
-          description.textContent = item.description || "현재 사용할 수 없습니다.";
+          description.textContent = item.description || t("현재 사용할 수 없습니다.");
           main.append(description);
         }
         option.append(main);
@@ -154,10 +156,10 @@
         options.push(option);
       });
       results.replaceChildren(fragment);
-      count.textContent = `${visibleItems.length}개 결과`;
+      count.textContent = t("{0}개 결과", visibleItems.length);
       empty.hidden = visibleItems.length > 0;
-      empty.textContent = terms.length ? "검색 결과가 없습니다. 다른 검색어로 찾아보세요."
-        : "현재 표시할 명령이나 작업이 없습니다.";
+      empty.textContent = terms.length ? t("검색 결과가 없습니다. 다른 검색어로 찾아보세요.")
+        : t("현재 표시할 명령이나 작업이 없습니다.");
       const previous = !resetSelection && visibleItems.find(item => item.id === selectedId && enabled(item));
       select(previous?.id || visibleItems.find(enabled)?.id, resetSelection || !previous);
       if (previous) scrollArea.scrollTop = scrollTop;

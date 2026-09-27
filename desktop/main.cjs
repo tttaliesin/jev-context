@@ -7,6 +7,8 @@ const { pathToFileURL } = require('node:url');
 const { BridgeClient } = require('./bridge-client.cjs');
 const { normalizeWindowState, loadWindowState, saveWindowState } = require('./window-state.cjs');
 const { createSetupController } = require('./setup-client.cjs');
+const locale = require('./locales.js');
+const t = (key, ...args) => locale.translate(settings?.language, key, ...args);
 
 app.setName('Jev Context');
 const appId = 'com.jev.context.manager';
@@ -20,6 +22,7 @@ const pages = new Map([
   ['/', 'index.html'], ['/index.html', 'index.html'],
   ['/style.css', 'style.css'], ['/renderer.js', 'renderer.js'], ['/command-menu.js', 'command-menu.js'],
   ['/onboarding.js', 'onboarding.js'],
+  ['/i18n.js', 'i18n.js'], ['/locales.js', '../locales.js'],
   ['/jev-mark.svg', '../assets/jev-mark.svg'],
 ]);
 let window;
@@ -41,11 +44,20 @@ function loadSettings() {
   const saved = readJSON(path.join(app.getPath('userData'), 'settings.json')) || {};
   const override = process.argv.indexOf('--project-config');
   return {
+    language: locale.normalize(saved.language),
     projectRoot,
     pythonPath: saved.pythonPath || path.resolve(base, launch.pythonPath || path.join(projectRoot, '.venv', 'Scripts', 'python.exe')),
     configPath: override >= 0 && process.argv[override + 1] ? path.resolve(process.argv[override + 1])
       : saved.configPath || path.resolve(base, launch.configPath || path.join(projectRoot, '.local', 'project.toml')),
   };
+}
+
+function saveSettings(next) {
+  const filename = path.join(app.getPath('userData'), 'settings.json');
+  fs.mkdirSync(path.dirname(filename), { recursive: true });
+  const pending = `${filename}.pending`;
+  fs.writeFileSync(pending, JSON.stringify({ configPath: next.configPath, pythonPath: next.pythonPath, language: next.language }, null, 2), 'utf8');
+  fs.renameSync(pending, filename);
 }
 
 function client() {
@@ -73,14 +85,21 @@ function register(channel, handler) {
 }
 
 function registerActions() {
+  register('jev:language:get', () => settings.language);
+  register('jev:language:set', language => {
+    if (!['ko', 'en'].includes(language)) throw new Error('지원하지 않는 언어입니다.');
+    const next = { ...settings, language };
+    saveSettings(next);
+    settings = next;
+    return language;
+  });
   const setup = createSetupController({ dialog, clipboard, getWindow: () => window, getSettings: () => settings,
     adopt: async next => {
       const candidate = new BridgeClient(next);
       try { await candidate.request('overview'); } catch (error) { candidate.close(); throw error; }
       bridge?.close(); bridge = candidate;
       settings = { ...settings, configPath: next.configPath, pythonPath: next.pythonPath };
-      fs.mkdirSync(app.getPath('userData'), { recursive: true });
-      fs.writeFileSync(path.join(app.getPath('userData'), 'settings.json'), JSON.stringify({ configPath: settings.configPath, pythonPath: settings.pythonPath }, null, 2), 'utf8');
+      saveSettings(settings);
     } });
   register('jev:setup', payload => {
     if (!payload || typeof payload.action !== 'string' || Object.keys(payload).some(key => !['action', 'params'].includes(key))) throw new Error('잘못된 설정 요청입니다.');
@@ -108,8 +127,8 @@ function registerActions() {
   register('jev:connection', () => client().request('connection_check'));
   register('jev:project', async () => {
     const selected = await dialog.showOpenDialog(window, {
-      title: '프로젝트 설정 열기', defaultPath: settings.configPath,
-      properties: ['openFile'], filters: [{ name: 'Jev 프로젝트 설정', extensions: ['toml'] }],
+      title: t('프로젝트 설정 열기'), defaultPath: settings.configPath,
+      properties: ['openFile'], filters: [{ name: t('Jev 프로젝트 설정'), extensions: ['toml'] }],
     });
     if (selected.canceled || !selected.filePaths[0]) return null;
     const next = { ...settings, configPath: path.resolve(selected.filePaths[0]) };
@@ -119,9 +138,8 @@ function registerActions() {
     catch (error) { candidate.close(); throw error; }
     bridge?.close();
     bridge = candidate;
-    settings = next;
-    fs.mkdirSync(app.getPath('userData'), { recursive: true });
-    fs.writeFileSync(path.join(app.getPath('userData'), 'settings.json'), JSON.stringify({ configPath: next.configPath }, null, 2), 'utf8');
+    settings = { ...next, language: settings.language };
+    saveSettings(settings);
     return snapshot;
   });
 }
@@ -184,7 +202,7 @@ else {
     session.defaultSession.setPermissionCheckHandler(() => false);
     registerActions();
     await createWindow();
-  }).catch(error => { dialog.showErrorBox('Jev Context 실행 오류', error.message); app.quit(); });
+  }).catch(error => { dialog.showErrorBox(t('Jev Context 실행 오류'), locale.message(settings?.language, error.message)); app.quit(); });
   app.on('window-all-closed', () => app.quit());
   app.on('before-quit', () => bridge?.close());
 }
