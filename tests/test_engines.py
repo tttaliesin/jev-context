@@ -38,6 +38,37 @@ def questions():
     ]
 
 
+@pytest.mark.parametrize(
+    "family,own,unrelated",
+    [
+        ("openjev", "engines.py", "modal_engine.py"),
+        ("laya", "laya_worker.py", "semif_worker.py"),
+        ("semif_openvino", "semif_worker.py", "laya_worker.py"),
+        ("openjev_modal", "modal_engine.py", "shared_engine.py"),
+    ],
+)
+def test_fingerprint_tracks_only_selected_family_and_shared_code(
+    monkeypatch, family, own, unrelated
+):
+    original = Path.read_bytes
+    changed = set()
+
+    def read(path):
+        data = original(path)
+        return data + b"\n# changed" if path.name in changed else data
+
+    monkeypatch.setattr(Path, "read_bytes", read)
+    selected = {**profile(), "family": family}
+    before = fingerprint(selected)
+    changed.add(unrelated)
+    assert fingerprint(selected) == before
+    changed.add(own)
+    assert fingerprint(selected) != before
+    changed.clear()
+    changed.add("common.py")
+    assert fingerprint(selected) != before
+
+
 def raw():
     return dict(
         answers=dict(

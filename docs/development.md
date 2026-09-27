@@ -34,7 +34,13 @@ mise 없이 설치할 때는 `--python`으로 Python 3.12 실행 파일을 지�
 
 GitHub Actions([check.yml](../.github/workflows/check.yml))는 `master` push와 pull request마다 Windows 러너에서 같은 순서로 검사하고, 창 상태·언어·프로젝트 전환·bridge 복구 Node 테스트도 실행합니다.
 
-pytest는 약 250개 테스트를 1분 20초 정도에 실행합니다. `test_coding_benchmark.py`는 격리된 pytest를 프로젝트의 `.t/` 아래에서 실행하고, 끝나면 그 임시 폴더를 지웁니다.
+기본 pytest는 `tests/`의 제품 검사를 실행합니다. `test_coding_benchmark.py`는 격리된 pytest를 프로젝트의 `.t/` 아래에서 실행하고, 끝나면 그 임시 폴더를 지웁니다.
+
+중단한 출력 축약 실험은 `experiments/output_filter/`에 분리했습니다. 제품 wheel과 기본 pytest에 포함하지 않으며, `python -m pytest experiments/output_filter -q`로 따로 검사합니다. CI도 별도 단계로 실행합니다. 새 벤치마크 생성기는 분리된 실험 파일을 사용하고, 이전에 동결한 입력·결과는 그대로 유지합니다.
+
+공통 파일 경로·원자적 쓰기는 `project_files.py`가 담당합니다. 관측 기록은 `.local/jev-runtime/observation.lock`, 온보딩은 기존 `.local/jev-setup/setup.lock`을 사용합니다. 엔진 식별값은 공통 코드와 선택한 엔진 실행 코드만 포함하므로 다른 엔진 worker 수정으로 무효화되지 않습니다. 이번 식별 규칙 변경 이전의 프로세스·평가·Modal 세션은 새 식별값과 혼용할 수 없습니다. 실행 중인 앱과 MCP는 재연결 후 변경을 읽습니다.
+
+정리 범위와 실제 제거·보존 내역은 [정리 계획](project-cleanup-plan.md)과 [결과](project-cleanup-results.md)에 있습니다.
 
 샌드박스 계정 등 **다른 Windows 계정으로 테스트를 실행하면**, 저장 폴더에 거는 보호 권한(`storage.protect_directory`) 때문에 원래 사용자가 지울 수 없는 임시 폴더가 남을 수 있습니다. 이런 폴더는 관리자 권한으로 소유권을 가져온 뒤 지워야 합니다. pytest의 기본 임시 폴더 `%TEMP%\pytest-of-<사용자>`가 이렇게 잠기면 모든 테스트가 `PermissionError`로 실패하므로, 그 폴더를 지우거나 `--basetemp`로 다른 위치를 지정합니다.
 

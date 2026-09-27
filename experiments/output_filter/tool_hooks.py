@@ -5,7 +5,7 @@ evidence behind docs/hook-benchmark-plan.md.
 
 UserPromptSubmit records the request text; PostToolUse replaces an oversized shell result with
 selected lines and the path of the saved full output. Any failure passes the result through.
-Run as ``python -m jev_context.tool_hooks --state-dir DIR [--mode observe|filter]``;
+Run as ``python experiments/output_filter/tool_hooks.py --state-dir DIR [--mode observe|filter]``;
 ``DIR/settings.json`` may override mode, min_bytes and budget_bytes. Invalid settings pass through.
 """
 

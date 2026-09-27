@@ -101,8 +101,6 @@ def test_probe_readonly_errors_and_unrelated_calls_do_not_record(tmp_path):
 
 
 def test_broken_sidecar_and_write_failure_are_optional(tmp_path, monkeypatch):
-    from jev_context import onboarding
-
     path, _ = project(tmp_path)
     config = Config.load(path)
     observe(config, path)
@@ -113,7 +111,7 @@ def test_broken_sidecar_and_write_failure_are_optional(tmp_path, monkeypatch):
             "unavailable",
             "project_mismatch",
         }
-    monkeypatch.setattr(onboarding, "atomic_write", lambda *args: (_ for _ in ()).throw(OSError()))
+    monkeypatch.setattr(observation, "atomic_write", lambda *args: (_ for _ in ()).throw(OSError()))
     observe(config, path)  # No exception replaces the original response.
 
 
@@ -133,6 +131,24 @@ def test_readonly_reads_and_bridge_refresh_preserve_observation(tmp_path):
         assert observation._path(config).read_bytes() == before
     finally:
         bridge.close()
+
+
+def test_setup_lock_does_not_block_observation_and_observation_lock_preserves_record(tmp_path):
+    from jev_context.onboarding import locked
+    from jev_context.project_files import safe_path
+    from jev_context.storage import FileLock
+
+    path, _ = project(tmp_path)
+    config = Config.load(path)
+    with locked(config.project_root):
+        observe(config, path)
+        assert observation.observation_status(config, path)["state"] == "recorded"
+    before = observation._path(config).read_bytes()
+    with FileLock(safe_path(config.project_root, ".local/jev-runtime/observation.lock")):
+        observe(config, path, outcome="partial")
+    assert observation._path(config).read_bytes() == before
+    observe(config, path, outcome="partial")
+    assert observation.observation_status(config, path)["last_context"]["outcome"] == "partial"
 
 
 def test_real_mcp_response_observation_restart_and_health_probe(tmp_path):

@@ -23,6 +23,7 @@ from jev_context.common import digest, now
 
 ROOT = Path(__file__).resolve().parents[1]
 PYTHON = ROOT / ".venv/Scripts/python.exe"
+HOOK = ROOT / "experiments/output_filter/tool_hooks.py"
 DEFAULT_CODEX = Path(os.environ.get("LOCALAPPDATA", "")) / "OpenAI/Codex/bin"
 HOOK_ARGS = ["--min-bytes", "24000", "--budget-bytes", "8000"]  # the deployed filter settings
 CONDITIONS = ("observe", "filter")
@@ -182,7 +183,7 @@ def run_hidden(workspace, task, receipt):
 
 def hooks_config(trial, mode):
     state = trial / "h"
-    command = [str(PYTHON), "-m", "jev_context.tool_hooks", "--state-dir", str(state)]
+    command = [str(PYTHON), str(HOOK), "--state-dir", str(state)]
     command += ["--mode", mode, *HOOK_ARGS]
     if any(" " in part for part in command):
         raise ValueError("Hook command paths must not contain spaces")  # PowerShell quoting
@@ -212,7 +213,7 @@ def prepare(destination):
         "created_at": now(),
         "provenance": "agent_authored_seeded_repairs",
         "human_reviewed": False,
-        "hook_sha256": digest((ROOT / "src/jev_context/tool_hooks.py").read_bytes()),
+        "hook_sha256": digest(HOOK.read_bytes()),
         "hook_args": HOOK_ARGS,
         "tasks": {},
         "trials": [],

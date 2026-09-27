@@ -1,8 +1,9 @@
 import json
 import subprocess
 import sys
+from pathlib import Path
 
-from jev_context.tool_hooks import handle, terms
+from experiments.output_filter.tool_hooks import handle, terms
 
 
 def post(command, output, session="s1", tool="Bash"):
@@ -167,7 +168,7 @@ def test_terms_cover_korean_particles_and_paths():
 
 def run_hook(state, payload, mode="observe"):
     return subprocess.run(
-        [sys.executable, "-m", "jev_context.tool_hooks", "--state-dir", str(state),
+        [sys.executable, str(Path(__file__).with_name("tool_hooks.py")), "--state-dir", str(state),
          "--mode", mode],
         input=json.dumps(payload).encode(),
         capture_output=True,
@@ -188,7 +189,7 @@ def test_settings_file_overrides_mode_without_changing_the_command(tmp_path):
 
 def test_module_entry_point_never_fails(tmp_path):
     run = subprocess.run(
-        [sys.executable, "-m", "jev_context.tool_hooks", "--state-dir", str(tmp_path),
+        [sys.executable, str(Path(__file__).with_name("tool_hooks.py")), "--state-dir", str(tmp_path),
          "--mode", "filter"],
         input=b"not json",
         capture_output=True,
@@ -197,7 +198,7 @@ def test_module_entry_point_never_fails(tmp_path):
     assert "error" in (tmp_path / "hook-log.jsonl").read_text(encoding="utf-8")
     payload = json.dumps(post("rg -n def", big_output())).encode()
     run = subprocess.run(
-        [sys.executable, "-m", "jev_context.tool_hooks", "--state-dir", str(tmp_path),
+        [sys.executable, str(Path(__file__).with_name("tool_hooks.py")), "--state-dir", str(tmp_path),
          "--mode", "filter"],
         input=payload,
         capture_output=True,

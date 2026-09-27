@@ -1,6 +1,6 @@
 # PostToolUse hook 비교 계획
 
-> **설계 범위 밖 실험.** [통합 설계 2.0](design/unified-design.md)은 hook을 갱신 신호와 작업 ID 전달로 한정하고 출력 교체를 포함하지 않음. 2026-09-24 이 실험을 중단하고 `.codex/hooks.json`에서 `PostToolUse`를 제거, 설계 hook은 [호스트 기능표](host-capabilities.md) 참조. `tool_hooks.py`와 이 기록은 실험 근거로만 보존
+> **설계 범위 밖 실험.** [통합 설계 2.0](design/unified-design.md)은 hook을 갱신 신호와 작업 ID 전달로 한정하고 출력 교체를 포함하지 않음. 2026-09-24 이 실험을 중단하고 `.codex/hooks.json`에서 `PostToolUse`를 제거, 설계 hook은 [호스트 기능표](host-capabilities.md) 참조. [experiments/output_filter/tool_hooks.py](../experiments/output_filter/tool_hooks.py)와 이 기록은 실험 근거로만 보존 (제품 패키지에서 분리)
 
 큰 셸 출력을 요청 관련 줄로 교체하는 hook이 실제 코딩 작업의 토큰·요청 수·성공률에 주는 영향을 보는 소규모 비교
 짧은 단일 질문 시험(관찰 55,188 → 교체 53,509 입력 토큰, 1회 측정)에서 확인하지 못한 긴 작업의 누적 효과가 대상

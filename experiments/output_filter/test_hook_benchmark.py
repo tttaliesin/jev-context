@@ -40,7 +40,7 @@ def test_prompt_states_task_and_limits():
 def test_suite_tests_exclude_script_dependent_files():
     names = {path.name for path in suite_tests()}
     assert "test_hook_benchmark.py" not in names and "test_coding_benchmark.py" not in names
-    assert "test_tool_hooks.py" in names
+    assert "test_tool_hooks.py" not in names
 
 
 def test_hook_metrics_count_filters_and_saved_output_reads(tmp_path):

@@ -11,6 +11,8 @@ from pathlib import Path
 
 from .budget import measure
 from .common import DomainError, digest, dumps, now, uid
+from .project_files import atomic_write, safe_path
+from .storage import FileLock
 
 
 def source_fingerprint():
@@ -54,8 +56,6 @@ def compare_build(loaded, disk):
 
 
 def _path(config):
-    from .onboarding import safe_path
-
     return safe_path(config.project_root, ".local/jev-runtime/observation.json")
 
 
@@ -81,10 +81,9 @@ def observe_response(config, name, arguments, result, runtime, client_name, conf
         or not config_hash
     ):
         return
-    from .onboarding import atomic_write, locked
 
     try:
-        with locked(config.project_root):
+        with FileLock(safe_path(config.project_root, ".local/jev-runtime/observation.lock")):
             try:
                 item = _read(config)
             except (OSError, ValueError, DomainError):

@@ -38,6 +38,12 @@ jobs:
       - name: Build
         run: uv build --no-build-isolation --offline
 
+      - name: Archived experiment checks (outside product suite)
+        run: |
+          uv run --no-sync python -m ruff check experiments
+          uv run --no-sync python -m ruff format --check experiments
+          uv run --no-sync python -m pytest experiments/output_filter -q
+
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"

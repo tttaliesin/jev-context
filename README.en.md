@@ -169,6 +169,8 @@ Cached model preparation previously took about 20 seconds and took about 45 seco
 
 ## Development
 
+Product code lives in `src/jev_context/` and `desktop/`. The discontinued output-filter experiment is isolated in `experiments/output_filter/`, outside the product package and default test suite. [Structure and local cleanup plan](docs/project-cleanup-plan.md) · [Results](docs/project-cleanup-results.md) (Korean).
+
 ```powershell
 .\.venv\Scripts\python.exe scripts\check.py
 node --test scripts/test_locales.cjs

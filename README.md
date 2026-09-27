@@ -165,6 +165,8 @@ Jev와 Workroom은 **독립 제품**입니다. Codex·Claude Desktop의 에이�
 
 ## 개발
 
+제품 코드는 `src/jev_context/`와 `desktop/`에 있습니다. 중단한 출력 축약 실험은 `experiments/output_filter/`로 분리했으며 제품 패키지와 기본 테스트에 포함하지 않습니다. [구조·로컬 파일 정리 계획](docs/project-cleanup-plan.md) · [적용 결과](docs/project-cleanup-results.md)
+
 ```powershell
 .\.venv\Scripts\python.exe scripts\check.py
 ```

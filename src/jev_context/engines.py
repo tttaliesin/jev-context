@@ -35,17 +35,29 @@ def fingerprint(profile):
     }
     if not required <= profile.keys():
         raise DomainError("engine_unavailable", "Profile lacks reproducibility fields")
-    adapter = {
-        name: digest(Path(__file__).with_name(name).read_bytes())
-        for name in (
-            "engines.py",
-            "laya_worker.py",
+    # Shared code and this family's execution path only. An unrelated worker edit
+    # must not invalidate the selected engine's session or evaluation identity.
+    families = {
+        "openjev": (),
+        "laya": ("laya_worker.py", "shared_engine.py", "worker_lifetime.py"),
+        "semif_openvino": (
             "semif_worker.py",
-            "judgment.py",
-            "modal_engine.py",
             "shared_engine.py",
             "worker_lifetime.py",
             "openvino_cache.py",
+        ),
+        "openjev_modal": ("modal_engine.py",),
+    }
+    if profile["family"] not in families:
+        raise DomainError("engine_unavailable", "Unknown engine family")
+    adapter = {
+        name: digest(Path(__file__).with_name(name).read_bytes())
+        for name in (
+            "common.py",
+            "engines.py",
+            "judgment.py",
+            "storage.py",
+            *families[profile["family"]],
         )
     }
     return digest(
