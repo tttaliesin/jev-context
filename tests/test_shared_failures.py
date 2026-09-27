@@ -10,15 +10,44 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import test_shared_engine as shared
 from test_shared_engine import ask, begin_preparing, process_alive
 
+from jev_context import shared_engine
 from jev_context.common import DomainError
 from jev_context.shared_engine import SharedLocalEngine
 
 runtime_factory = shared.runtime_factory
+
+
+@pytest.mark.parametrize("winerror", [5, 32, 33, None])
+def test_endpoint_publication_retry_is_bounded_and_specific(monkeypatch, winerror):
+    elapsed = [0.0]
+    attempts = []
+
+    def sleep(seconds):
+        elapsed[0] += seconds
+
+    def replace(_):
+        attempts.append(elapsed[0])
+        error = PermissionError("denied")
+        if winerror is not None:
+            error.winerror = winerror
+        raise error
+
+    monkeypatch.setattr(
+        shared_engine, "time", SimpleNamespace(monotonic=lambda: elapsed[0], sleep=sleep)
+    )
+    with pytest.raises(PermissionError):
+        shared_engine.publish_endpoint(SimpleNamespace(replace=replace), object())
+    if winerror is None:
+        assert attempts == [0.0]
+    else:
+        assert len(attempts) > 1
+        assert 0.5 <= elapsed[0] < 0.52
 
 
 def wait_until_dead(pid, timeout=4):
@@ -201,6 +230,31 @@ def test_crashed_broker_releases_worker_and_same_profile_recovers_stale_endpoint
     recovered = runtime.wait_for(engine, "shadow")
     assert recovered["instance_id"] != prepared["instance_id"]
     assert engine.evaluate(ask(engine, "after-crash"))["evaluation_id"] == "after-crash"
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows rename sharing semantics")
+def test_recovery_waits_for_a_status_reader_to_close_old_endpoint(runtime_factory):
+    runtime = runtime_factory(idle_timeout_seconds=2)
+    engine = runtime.proxy()
+    begin_preparing(runtime, engine)
+    prepared = runtime.wait_for(engine, "shadow")
+    crash_broker_and_check_worker_exit(runtime, engine, prepared)
+    # A status call can still have the old endpoint open when the replacement
+    # broker publishes its endpoint. Windows readers deny replacement until close.
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with engine.endpoint.open("rb"):
+            starting = pool.submit(engine.prepare)
+            deadline = time.monotonic() + 4
+            pending = engine.endpoint.with_suffix(".tmp")
+            while not pending.exists() and not starting.done() and time.monotonic() < deadline:
+                time.sleep(0.01)
+            assert pending.exists(), "Replacement broker did not reach endpoint publication"
+            time.sleep(0.1)
+        result = starting.result(timeout=4)
+    assert result["state"] in {"preparing", "shadow"}
+    recovered = runtime.wait_for(engine, "shadow")
+    assert recovered["instance_id"] != prepared["instance_id"]
+    assert engine.evaluate(ask(engine, "after-reader"))["status"] == "observed"
 
 
 def test_different_profile_is_busy_while_owner_lives_but_recovers_dead_endpoint(runtime_factory):

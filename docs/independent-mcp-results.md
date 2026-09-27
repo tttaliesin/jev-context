@@ -27,3 +27,13 @@
 ## 판정 범위
 
 이는 Jev의 일반 기억 도구와 독립 관리 앱 회귀 검증이다. 실제 Workroom 결과를 사용자 대신 수집하지 않았고, Codex·Claude Desktop을 자동 연결하지 않았다. 두 서버가 등록돼 있어도 에이전트 지침과 실제 호출이 있어야 기억이 저장·검색된다. 이번 변경으로 일반 코딩 효율 개선이나 모델 판단 정확도를 입증한 것은 아니다.
+
+## 원격 검사에서 발견한 복구 결함
+
+구조 정정 커밋 `bd89b3b`의 [첫 원격 CI](https://github.com/tttaliesin/jev-context/actions/runs/36316808014)는 기존 강제 종료 후 복구 검사 1개에서 실패했다(291 passed / 1 failed). 새 일반 기억 검사는 통과했으나, 재시작한 broker가 `engine_preparing` 대신 `engine_unavailable`을 반환했다. 이전 버전 검사에서도 이 경로의 1초 기동 시간 가정이 실패한 이력이 있다.
+
+별도 Windows 재현 검사에서 status reader가 과거 `endpoint.json`을 연 동안 새 broker가 `endpoint.tmp`를 교체하면 `PermissionError: [WinError 5]`로 종료한다는 것을 확인했다. 수정 전 실제 프로세스 검사는 실패했고 `.t/endpoint-reader-before/test_recovery_waits_for_a_stat0/rt0/locks/shared/broker.stderr.log`에서 교체 실패 stack을 확인했다. 원 CI에는 내부 broker stderr가 없어 동일 원인인지는 추론이며, 이 재현으로 확인한 복구 결함과 구분한다.
+
+`shared_engine.publish_endpoint`가 Windows 접근·공유 오류(5/32/33)만 최대 0.5초 동안 재시도하도록 수정했다. 기존 파일은 원자적 교체가 성공할 때까지 유지하고 영구 권한 오류는 한도 후 실패한다. 다른 종류의 권한 오류는 즉시 실패한다. 시간 기준을 완화하거나 오류 응답을 성공으로 취급하지 않았다.
+
+수정 후 실제 열린 파일을 닫았을 때 새 broker와 worker가 복구하고 판단을 수행하는 검사, 재시도 한도/오류 구분 검사, 공유 엔진·MCP 회귀는 **18 passed**였다. 최종 `scripts/check.py`도 lint·format 및 **295 passed / 2 skipped**, 89.23초로 통과했다. 이 수치가 위 구조 정정 직후의 290개 통과 결과를 갱신한다. 수정 커밋의 원격 CI는 푸시 후 별도로 확인한다.

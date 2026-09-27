@@ -38,6 +38,21 @@ def private_directory(path):
         path.chmod(0o700)
 
 
+def publish_endpoint(temporary, endpoint):
+    # Windows status readers may briefly deny atomic replacement of the old file.
+    # Keep the broker lock and old endpoint intact while retrying only sharing /
+    # access-denied errors. Permanent permissions still fail within a fixed bound.
+    deadline = time.monotonic() + 0.5
+    while True:
+        try:
+            temporary.replace(endpoint)
+            return
+        except PermissionError as exc:
+            if getattr(exc, "winerror", None) not in {5, 32, 33} or time.monotonic() >= deadline:
+                raise
+            time.sleep(0.01)
+
+
 def number(value, low, high):
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError("Expected number")
@@ -485,7 +500,7 @@ class Broker:
                 }
                 temporary = endpoint.with_suffix(".tmp")
                 temporary.write_text(dumps(info), encoding="utf-8")
-                temporary.replace(endpoint)
+                publish_endpoint(temporary, endpoint)
                 try:
                     while True:
                         with self.mutex:
