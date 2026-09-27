@@ -56,3 +56,9 @@
 위 검사 이후 이번 작업에서 만든 `.t/cleanup-focused`, `.t/cleanup-full`, `.t/cleanup-experiments`도 별도 목록을 남기고 정리했다. 이 소량의 추가 제거는 위 20.09 GiB에 포함하지 않았다.
 
 원격 커밋과 CI 상태는 이 문서가 포함된 Git 이력 및 해당 커밋의 Actions 결과로 확인한다.
+
+### 최초 원격 검사 실패 기록
+
+`ffc06bb`의 [첫 CI 실행](https://github.com/tttaliesin/jev-context/actions/runs/36328644235)은 **289 passed, 1 failed**였다. 기존 `test_two_real_mcp_hosts_share_demand_started_model_and_status_does_not_keep_it_alive`에서 첫 `workspace_status` 응답이 클라이언트의 8초 제한을 넘었다. 서버 내부의 어느 단계가 지연됐는지는 이 로그만으로 확정하지 못했다.
+
+같은 코드로 `tests/test_shared_mcp.py`를 로컬 재검사한 결과 **2 passed (8.88초)**였다. 제품 코드와 테스트 제한 시간을 변경하지 않았다. CI 실패 로그는 `.local/cleanup-20260927/ci-first-failure.log`에 보존했다. GitHub의 기존 실행 재시도 API는 저장소 관리자 권한 부족으로 거절되어, 이 실패 기록을 추가하는 커밋의 CI로 같은 제품 코드를 다시 검사한다. 이후 통과하더라도 첫 시간초과의 원인이 해결됐다고 단정하지 않는다.
