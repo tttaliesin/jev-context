@@ -6,7 +6,7 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { BridgeClient } = require('./bridge-client.cjs');
 const { normalizeWindowState, loadWindowState, saveWindowState } = require('./window-state.cjs');
-const { createSetupController } = require('./setup-client.cjs');
+const { createSetupController, requestSetup } = require('./setup-client.cjs');
 const locale = require('./locales.js');
 const t = (key, ...args) => locale.translate(settings?.language, key, ...args);
 
@@ -85,6 +85,22 @@ function register(channel, handler) {
 }
 
 function registerActions() {
+  register('jev:bridge-export', async () => {
+    const descriptor = await requestSetup(settings, 'bridge_export');
+    const result = await dialog.showSaveDialog(window, {
+      title: t('Workroom 연결 파일 내보내기'),
+      defaultPath: path.join(descriptor.cwd, 'workroom-jev.json'),
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+    if (result.canceled || !result.filePath) return null;
+    // Never overwrite an existing user file, even after a native overwrite prompt.
+    try { fs.writeFileSync(result.filePath, JSON.stringify(descriptor, null, 2) + '\n', { encoding: 'utf8', flag: 'wx' }); }
+    catch (error) {
+      if (error.code === 'EEXIST') throw new Error('같은 이름의 파일이 있습니다. 다른 이름으로 내보내세요.');
+      throw error;
+    }
+    return { exported: true };
+  });
   register('jev:language:get', () => settings.language);
   register('jev:language:set', language => {
     if (!['ko', 'en'].includes(language)) throw new Error('지원하지 않는 언어입니다.');

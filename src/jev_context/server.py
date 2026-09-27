@@ -10,6 +10,7 @@ from mcp.shared.exceptions import McpError
 from mcp.shared.message import SessionMessage
 from mcp.types import CallToolResult, ErrorData, JSONRPCMessage, TextContent, Tool, ToolAnnotations
 
+from . import workroom_bridge
 from .common import DomainError, digest, dumps, failed, strict_loads
 from .service import CONTRACT, CONTRACT_V2, Service
 
@@ -97,9 +98,13 @@ async def strict_stdio(contract=CONTRACT):
             group.cancel_scope.cancel()
 
 
-async def serve(config, engine=None, config_path=None):
+async def serve(config, engine=None, config_path=None, bridge_only=False):
     loaded_hash = digest(Path(config_path).read_bytes()) if config_path else None
     contract = CONTRACT_V2 if config.contract_version == "2.0" else CONTRACT
+    if bridge_only and engine is not None:
+        raise ValueError("Bridge-only serving cannot use a model engine")
+    native_tools = {} if bridge_only else contract["tools"]
+    tools = {**native_tools, **workroom_bridge.SCHEMAS}
     server = Server("jev-context", version="0.2.0")
     limiter = anyio.CapacityLimiter(1)
 
@@ -108,11 +113,18 @@ async def serve(config, engine=None, config_path=None):
         return [
             Tool(
                 name=name,
-                description=DESCRIPTIONS[name],
+                description=(DESCRIPTIONS | workroom_bridge.DESCRIPTIONS)[name],
                 inputSchema=schema,
-                outputSchema=contract["output"],
+                outputSchema=contract["output"] if name in native_tools else None,
                 annotations=ToolAnnotations(
-                    readOnlyHint=name in {"workspace_status", "source_read", "work_inspect"},
+                    readOnlyHint=name
+                    in {
+                        "workspace_status",
+                        "source_read",
+                        "work_inspect",
+                        "bridge_status",
+                        "bridge_search",
+                    },
                     destructiveHint=name == "data_forget",
                     openWorldHint=(
                         engine is not None
@@ -122,13 +134,20 @@ async def serve(config, engine=None, config_path=None):
                     idempotentHint=name != "context_prepare",
                 ),
             )
-            for name, schema in contract["tools"].items()
+            for name, schema in tools.items()
         ]
 
     @server.call_tool(validate_input=False)
     async def call_tool(name, arguments):
-        if name not in contract["tools"]:
+        if name not in tools:
             raise McpError(ErrorData(code=-32601, message="Unknown tool"))
+        if name in workroom_bridge.SCHEMAS:
+            result, is_error = await anyio.to_thread.run_sync(
+                workroom_bridge.call, config, name, arguments, limiter=limiter
+            )
+            return CallToolResult(
+                content=[TextContent(type="text", text=dumps(result))], isError=is_error
+            )
 
         def invoke():
             service = None
@@ -166,5 +185,5 @@ async def serve(config, engine=None, config_path=None):
             isError=result["outcome"] in {"error", "conflict"},
         )
 
-    async with strict_stdio(contract) as (reader, writer):
+    async with strict_stdio({"tools": tools}) as (reader, writer):
         await server.run(reader, writer, server.create_initialization_options())
