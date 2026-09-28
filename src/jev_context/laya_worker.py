@@ -7,6 +7,18 @@ import sys
 from pathlib import Path
 
 
+def validate_rotary_config(checkpoint_config, loaded_config):
+    """Reject legacy Transformers silently ignoring the checkpoint's v5 rotary fields."""
+    for kind, legacy in (
+        ("full_attention", "global_rope_theta"),
+        ("sliding_attention", "local_rope_theta"),
+    ):
+        expected = checkpoint_config.get("rope_parameters", {}).get(kind, {}).get("rope_theta")
+        effective = getattr(loaded_config, legacy, None)
+        if expected is not None and effective is not None and expected != effective:
+            raise ValueError("Checkpoint rotary configuration is incompatible with this runtime")
+
+
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
     os.environ.update(HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1")
@@ -26,6 +38,10 @@ def main():
         from laya.common import render_options, serialize_state
 
         agent = laya.load(str(model_path), device=device)
+        validate_rotary_config(
+            json.loads((model_path / "encoder/config.json").read_text(encoding="utf-8")),
+            agent.model.encoder.config,
+        )
         if os.environ.get("JEV_WARMUP") == "1":
             agent.predict(
                 {"text": "준비 확인"},

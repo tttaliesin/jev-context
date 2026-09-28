@@ -225,11 +225,13 @@ def test_laya_real_worker_protocol_and_exclusive_model_lock(tmp_path, monkeypatc
     package.mkdir(parents=True)
     package.joinpath("__init__.py").write_text(
         """
+from types import SimpleNamespace
 class Tokenizer:
  mask_token='[MASK]'
  def __call__(self,text,**kwargs):return {'input_ids':list(range(len(text)))}
 class Agent:
  device='cpu'
+ model=SimpleNamespace(encoder=SimpleNamespace(config=SimpleNamespace(local_rope_theta=160000)))
  cfg={'max_len':10000,'head_max_len':1000}
  tok=Tokenizer()
  def _to_internal(self,q):return {'t':q['type'],'ins':q['instructions'],'crit':q['criteria']}
@@ -252,6 +254,10 @@ def load(*args,**kwargs):return Agent()
         (model / name).mkdir()
     for name in ("rl_agent_config.json", "model.safetensors"):
         (model / name).write_text("{}", encoding="utf-8")
+    (model / "encoder/config.json").write_text(
+        json.dumps({"rope_parameters": {"sliding_attention": {"rope_theta": 160000}}}),
+        encoding="utf-8",
+    )
     p = {
         **profile(),
         "family": "laya",

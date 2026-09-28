@@ -1,0 +1,13 @@
+{
+  "packets": 69,
+  "past_evaluations": 19,
+  "evaluations_without_original_state": 19,
+  "review_candidates": 230,
+  "human_reviewed": 0,
+  "target_candidates": 600,
+  "connected_groups": 1,
+  "purpose_counts": {
+    "relevance": 230
+  },
+  "note": "Reconstructed review candidates, not original requests or gold labels"
+}

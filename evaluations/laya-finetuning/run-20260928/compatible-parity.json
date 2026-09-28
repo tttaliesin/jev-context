@@ -1,0 +1,243 @@
+{
+  "model": "jev-laya:pilot",
+  "checkpoint_sha256": "7ea74a5ab6f09bb57bc20b2f219408ed968b2f44f8e52121590a75fd88f190e7",
+  "reference_sha256": "5845752036e387c229d627a3356e80034f5ee15e83e00d29614e78ea8d215712",
+  "rows": [
+    {
+      "id": "development-relevance-1",
+      "choice_match": true,
+      "maximum_probability_error": 0.0,
+      "actual": {
+        "type": "choice",
+        "choice": "relevant",
+        "confidence": 0.2674,
+        "probabilities": {
+          "relevant": 0.5116,
+          "irrelevant": 0.1084,
+          "insufficient_evidence": 0.38
+        }
+      },
+      "latency_ms": 111.41339992173016
+    },
+    {
+      "id": "development-relevance-2",
+      "choice_match": true,
+      "maximum_probability_error": 0.0,
+      "actual": {
+        "type": "choice",
+        "choice": "relevant",
+        "confidence": 0.413,
+        "probabilities": {
+          "relevant": 0.6087,
+          "irrelevant": 0.098,
+          "insufficient_evidence": 0.2933
+        }
+      },
+      "latency_ms": 95.25920008309186
+    },
+    {
+      "id": "development-relevance-3",
+      "choice_match": true,
+      "maximum_probability_error": 0.0,
+      "actual": {
+        "type": "choice",
+        "choice": "irrelevant",
+        "confidence": 0.8687,
+        "probabilities": {
+          "relevant": 0.0114,
+          "irrelevant": 0.9125,
+          "insufficient_evidence": 0.0761
+        }
+      },
+      "latency_ms": 83.14450015313923
+    },
+    {
+      "id": "development-relevance-4",
+      "choice_match": true,
+      "maximum_probability_error": 0.0,
+      "actual": {
+        "type": "choice",
+        "choice": "irrelevant",
+        "confidence": 0.6768,
+        "probabilities": {
+          "relevant": 0.0253,
+          "irrelevant": 0.7846,
+          "insufficient_evidence": 0.1902
+        }
+      },
+      "latency_ms": 90.91369993984699
+    },
+    {
+      "id": "development-evidence_relation-1",
+      "choice_match": true,
+      "maximum_probability_error": 0.0,
+      "actual": {
+        "type": "choice",
+        "choice": "supports",
+        "confidence": 0.4677,
+        "probabilities": {
+          "supports": 0.5741,
+          "contradicts": 0.0376,
+          "partial": 0.2246,
+          "unrelated": 0.0191,
+          "insufficient_evidence": 0.1446
+        }
+      },
+      "latency_ms": 197.6627002004534
+    },
+    {
+      "id": "development-evidence_relation-2",
+      "choice_match": true,
+      "maximum_probability_error": 0.0,
+      "actual": {
+        "type": "choice",
+        "choice": "unrelated",
+        "confidence": 0.2025,
+        "probabilities": {
+          "supports": 0.2159,
+          "contradicts": 0.1187,
+          "partial": 0.1734,
+          "unrelated": 0.362,
+          "insufficient_evidence": 0.1301
+        }
+      },
+      "latency_ms": 206.81639993563294
+    },
+    {
+      "id": "development-evidence_relation-3",
+      "choice_match": true,
+      "maximum_probability_error": 0.0,
+      "actual": {
+        "type": "choice",
+        "choice": "supports",
+        "confidence": 0.2906,
+        "probabilities": {
+          "supports": 0.4324,
+          "contradicts": 0.1158,
+          "partial": 0.3169,
+          "unrelated": 0.0242,
+          "insufficient_evidence": 0.1107
+        }
+      },
+      "latency_ms": 216.3775998633355
+    },
+    {
+      "id": "development-evidence_relation-4",
+      "choice_match": true,
+      "maximum_probability_error": 0.0,
+      "actual": {
+        "type": "choice",
+        "choice": "partial",
+        "confidence": 0.3929,
+        "probabilities": {
+          "supports": 0.1143,
+          "contradicts": 0.097,
+          "partial": 0.5143,
+          "unrelated": 0.043,
+          "insufficient_evidence": 0.2313
+        }
+      },
+      "latency_ms": 232.00850002467632
+    },
+    {
+      "id": "development-capability_fit-1",
+      "choice_match": true,
+      "maximum_probability_error": 0.0,
+      "actual": {
+        "type": "choice",
+        "choice": "unfit",
+        "confidence": 0.2188,
+        "probabilities": {
+          "fit": 0.3117,
+          "unfit": 0.4792,
+          "insufficient_evidence": 0.2091
+        }
+      },
+      "latency_ms": 169.71849999390543
+    },
+    {
+      "id": "development-capability_fit-2",
+      "choice_match": true,
+      "maximum_probability_error": 0.0,
+      "actual": {
+        "type": "choice",
+        "choice": "fit",
+        "confidence": 0.5817,
+        "probabilities": {
+          "fit": 0.7212,
+          "unfit": 0.1827,
+          "insufficient_evidence": 0.0961
+        }
+      },
+      "latency_ms": 169.5194998756051
+    },
+    {
+      "id": "development-capability_fit-3",
+      "choice_match": true,
+      "maximum_probability_error": 0.0,
+      "actual": {
+        "type": "choice",
+        "choice": "unfit",
+        "confidence": 0.4292,
+        "probabilities": {
+          "fit": 0.1764,
+          "unfit": 0.6195,
+          "insufficient_evidence": 0.2042
+        }
+      },
+      "latency_ms": 142.0790001284331
+    },
+    {
+      "id": "development-capability_fit-4",
+      "choice_match": true,
+      "maximum_probability_error": 0.0,
+      "actual": {
+        "type": "choice",
+        "choice": "unfit",
+        "confidence": 0.386,
+        "probabilities": {
+          "fit": 0.1845,
+          "unfit": 0.5907,
+          "insufficient_evidence": 0.2248
+        }
+      },
+      "latency_ms": 142.873200122267
+    }
+  ],
+  "quality_evaluation": false,
+  "promotion_eligible": false,
+  "load_seconds": 2.501016799826175,
+  "memory_loaded": {
+    "processes": [
+      {
+        "ProcessId": 589124,
+        "ParentProcessId": 598276,
+        "Name": "ollaya.exe",
+        "WorkingSetSize": 15618048
+      },
+      {
+        "ProcessId": 444,
+        "ParentProcessId": 589124,
+        "Name": "conhost.exe",
+        "WorkingSetSize": 10539008
+      },
+      {
+        "ProcessId": 579776,
+        "ParentProcessId": 589124,
+        "Name": "ollaya.exe",
+        "WorkingSetSize": 1410400256
+      },
+      {
+        "ProcessId": 597836,
+        "ParentProcessId": 579776,
+        "Name": "conhost.exe",
+        "WorkingSetSize": 7815168
+      }
+    ],
+    "working_set_sum_bytes": 1444372480
+  },
+  "passed": true,
+  "after_unload": {
+    "models": []
+  }
+}

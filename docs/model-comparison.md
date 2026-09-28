@@ -3,6 +3,8 @@
 2026-09-23 · 한국어 원문 30개와 대응 영어 입력 30개를 로컬 CPU에서 평가하고 같은 날 Laya·OpenJev Modal과 비교
 엔진 후보 여부를 판단하기 위한 단발 실행이며 프로젝트 코드·설정·profile은 변경하지 않은 범위
 
+2026-09-28 후속 확인: 이 문서의 Python Laya 환경(torch 2.8.0, transformers 4.56.2)이 checkpoint의 새 rotary 설정을 일부 무시하는 호환성 문제가 발견됐다. 아래 Laya 수치는 당시 환경의 관측으로 보존하며, 올바른 설정을 검증한 Laya 모델의 대표 성능으로 사용하지 않는다. [진단·수정·동등성 검증](laya-finetuning-results.md#첫-실패와-수정). AgentJev·OpenJev 및 이후 별도 Ollaya 실행 결과와는 구분한다.
+
 ## 관찰 결과
 
 같은 문항·질문 지시문·선택지·채점 기준에서 AgentJev가 Laya보다 정답 수가 적고 중요 문항 오답이 많은 결과

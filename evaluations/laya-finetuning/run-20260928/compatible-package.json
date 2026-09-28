@@ -1,0 +1,16 @@
+{
+  "status": "packaged_requires_runtime_parity",
+  "model": "jev-laya:pilot",
+  "base_manifest_sha256": "2840506e1f978aeb696a6f84af43ecc7fca95754cb63a67bafe6132532d384eb",
+  "manifest_sha256": "b384c137293a6c9449f476ca579c8ab20c7dc6b992833cbb4491b1c4d81557f4",
+  "checkpoint_sha256": "7ea74a5ab6f09bb57bc20b2f219408ed968b2f44f8e52121590a75fd88f190e7",
+  "external_tensors": 168,
+  "inline_updated": {
+    "scorer.3.weight": {
+      "initializer": "val_1925",
+      "transform": "transpose"
+    }
+  },
+  "promotion_eligible": false,
+  "onnx": "1.23.0"
+}

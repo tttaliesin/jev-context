@@ -5,3 +5,4 @@ evaluations/ollaya-tuning/development.json text eol=lf
 evaluations/ollaya-tuning/validation.json text eol=lf
 evaluations/ollaya-tuning/candidates.json text eol=lf
 evaluations/ollaya-tuning/run-20260928/*.json -text whitespace=cr-at-eol
+evaluations/laya-finetuning/run-20260928/*.json -text whitespace=cr-at-eol

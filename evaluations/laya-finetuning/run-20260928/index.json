@@ -1,0 +1,30 @@
+{
+  "base_commit": "0a3fe9ab8b83774a6ca554debd9d83b7551f6025",
+  "files": {
+    "initial-train.json": "c480701d654793849c139a55837472358d6c2eb7595ee47ab0ae127a24d42972",
+    "initial-reload.json": "cee937ccf642161c41f00255efbfc651a278f38006e287fdacdf5d4b5b615a49",
+    "initial-package.json": "ac7d8254793ed522cb85d6071c7fa45981af2e6406bc7d0c48889f131a9398cb",
+    "initial-parity.json": "83f03bfd58c79a677b5b88f5d79d56e53781f655ecfd55dfbfdbdcbba62c4c17",
+    "compatible-train.json": "944796133853a8afa10607ee612cd0a1c75d010d1ad9d7e9c3be25838202f95b",
+    "compatible-reload.json": "5845752036e387c229d627a3356e80034f5ee15e83e00d29614e78ea8d215712",
+    "compatible-package.json": "661b9c6b14f3247d32baf09676c23a6245ab29351bb9c8750ee7e032e2175b5b",
+    "compatible-parity.json": "1edb2d4d20250627cddffde4a7144bd70c7d762ea82a589440aee5bc5a91e84c",
+    "inventory.json": "ca71bc9d60892db8364f857be435416a7b9cdea7a9e8898bc72c696de780d634",
+    "cleanup.json": "f1b3f510b52413e5fcf8131313f19ff2fafb086ff6366af34aab257d8e2361e5",
+    "environment.json": "63172c6a18dd86ecf73216ee3a75ff9d5bdbe097a08a96133a340b18d45126f4"
+  },
+  "provenance": "technical_pilot_on_exposed_development_cases",
+  "formal_training_ready": false,
+  "quality_evaluation": false,
+  "promotion_eligible": false,
+  "first_failure": "Transformers 4.56.2 ignores v5 local rope_theta; default 10000 differed from checkpoint 160000",
+  "resolution": "Translated the explicit default rotary parameters in an isolated reference config and repeated training, reload and parity; retained first failure.",
+  "data_limit": "230 reconstructed relevance candidates, zero human labels, one connected source/work group; not 600 real labeled decisions.",
+  "private_candidate_rows_published": false,
+  "tools": {
+    "scripts/train_laya_pilot.py": "ca8a920a3e2d720af350130b3ed85422f70b7e99cffbade7018b1802f109961d",
+    "scripts/package_laya_pilot.py": "c12ca06baa9d04b209a6b9fe223ef46f8a25531d1351e6c242d02e59ad9ccebf",
+    "scripts/verify_laya_pilot.py": "98889978f4c1b83ca5ee130f0e199453368175efb0fec4dc993b436047aa7dfe",
+    "scripts/prepare_laya_training_data.py": "88a0e998ac167081d7b5dd13f6044660596086e35b2819239894f6d2ad8e5016"
+  }
+}

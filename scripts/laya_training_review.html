@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ko"><meta charset="utf-8"><title>Laya 학습 정답 검토</title>
+<style>
+body{font:16px/1.6 system-ui;margin:32px auto;max-width:1000px;background:#f6f7f9;color:#182330;padding:0 20px}
+section{background:white;border:1px solid #d4dae1;border-radius:12px;padding:24px;margin:16px 0}
+label{display:block;margin:12px 0}button,select,input,textarea{font:inherit;padding:8px;max-width:100%;box-sizing:border-box}
+button{cursor:pointer;margin:4px}textarea{width:100%;min-height:100px}pre{white-space:pre-wrap;overflow-wrap:anywhere}
+.hint{color:#56616e}#status{font-weight:bold}nav{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+</style>
+<h1>학습 정답 검토</h1>
+<p>작업 목표와 출처 원문을 다시 묶은 후보입니다. 과거 모델 요청을 복원한 자료가 아닙니다.
+질문과 원문이 실제로 판단 가능한지 확인하세요. 판단할 수 없는 항목은 미검토로 남겨 주세요.</p>
+<label>검토자 이름 <input id="reviewer" autocomplete="name"></label>
+<nav><button id="previous">이전</button><span id="position"></span><button id="next">다음</button>
+<button id="save">검토 결과 내려받기</button><label>이어 검토하기 <input id="import" type="file" accept=".jsonl"></label></nav>
+<p id="status" role="status"></p>
+<section><div id="origin" class="hint"></div><label>질문·목표 <textarea id="query"></textarea></label>
+<h2>판단할 원문</h2><pre id="candidate"></pre>
+<label>정답 <select id="label"></select></label>
+<label>중요 사례인가? <select id="critical"><option value="">선택 필요</option><option value="true">예</option><option value="false">아니오</option></select></label>
+<button id="confirm">이 항목 검토 완료</button><button id="clear">미검토로 되돌리기</button></section>
+<p class="hint">이 파일은 네트워크 요청 없이 동작합니다. 브라우저를 닫기 전에 결과를 내려받으세요.
+내려받은 파일을 ‘이어 검토하기’에서 열면 계속할 수 있습니다. 본 학습 준비에는 세 목적과 독립 출처 그룹이 모두 필요합니다.</p>
+<script>
+const data=/*REVIEW_DATA*/;
+let rows=data.rows,index=0;
+const el=id=>document.getElementById(id);
+function show(){
+ const row=rows[index];if(!row){el('status').textContent='검토 후보가 없습니다.';return}
+ el('position').textContent=`${index+1} / ${rows.length}`;
+ el('origin').textContent=`${row.id} · ${row.purpose} · ${JSON.stringify(row.source_refs)}`;
+ el('query').value=row.state.query;el('candidate').textContent=row.state.candidate;
+ el('label').replaceChildren(new Option('선택 필요',''),...data.labels[row.purpose].map(x=>new Option(x,x)));
+ el('label').value=row.expected||'';el('critical').value=typeof row.critical==='boolean'?String(row.critical):'';
+ el('status').textContent=`검토 완료 ${rows.filter(x=>x.review.status==='human_reviewed').length}개 · 현재 ${row.review.status}`;
+}
+el('previous').onclick=()=>{index=Math.max(0,index-1);show()};
+el('next').onclick=()=>{index=Math.min(rows.length-1,index+1);show()};
+el('confirm').onclick=()=>{
+ const name=el('reviewer').value.trim(),label=el('label').value,critical=el('critical').value,query=el('query').value.trim();
+ if(!name||!label||!critical||!query){el('status').textContent='검토자·질문·정답·중요 여부를 모두 입력하세요.';return}
+ const row=rows[index];row.state.query=query;row.state.goal=query;row.expected=label;row.critical=critical==='true';
+ row.review={status:'human_reviewed',reviewer:name,reviewed_at:new Date().toISOString()};show();
+};
+el('clear').onclick=()=>{const row=rows[index];row.expected=null;row.critical=null;row.review={status:'pending',reviewer:null,reviewed_at:null};show()};
+el('save').onclick=()=>{
+ const url=URL.createObjectURL(new Blob([rows.map(x=>JSON.stringify(x)).join('\n')+'\n'],{type:'application/x-ndjson'}));
+ const a=document.createElement('a');a.href=url;a.download='laya-reviewed.jsonl';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+};
+el('import').onchange=async event=>{
+ try{
+  const imported=(await event.target.files[0].text()).trim().split(/\r?\n/).map(JSON.parse);
+  const byId=new Map(imported.map(r=>[r.id,r]));
+  for(const row of rows){const r=byId.get(row.id);if(r&&r.source_text_sha256===row.source_text_sha256&&r.state.candidate===row.state.candidate&&r.purpose===row.purpose){row.state.query=r.state.query;row.state.goal=r.state.goal;row.expected=r.expected;row.critical=r.critical;row.review=r.review}}
+  show();
+ }catch(error){el('status').textContent=`불러오기 실패: ${error.message}`}
+};
+show();
+</script></html>

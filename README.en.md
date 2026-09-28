@@ -193,6 +193,7 @@ The detailed guides and historical reports below are currently **in Korean**. Th
 | Models and shared runtime | [Models](docs/models.md) · [Model lifecycle](docs/model-lifecycle-design.md) |
 | External decision-model runtime | [Ollaya research](docs/ollaya-research.md) · [Evaluation plan](docs/ollaya-evaluation-plan.md) · [Plan review](docs/ollaya-evaluation-review.md) · [Tuning and comparison results](docs/ollaya-evaluation-results.md) |
 | Further Ollaya tuning, model selection, and training | [Second-stage plan](docs/ollaya-tuning-plan.md) · [Review](docs/ollaya-tuning-review.md) · [Fresh-case comparison](docs/ollaya-tuning-results.md) · [Weight fine-tuning readiness](docs/ollaya-finetuning-readiness.md) |
+| Actual weight training and Ollaya import | [Execution plan and review](docs/laya-finetuning-plan.md) · [Pilot training, runtime parity, and data limitations](docs/laya-finetuning-results.md) |
 | Context delivery | [Research](docs/context-efficiency-research.md) · [Plan](docs/context-efficiency-implementation-plan.md) · [Results](docs/context-efficiency-results.md) |
 | README design and actual captures | [References and capture notes](docs/readme-design-references.md) |
 
