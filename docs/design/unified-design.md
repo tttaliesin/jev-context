@@ -497,6 +497,6 @@ V0~V1에서 모델 또는 호스트 연결이 불가능하면 해당 환경의 �
 
 ### 이전 문서의 지위
 
-[방향 설계 0.4](proposal.md), [상세 설계 1.0](detailed-design.md), [이전 자료 비교](source-comparison.md), [이전 검증 계획](acceptance.md)은 당시 선택을 추적할 참고 자료
-[도구 계약 1.0](tool-contracts.md), [저장 설계 1.0](storage-and-flows.md), [모델 조사](local-models.md), [합성 사례](pilot-cases.md), [이전 검토 기록](design-review.md)은 기존 구현과 조사 이력의 참고 자료
+[방향 설계 0.4](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/design/proposal.md), [상세 설계 1.0](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/design/detailed-design.md), [이전 자료 비교](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/design/source-comparison.md), [이전 검증 계획](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/design/acceptance.md)은 당시 선택을 추적할 참고 자료
+[도구 계약 1.0](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/design/tool-contracts.md), [저장 설계 1.0](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/design/storage-and-flows.md), [모델 조사](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/design/local-models.md), [합성 사례](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/design/pilot-cases.md), [이전 검토 기록](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/design/design-review.md)은 기존 구현과 조사 이력의 참고 자료
 새 제품 범위·우선순위·완료 정의에서 상충하면 이 문서의 결정을 우선하고 실제 실행 계약은 schema와 코드의 버전으로 판단

@@ -2,6 +2,20 @@
 
 실행: 2026-09-27~28 · [적용 계획](project-cleanup-plan.md) 순서로 진행
 
+## 2026-09-28 후속 정리: 중단 실험·중복 도구·이전 설계
+
+현재 앱 실행과 진행 중인 학습에 필요하지 않은 **16개 파일, 3,118줄, 199,879 bytes**를 현재 트리에서 제거했다. 이는 Git에 저장된 파일 내용 기준이며 디스크 여유 공간 증가량이 아니다. 새 보관 폴더를 만들지 않고 제거 전 커밋 `67ccafc`에 원본을 남겼다.
+
+| 제거한 묶음 | 이유 | 과거 내용 |
+|---|---|---|
+| 출력 축약 실험 4개 파일·전용 벤치마크·계획 (6개) | 2026-09-24 중단됐으며 참조는 실험 내부와 자체 테스트뿐이었다. 제품 코드·현재 테스트·설치된 hook에는 의존하지 않는다. | [실험 코드](https://github.com/tttaliesin/jev-context/tree/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/experiments/output_filter) · [벤치마크](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/scripts/hook_benchmark.py) · [당시 계획](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/hook-benchmark-plan.md) |
+| `mise.toml` (1개) | uv·Python 명령을 감싼 선택적 실행 계층. 직접 명령으로 개발 안내를 통일했다. | [이전 설정](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/mise.toml) |
+| 설계 0.4·1.0 문서 (9개) | 모든 문서에 통합 설계 2.0으로 대체됐다고 명시돼 있었다. 현재 설계의 과거 근거 링크를 고정 커밋으로 바꿨다. | [이전 설계 묶음](https://github.com/tttaliesin/jev-context/tree/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/design) |
+
+현재 통합 설계, 제품 코드와 테스트, 앱 빌드·연결 도구, 진행 중인 Laya 학습 자료·평가 결과, 모델 준비 도구는 남겼다. `.local`의 작업 DB·프로필·가중치와 `.venv`, 실행 앱 `dist`도 유지한다. v1 계약은 v2 계약과 호환 검사에서 사용하므로 이전 설계 문서와 달리 제거 대상이 아니다.
+
+README 두 언어와 개발 안내를 갱신했다. 남은 코드에서 삭제 경로 참조가 없고, 변경 문서의 로컬 링크 162개와 고정 Git 링크 34개의 대상이 존재함을 확인했다. Ruff lint·format(95개 파일)과 pytest 수집(322개)이 통과했다. 테스트 본 실행과 원격 CI는 수행하지 않았다. 아래 내용은 이전 정리 당시의 기록으로, 그때 별도로 보존했던 실험 코드는 이번에 위와 같이 제거했다.
+
 ## 적용한 구조 변경
 
 - 중단한 출력 축약 실험과 관련 테스트 2개 파일을 `experiments/output_filter/`로 이동했다. 제품 wheel·기본 제품 pytest에서 제외하고 별도 검사와 CI 단계로 유지했다. 벤치마크 생성기의 실행 경로·hash 참조를 수정했으며, 기존에 동결한 입력과 결과는 수정하지 않았다.

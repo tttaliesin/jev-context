@@ -168,14 +168,14 @@ Cached model preparation previously took about 20 seconds and took about 45 seco
 
 ## Development
 
-Product code lives in `src/jev_context/` and `desktop/`. The discontinued output-filter experiment is isolated in `experiments/output_filter/`, outside the product package and default test suite. [Structure and local cleanup plan](docs/project-cleanup-plan.md) · [Results](docs/project-cleanup-results.md) (Korean).
+Product code lives in `src/jev_context/` and `desktop/`. Retired experiments and superseded designs have been removed from the current tree and preserved in Git history. [Cleanup results](docs/project-cleanup-results.md) (Korean).
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\check.py
 node --test scripts/test_locales.cjs
 ```
 
-The Python check runs Ruff lint, format checks, and pytest, returning the first failure's exit code. `mise run check` also validates the lockfile and builds the package. Model adapter tests use mock workers to verify contracts; they do not measure model accuracy. See the [development guide](docs/development.md) (Korean).
+The Python check runs Ruff lint, format checks, and pytest, returning the first failure's exit code. Model adapter tests use mock workers to verify contracts; they do not measure model accuracy. See the [development guide](docs/development.md) (Korean) for targeted checks and build commands.
 
 ## Documentation
 
@@ -201,7 +201,7 @@ The detailed guides and historical reports below are currently **in Korean**. Th
 
 - September 26, 2026: [Project relocation recovery](docs/recovery-validation.md) ([incident](docs/recovery-case.md)), [model lifecycle validation](docs/model-lifecycle-validation.md) ([case](docs/model-lifecycle-case.md)), [startup performance](docs/model-startup-performance.md), [resume evaluation plan](docs/resume-evaluation-plan.md) and [results](docs/resume-evaluation-results.md).
 - September 26 desktop UX: [Design references](docs/design-reference-research.md), [brand examples](docs/desktop-ux-references.md), [implementation plan](docs/desktop-ux-plan.md).
-- September 24: [PostToolUse hook comparison plan](docs/hook-benchmark-plan.md) (discontinued experiment).
+- September 24: [PostToolUse hook comparison plan](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/hook-benchmark-plan.md) (discontinued experiment).
 - September 23: [Judgment model comparison](docs/model-comparison.md).
 - September 22: [Revised judgment comparison](docs/judgment-revision.md), [native MCP validation](docs/native-mcp-validation.md), [OpenJev per-work Modal sessions](docs/openjev-session.md), [Modal diagnostics](docs/openjev-modal-evaluation.md), [translated-input comparison](docs/translation-evaluation.md), [independent coding comparison plan](docs/coding-benchmark-plan.md) and [results](docs/coding-benchmark-results.md), [0.2.0 validation](docs/verification-v2.md), [0.1.0 validation](docs/verification.md), [0.1.0 implementation notes](docs/implementation-notes.md).
 
@@ -210,10 +210,10 @@ The detailed guides and historical reports below are currently **in Korean**. Th
 <details>
 <summary><b>Earlier design 1.0</b> (superseded by unified design 2.0)</summary>
 
-- [Proposal 0.4](docs/design/proposal.md), [detailed design 1.0](docs/design/detailed-design.md), [design review](docs/design/design-review.md).
-- [Tool contracts](docs/design/tool-contracts.md), [storage and flows](docs/design/storage-and-flows.md).
-- [Acceptance criteria](docs/design/acceptance.md), [30 pilot cases](docs/design/pilot-cases.md).
-- [Local judgment engines](docs/design/local-models.md), [PDF and X source comparison](docs/design/source-comparison.md).
+- [Proposal 0.4](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/design/proposal.md), [detailed design 1.0](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/design/detailed-design.md), [design review](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/design/design-review.md).
+- [Tool contracts](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/design/tool-contracts.md), [storage and flows](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/design/storage-and-flows.md).
+- [Acceptance criteria](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/design/acceptance.md), [30 pilot cases](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/design/pilot-cases.md).
+- [Local judgment engines](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/design/local-models.md), [PDF and X source comparison](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/design/source-comparison.md).
 
 </details>
 

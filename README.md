@@ -164,13 +164,13 @@ Jev와 Workroom은 **독립 제품**입니다. Codex·Claude Desktop의 에이�
 
 ## 개발
 
-제품 코드는 `src/jev_context/`와 `desktop/`에 있습니다. 중단한 출력 축약 실험은 `experiments/output_filter/`로 분리했으며 제품 패키지와 기본 테스트에 포함하지 않습니다. [구조·로컬 파일 정리 계획](docs/project-cleanup-plan.md) · [적용 결과](docs/project-cleanup-results.md)
+제품 코드는 `src/jev_context/`와 `desktop/`에 있습니다. 중단 실험과 대체된 이전 설계는 현재 트리에서 제거하고 Git 이력으로 보존합니다. [정리 결과](docs/project-cleanup-results.md)
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\check.py
 ```
 
-Ruff lint·format 검사와 pytest를 순서대로 실행하고 첫 실패의 종료 코드를 돌려줍니다. `mise run check`는 여기에 lock 확인과 build를 더합니다. 모델 어댑터 테스트는 모의 worker로 계약을 검사하며 모델 정확도와는 별개입니다. 환경 구성은 [개발 환경](docs/development.md)에 있습니다.
+Ruff lint·format 검사와 pytest를 순서대로 실행하고 첫 실패의 종료 코드를 돌려줍니다. 모델 어댑터 테스트는 모의 worker로 계약을 검사하며 모델 정확도와는 별개입니다. 개별 검사와 빌드 명령은 [개발 환경](docs/development.md)에 있습니다.
 
 ## 문서
 
@@ -193,7 +193,7 @@ Ruff lint·format 검사와 pytest를 순서대로 실행하고 첫 실패의 �
 
 - 2026-09-26: [프로젝트 이동 복구와 실사용 검증](docs/recovery-validation.md) ([장애 기록](docs/recovery-case.md)), [모델 수명 적용 검증](docs/model-lifecycle-validation.md) ([원문](docs/model-lifecycle-case.md)), [모델 시작 지연 개선](docs/model-startup-performance.md), [작업 재개 비교 계획](docs/resume-evaluation-plan.md)·[결과](docs/resume-evaluation-results.md)
 - 2026-09-26 데스크톱 UX: [디자인 레퍼런스 조사](docs/design-reference-research.md), [브랜드 사례 조사](docs/desktop-ux-references.md), [재적용 계획](docs/desktop-ux-plan.md)
-- 2026-09-24: [PostToolUse hook 비교 계획](docs/hook-benchmark-plan.md) (중단된 실험)
+- 2026-09-24: [PostToolUse hook 비교 계획](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/hook-benchmark-plan.md) (중단된 실험)
 - 2026-09-23: [판단 모델 비교 진단](docs/model-comparison.md)
 - 2026-09-22: [판단 개선 후 비교](docs/judgment-revision.md), [현재 대화의 MCP 연결 검증](docs/native-mcp-validation.md), [OpenJev 작업별 Modal 연결](docs/openjev-session.md), [OpenJev Modal 진단](docs/openjev-modal-evaluation.md), [영어 번역 입력 비교](docs/translation-evaluation.md), [독립 코드 수정 비교 계획](docs/coding-benchmark-plan.md)·[결과](docs/coding-benchmark-results.md), [0.2.0 검증 기록](docs/verification-v2.md), [0.1.0 검증 기록](docs/verification.md), [0.1.0 설계 보완](docs/implementation-notes.md)
 
@@ -202,10 +202,10 @@ Ruff lint·format 검사와 pytest를 순서대로 실행하고 첫 실패의 �
 <details>
 <summary><b>이전 설계 1.0</b> (통합 설계 2.0으로 대체됨)</summary>
 
-- [설계안 0.4](docs/design/proposal.md), [상세 설계 1.0](docs/design/detailed-design.md), [설계 검토](docs/design/design-review.md)
-- [도구 인터페이스 계약](docs/design/tool-contracts.md), [저장 구조와 처리 순서](docs/design/storage-and-flows.md)
-- [검증 설계와 합격 기준](docs/design/acceptance.md), [평가 사례 30개](docs/design/pilot-cases.md)
-- [로컬 판단 엔진 비교](docs/design/local-models.md), [PDF와 X 글 비교](docs/design/source-comparison.md)
+- [설계안 0.4](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/design/proposal.md), [상세 설계 1.0](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/design/detailed-design.md), [설계 검토](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/design/design-review.md)
+- [도구 인터페이스 계약](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/design/tool-contracts.md), [저장 구조와 처리 순서](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/design/storage-and-flows.md)
+- [검증 설계와 합격 기준](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/design/acceptance.md), [평가 사례 30개](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/design/pilot-cases.md)
+- [로컬 판단 엔진 비교](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/design/local-models.md), [PDF와 X 글 비교](https://github.com/tttaliesin/jev-context/blob/67ccafcbba7ac27e435d6bcdc7a86505997f9c16/docs/design/source-comparison.md)
 
 </details>
 
