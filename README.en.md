@@ -122,6 +122,8 @@ Required constraints, known conflicts, failures, and counterevidence are protect
 
 Contract 2.0 removes obsolete next actions from completed work and exposes superseded criteria and verification details through references. Read stored judgment details with `work_inspect(view=judgments)`. See the [implementation plan](docs/context-efficiency-implementation-plan.md) and [results](docs/context-efficiency-results.md) (Korean).
 
+New model judgments retain the original input, questions, profile fingerprint, and result in the project store. The [record audit and training readiness report](docs/laya-finetuning-results.md) distinguishes recorded reports, agent-proposed labels, and human review. Independent data remains insufficient to establish a fine-tuning improvement.
+
 | Tool | Purpose |
 |---|---|
 | `workspace_status` | List projects and work; inspect collection and model status |

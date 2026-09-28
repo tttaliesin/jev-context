@@ -164,6 +164,18 @@ def test_model_selection_protects_required_and_shadow_preserves(v2, tmp_path):
     active = call(v2, "context_prepare", **args)
     assert not active["data"]["evidence"]
     assert active["data"]["judgment"]["status"] == "applied"
+    # Even an omitted source remains linked to the stored request for deletion policy.
+    pid = active["data"]["packet_id"]
+    stored = v2.store.body("packets", pid)
+    evaluation = stored["judgment"]["evaluations"][0]
+    assert evaluation["request"]["state"]["query"] == "로그인"
+    assert (
+        evaluation["request"]["state"]["candidate"] == "로그인 토큰은 만료되지 않았다. 반대 근거."
+    )
+    assert evaluation["input_hash"] == digest(dumps(evaluation["request"]["state"]).encode())
+    assert evaluation["request_dispatched"]
+    assert source["source_id"] in {r["source_id"] for r in v2.store.inherited_refs("packets", pid)}
+    assert "evaluations" not in active["data"]["judgment"]
     required = call(
         v2,
         "context_prepare",
@@ -298,6 +310,12 @@ def test_capability_freshness_version_mandatory_and_no_execution(v2, tmp_path):
     result = call(v2, "capability_recommend", work_id=wid, query="코드 조사", inventory=inv)
     assert {i["id"] for i in result["data"]["selected"]} == {"read", "rules"}
     assert result["data"]["execution_authorized"] is False
+    assert "request" not in result["data"]["evaluations"][0]
+    pid = result["data"]["inspection"]["packet_id"]
+    stored = v2.store.body("packets", pid)
+    requests = [r["request"] for r in stored["judgment"]["evaluations"]]
+    assert requests[0]["state"]["candidate"] == inv["items"][0]
+    assert requests[0]["questions"][0]["purpose"] == "capability_fit"
     old_hash = inventory_hash(inv)
     inv["items"][0]["version"] = "2"
     assert (

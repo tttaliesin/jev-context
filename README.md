@@ -118,6 +118,8 @@ Jev와 Workroom은 **독립 제품**입니다. Codex·Claude Desktop의 에이�
 
 계약 2.0은 완료된 작업의 오래된 다음 행동을 제거하고, 대체된 기준·검증 상세는 참조로 제공합니다. 저장된 판단 상세는 `work_inspect(view=judgments)`로 읽습니다. [적용 계획](docs/context-efficiency-implementation-plan.md)과 [검증 결과](docs/context-efficiency-results.md)를 참고하세요.
 
+새 모델 판단은 실제 입력·질문·프로필 식별값과 결과를 프로젝트 저장소에 보존합니다. [실제 기록 조사와 학습 준비](docs/laya-finetuning-results.md)에서는 저장된 보고, 에이전트 정답 초안, 사람 검토를 구분합니다. 독립 자료가 부족해 추가 학습의 성능 향상은 아직 확인하지 못했습니다.
+
 | 도구 | 하는 일 |
 |---|---|
 | `workspace_status` | 프로젝트와 작업 목록, 수집 및 모델 상태 조회 |

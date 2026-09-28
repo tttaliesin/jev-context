@@ -4,7 +4,7 @@ import json
 import time
 from pathlib import Path
 
-from .common import DomainError, digest, dumps, uid
+from .common import DomainError, digest, dumps, now, uid
 
 TEMPLATE_REVISION = "jev-context-v2-2"
 
@@ -115,24 +115,37 @@ def evaluate_many(service, entries, deadline, language="ko", work_id=None):
     ]
     if not requests:
         return []
+    captured_at = now()
+    snapshots = json.loads(dumps(requests))
     if hasattr(service.engine, "evaluate_many"):
         try:
             results = service.engine.evaluate_many(requests)
         except DomainError as exc:
-            return abstained(exc.code)
+            results = abstained(exc.code)
     else:
         results = []
-        for request in requests:
+        for index, request in enumerate(requests):
             request["deadline_ms"] = int((deadline - time.monotonic()) * 1000)
+            snapshots[index] = json.loads(dumps(request))
             if request["deadline_ms"] <= 0:
-                results.append({"status": "abstained", "reason": "judgment_deadline"})
+                results.append(
+                    {
+                        "status": "abstained",
+                        "reason": "judgment_deadline",
+                        "request_dispatched": False,
+                    }
+                )
                 continue
             try:
                 results.append(service.engine.evaluate(request))
             except DomainError as exc:
                 results.append({"status": "abstained", "reason": exc.code})
-    for result, (state, _) in zip(results, entries, strict=True):
-        result["input_hash"] = digest(dumps(state).encode())
+    for result, request in zip(results, snapshots, strict=True):
+        result["input_hash"] = digest(dumps(request["state"]).encode())
+        result["request"] = request
+        result.setdefault("request_dispatched", True)
+        result["captured_at"] = captured_at
+        result["template_revision"] = TEMPLATE_REVISION
     return results
 
 
@@ -191,6 +204,11 @@ def select_evidence(service, args, scope, required, candidates, deadline):
                 "source_id": item["source_id"],
                 "revision": item["revision"],
                 "content_hash": item["content_hash"],
+                "source_ref": {
+                    key: item[key]
+                    for key in ("source_id", "revision", "locator", "start_line", "end_line")
+                    if key in item
+                },
                 **result,
             }
         )

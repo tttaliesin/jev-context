@@ -102,6 +102,107 @@ def inventory(db_path):
         db.close()
 
 
+def audit_records(db_path):
+    """Keep exact recorded observations separate from reconstructed evidence questions."""
+    db = sqlite3.connect(Path(db_path).resolve().as_uri() + "?mode=ro", uri=True)
+    db.execute("BEGIN")
+    rows, stats = [], Counter()
+
+    def base(identity, work_id, state, provenance, refs, record):
+        return {
+            "id": identity,
+            "work_id": work_id,
+            "state": state,
+            "state_sha256": digest(state),
+            "source_refs": refs,
+            "source_record": record,
+            "source_record_sha256": digest(record),
+            "source_text_sha256": digest(state["candidate"]),
+            "provenance": provenance,
+            "expected": None,
+            "critical": None,
+            "review": {"status": "pending", "reviewer": None, "reviewed_at": None},
+            "automatic_checks": {"record_read_from_project_db": True, "gold_label_verified": False},
+        }
+
+    try:
+        for pid, wid, raw in db.execute("SELECT id,work_id,body FROM packets ORDER BY id"):
+            packet = json.loads(raw)
+            stats["packets"] += 1
+            for index, result in enumerate(packet.get("judgment", {}).get("evaluations", [])):
+                stats["past_evaluations"] += 1
+                request = result.get("request")
+                if not request:
+                    stats["evaluations_without_original_request"] += 1
+                    continue
+                if not result.get("request_dispatched"):
+                    stats["requests_not_dispatched"] += 1
+                    continue
+                if digest(request["state"]) != result.get("input_hash"):
+                    stats["invalid_input_hash"] += 1
+                    continue
+                refs = [result["source_ref"]] if result.get("source_ref") else []
+                refs.append({"source_id": pid, "locator": "project-db:" + pid})
+                for question in request["questions"]:
+                    purpose = question["purpose"]
+                    if purpose not in LABELS:
+                        continue
+                    row = base(
+                        f"actual-{pid}-{index}-{purpose}",
+                        wid,
+                        request["state"],
+                        "captured_model_request",
+                        refs,
+                        result,
+                    )
+                    row.update(purpose=purpose, original_model_request=True, packet_id=pid)
+                    rows.append(row)
+                    stats["captured_request_cases"] += 1
+        for eid, wid, raw in db.execute("SELECT id,work_id,body FROM evidence ORDER BY id"):
+            record = json.loads(raw)
+            stats["evidence_records"] += 1
+            observation = record.get("observation")
+            if not record.get("claim") or not isinstance(observation, dict):
+                stats["incomplete_evidence_records"] += 1
+                continue
+            if not observation.get("command") or not observation.get("result_excerpt"):
+                stats["incomplete_evidence_records"] += 1
+                continue
+            refs = [
+                json.loads(r[0])
+                for r in db.execute(
+                    "SELECT locator FROM source_refs WHERE owner_type='evidence' AND owner_id=?",
+                    (eid,),
+                )
+            ]
+            refs.append({"source_id": eid, "locator": "project-db:" + eid})
+            state = {
+                "context": "프로젝트에 저장된 과거 실행 보고다. 아래 기록이 당시 주장을 뒷받침하는지 판단한다. 기록 자체의 독립적인 사실 확인이나 현재 상태 확인을 뜻하지 않는다.",
+                "query": record["claim"],
+                "claim": record["claim"],
+                "candidate": canonical(observation),
+            }
+            row = base("record-" + eid, wid, state, "reconstructed_record_pair", refs, record)
+            row.update(
+                purpose="evidence_relation",
+                original_model_request=False,
+                recorded_provenance=record.get("provenance"),
+                evidence_id=eid,
+            )
+            rows.append(row)
+            stats["reconstructed_evidence_cases"] += 1
+        stats["cases"] = len(rows)
+        stats["connected_groups"] = len(set(assign_groups(rows)))
+        return rows, {
+            **stats,
+            "purpose_counts": dict(Counter(r["purpose"] for r in rows)),
+            "human_reviewed": 0,
+            "quality_evaluation": False,
+        }
+    finally:
+        db.close()
+
+
 def assign_groups(rows):
     """Connect all shared work IDs, source locators, and exact source text before splitting."""
     parents = {}
@@ -117,8 +218,14 @@ def assign_groups(rows):
         keys = ["id:" + row["id"], "text:" + digest(row["state"]["candidate"])]
         if row.get("work_id"):
             keys.append("work:" + row["work_id"])
+        if row.get("pair_group_id"):
+            keys.append("pair:" + row["pair_group_id"])
+        if row.get("derived_from"):
+            keys.append("id:" + row["derived_from"])
         for ref in row.get("source_refs", []):
-            keys.append("source:" + ref.get("locator", ref["source_id"]))
+            keys.append("source-id:" + ref["source_id"])
+            if ref.get("locator"):
+                keys.append("source-locator:" + ref["locator"])
         for key in keys[1:]:
             a, b = find(keys[0]), find(key)
             parents[max(a, b)] = min(a, b)
@@ -142,12 +249,25 @@ def prepare_reviewed(rows, minimum=600):
             (ROOT / f"evaluations/ollaya-tuning/{name}.json").read_text("utf-8")
         )["cases"]:
             exposed.add(digest(case["state"]))
+    rubric = ROOT / "evaluations/laya-finetuning/review-draft-20260928.json"
+    for case in json.loads(rubric.read_text("utf-8"))["cases"]:
+        exposed.add(digest(case["state"]))
     for row in rows:
+        if row.get("usage") == "rubric_review_only" or row.get("eligible_for_training") is False:
+            errors.append(f"Review-only case: {row['id']}")
+        if row.get("provenance") not in {"captured_model_request", "reconstructed_record_pair"}:
+            errors.append(f"Actual record provenance missing: {row['id']}")
+        if row.get("state_sha256") != digest(row["state"]):
+            errors.append(f"Original input missing/changed: {row['id']}")
+        record = row.get("source_record")
+        if not record or digest(record) != row.get("source_record_sha256"):
+            errors.append(f"Original record missing/changed: {row['id']}")
         review = row.get("review", {})
         if (
             review.get("status") != "human_reviewed"
             or not review.get("reviewer")
             or not review.get("reviewed_at")
+            or not review.get("reason")
         ):
             errors.append(f"Human review missing: {row['id']}")
         if row.get("expected") not in LABELS.get(row.get("purpose"), []):
@@ -156,8 +276,6 @@ def prepare_reviewed(rows, minimum=600):
             errors.append(f"Critical flag or provenance missing: {row['id']}")
         if digest(row["state"]) in exposed:
             errors.append(f"Previously exposed diagnostic: {row['id']}; keep in pilot only")
-    if errors:
-        return {"status": "not_ready", "errors": errors}, []
     prepared = []
     for row, group in zip(rows, assign_groups(rows), strict=True):
         bucket = int(group[:8], 16) % 100
@@ -172,13 +290,39 @@ def prepare_reviewed(rows, minimum=600):
         )
         prepared.append({**row, "group_id": group, "split": split})
     counts = Counter((r["split"], r["purpose"]) for r in prepared)
+    exposed_groups = {
+        r["group_id"] for r in prepared if r.get("eligible_for_independent_test") is False
+    }
+    for row in prepared:
+        if row["split"] == "test" and row["group_id"] in exposed_groups:
+            errors.append(f"Development-exposed group cannot be heldout: {row['id']}")
     for split in ("train", "development", "calibration", "test"):
         for purpose in LABELS:
             if counts[split, purpose] == 0:
                 errors.append(f"No independent group for {split}/{purpose}")
+    for purpose in LABELS:
+        if counts["test", purpose] < 30:
+            errors.append(
+                f"Need 30 heldout cases for {purpose}; received {counts['test', purpose]}"
+            )
     if errors:
-        return {"status": "not_ready", "errors": errors}, []
-    return {"status": "ready", "rows": len(rows), "data_sha256": digest(prepared)}, prepared
+        return {
+            "status": "not_ready",
+            "errors": errors,
+            "groups": len({r["group_id"] for r in prepared}),
+            "split_purpose_counts": {
+                f"{split}/{purpose}": count for (split, purpose), count in sorted(counts.items())
+            },
+        }, []
+    return {
+        "status": "ready",
+        "rows": len(rows),
+        "data_sha256": digest(prepared),
+        "groups": len({r["group_id"] for r in prepared}),
+        "split_purpose_counts": {
+            f"{split}/{purpose}": count for (split, purpose), count in sorted(counts.items())
+        },
+    }, prepared
 
 
 def write_review_html(path, rows):
@@ -189,21 +333,23 @@ def write_review_html(path, rows):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("stage", choices=["inventory", "prepare"])
+    parser.add_argument("stage", choices=["inventory", "audit", "prepare"])
     parser.add_argument("--db", type=Path)
     parser.add_argument("--reviewed", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
-    if args.stage == "inventory":
+    if args.stage in {"inventory", "audit"}:
         if not args.db:
             parser.error("inventory needs --db")
-        rows, stats = inventory(args.db)
+        rows, stats = (inventory if args.stage == "inventory" else audit_records)(args.db)
         jsonl(args.output / "review-candidates.jsonl", rows)
         write_review_html(args.output / "review.html", rows)
         stats["connected_groups"] = len(set(assign_groups(rows)))
         stats["purpose_counts"] = dict(Counter(r["purpose"] for r in rows))
-        stats["note"] = "Reconstructed review candidates, not original requests or gold labels"
+        stats["note"] = (
+            "Provenance is per case. Recorded outcomes and predictions are not gold labels."
+        )
     else:
         if not args.reviewed:
             parser.error("prepare needs --reviewed")

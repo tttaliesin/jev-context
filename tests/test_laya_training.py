@@ -11,7 +11,7 @@ from scripts.train_laya_pilot import compatible_encoder_config, safetensors_head
 
 
 def candidate(name, work, source, text):
-    return {
+    row = {
         "id": name,
         "work_id": work,
         "source_refs": [{"source_id": source, "locator": source}],
@@ -19,8 +19,114 @@ def candidate(name, work, source, text):
         "purpose": "relevance",
         "expected": "relevant",
         "critical": False,
-        "review": {"status": "human_reviewed", "reviewer": "tester", "reviewed_at": "2026-09-28"},
+        "review": {
+            "status": "human_reviewed",
+            "reviewer": "tester",
+            "reviewed_at": "2026-09-28",
+            "reason": "Fixture only",
+        },
+        "provenance": "captured_model_request",
     }
+    row["state_sha256"] = data.digest(row["state"])
+    row["source_record"] = {"request": {"state": row["state"]}}
+    row["source_record_sha256"] = data.digest(row["source_record"])
+    return row
+
+
+def test_pair_parent_cannot_cross_groups_without_shared_work_or_source():
+    rows = [candidate("a", "w1", "s1", "one"), candidate("b", "w2", "s2", "two")]
+    rows[1]["derived_from"] = "a"
+    assert len(set(data.assign_groups(rows))) == 1
+
+
+def test_source_id_links_rows_even_when_only_one_has_a_locator():
+    rows = [candidate("a", "w1", "s", "one"), candidate("b", "w2", "s", "two")]
+    rows[0]["source_refs"][0]["locator"] = "docs/example.md"
+    rows[1]["source_refs"][0].pop("locator")
+    assert len(set(data.assign_groups(rows))) == 1
+
+
+def test_request_snapshot_is_exact_and_expired_request_is_not_called(monkeypatch):
+    from jev_context import judgment
+
+    ticks = iter([0.0, 0.0, 2.0])
+    monkeypatch.setattr(judgment.time, "monotonic", lambda: next(ticks))
+    calls = []
+
+    def evaluate(request):
+        calls.append(request["evaluation_id"])
+        request["state"]["query"] = "engine changed its input"
+        return {"status": "observed", "answers": []}
+
+    service = SimpleNamespace(
+        engine=SimpleNamespace(fingerprint="test", evaluate=evaluate),
+        config=SimpleNamespace(engine={"state": "shadow"}, project_id="fixture"),
+    )
+    entries = [
+        ({"query": "original", "candidate": "one"}, ["relevance"]),
+        ({"query": "second", "candidate": "two"}, ["evidence_relation"]),
+    ]
+    rows = judgment.evaluate_many(service, entries, deadline=1.0)
+    assert len(calls) == 1
+    assert rows[0]["request"]["state"]["query"] == "original"
+    assert rows[0]["request_dispatched"] is True
+    assert rows[1]["request_dispatched"] is False
+
+
+def test_development_exposure_blocks_entire_heldout_group():
+    for index in range(100):
+        row = candidate(str(index), str(index), str(index), str(index))
+        group = data.assign_groups([row])[0]
+        if int(group[:8], 16) % 100 >= 90:
+            break
+    else:
+        pytest.fail("No test group in deterministic fixture search")
+    row["eligible_for_independent_test"] = False
+    report, prepared = data.prepare_reviewed([row], minimum=1)
+    assert not prepared
+    assert any("Development-exposed group" in e for e in report["errors"])
+
+
+def test_review_only_case_and_changed_input_are_rejected_even_with_human_flag():
+    row = candidate("a", "w", "s", "one")
+    row["usage"] = "rubric_review_only"
+    row["state"]["query"] = "edited"
+    report, prepared = data.prepare_reviewed([row], minimum=1)
+    assert not prepared
+    assert any("Review-only" in e for e in report["errors"])
+    assert any("Original input" in e for e in report["errors"])
+
+
+def test_record_audit_preserves_requests_and_does_not_invent_old_inputs(tmp_path):
+    path = tmp_path / "records.sqlite"
+    db = sqlite3.connect(path)
+    db.execute("CREATE TABLE packets(id TEXT,work_id TEXT,body TEXT)")
+    db.execute("CREATE TABLE evidence(id TEXT,work_id TEXT,body TEXT)")
+    db.execute("CREATE TABLE source_refs(owner_type TEXT,owner_id TEXT,locator TEXT)")
+    state = {"query": "로그인", "candidate": "실제 기록"}
+    result = {
+        "request": {"state": state, "questions": [{"purpose": "relevance"}]},
+        "input_hash": data.digest(state),
+        "request_dispatched": True,
+        "answers": [{"choice": "relevant"}],
+    }
+    packet = {"judgment": {"evaluations": [result, {"input_hash": "legacy"}]}}
+    db.execute("INSERT INTO packets VALUES(?,?,?)", ("p", "w", json.dumps(packet)))
+    evidence = {
+        "claim": "검사 통과",
+        "observation": {"command": "pytest", "exit_code": 0, "result_excerpt": "1 passed"},
+        "provenance": "agent_reported",
+    }
+    db.execute("INSERT INTO evidence VALUES(?,?,?)", ("e", "w", json.dumps(evidence)))
+    db.commit()
+    db.close()
+    original = path.read_bytes()
+    rows, report = data.audit_records(path)
+    assert len(rows) == 2 and report["evaluations_without_original_request"] == 1
+    assert rows[0]["state"] == state and rows[0]["original_model_request"]
+    assert rows[1]["source_record"] == evidence and not rows[1]["original_model_request"]
+    assert all(r["expected"] is None and r["review"]["status"] == "pending" for r in rows)
+    assert path.read_bytes() == original
 
 
 def test_groups_keep_transitive_work_and_source_overlap_together():

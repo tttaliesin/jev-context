@@ -468,6 +468,11 @@ def _store_packet(service, args, packet, outcome, warnings, budget, revision, so
                     packet["judgment"]["evaluation_count"] = len(
                         packet["judgment"].pop("evaluations")
                     )
+            elif "evaluations" in packet["judgment"]:
+                packet["judgment"]["evaluations"] = [
+                    {key: value for key, value in item.items() if key != "request"}
+                    for item in packet["judgment"]["evaluations"]
+                ]
             final = bounded(
                 response(args["request_id"], packet, outcome, warnings), budget, "evidence"
             )
@@ -491,6 +496,11 @@ def _store_packet(service, args, packet, outcome, warnings, budget, revision, so
                 [
                     {k: e[k] for k in ("source_id", "revision", "start_line", "end_line")}
                     for e in stored_packet.get("evidence", [])
+                ]
+                + [
+                    e["source_ref"]
+                    for e in stored_packet.get("judgment", {}).get("evaluations", [])
+                    if "source_ref" in e
                 ],
             )
     return final if v2 else response(args["request_id"], packet, outcome, warnings)

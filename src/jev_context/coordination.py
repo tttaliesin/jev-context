@@ -3,7 +3,7 @@ import time
 from datetime import UTC, datetime
 
 from .budget import bounded
-from .common import DomainError, digest, dumps, response
+from .common import DomainError, digest, dumps, response, uid
 from .judgment import evaluate_many, usable
 
 
@@ -82,6 +82,26 @@ def capability_recommend(service, args):
     from .judgment import promotion
 
     active = promotion(service, "capability_fit", language)[0]
+    packet_id = None
+    if any("request" in item for item in observations) and not service.config.read_only:
+        packet_id = uid("packet")
+        body = {
+            "packet_id": packet_id,
+            "kind": "capability_recommend",
+            "scope": {"goal": work["goal"], "constraints": work["scope"]["constraints"]},
+            "work_revision": work["revision"],
+            "inventory_hash": fingerprint,
+            "inventory_revision": inventory["revision"],
+            "judgment": {"evaluations": observations},
+        }
+        with service.store.transaction():
+            if service.work(args["work_id"])["revision"] != work["revision"]:
+                raise DomainError("revision_conflict", "Work changed before recording judgment")
+            service.store.check_space(len(dumps(body).encode()) + 4096)
+            service.db.execute(
+                "INSERT INTO packets VALUES(?,?,?,?)",
+                (packet_id, args["work_id"], dumps(body), "valid_at_read"),
+            )
     return bounded(
         response(
             args["request_id"],
@@ -91,7 +111,11 @@ def capability_recommend(service, args):
                 "inventory_revision": inventory["revision"],
                 "inventory_provenance": "agent_reported",
                 "selected": selected,
-                "evaluations": observations,
+                "evaluations": [
+                    {key: value for key, value in item.items() if key != "request"}
+                    for item in observations
+                ],
+                "inspection": {"view": "judgments", "packet_id": packet_id},
                 "missing_required": missing,
                 "inventory_complete": inventory["complete"],
                 "model_mode": "active" if active else "shadow",
