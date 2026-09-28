@@ -103,6 +103,7 @@ def test_record_audit_preserves_requests_and_does_not_invent_old_inputs(tmp_path
     db.execute("CREATE TABLE packets(id TEXT,work_id TEXT,body TEXT)")
     db.execute("CREATE TABLE evidence(id TEXT,work_id TEXT,body TEXT)")
     db.execute("CREATE TABLE source_refs(owner_type TEXT,owner_id TEXT,locator TEXT)")
+    db.execute("CREATE TABLE works(id TEXT,body TEXT)")
     state = {"query": "로그인", "candidate": "실제 기록"}
     result = {
         "request": {"state": state, "questions": [{"purpose": "relevance"}]},
@@ -118,15 +119,39 @@ def test_record_audit_preserves_requests_and_does_not_invent_old_inputs(tmp_path
         "provenance": "agent_reported",
     }
     db.execute("INSERT INTO evidence VALUES(?,?,?)", ("e", "w", json.dumps(evidence)))
+    db.execute(
+        "INSERT INTO works VALUES(?,?)",
+        ("verification", json.dumps({"scope": {"constraints": [data.VERIFICATION_MARKER]}})),
+    )
+    db.execute("INSERT INTO packets VALUES(?,?,?)", ("vp", "verification", json.dumps(packet)))
+    db.execute("INSERT INTO evidence VALUES(?,?,?)", ("ve", "verification", json.dumps(evidence)))
+    marked = {**packet, "scope": {"constraints": [data.VERIFICATION_MARKER]}}
+    db.execute("INSERT INTO packets VALUES(?,?,?)", ("marked", "other", json.dumps(marked)))
     db.commit()
     db.close()
     original = path.read_bytes()
     rows, report = data.audit_records(path)
     assert len(rows) == 2 and report["evaluations_without_original_request"] == 1
+    assert report["verification_packets_excluded"] == 2
+    assert report["verification_evaluations_excluded"] == 4
+    assert report["verification_evidence_excluded"] == 1
     assert rows[0]["state"] == state and rows[0]["original_model_request"]
     assert rows[1]["source_record"] == evidence and not rows[1]["original_model_request"]
     assert all(r["expected"] is None and r["review"]["status"] == "pending" for r in rows)
     assert path.read_bytes() == original
+
+
+@pytest.mark.parametrize("field", ["constraints", "scope"])
+def test_verification_request_cannot_be_made_training_data_by_human_flag(field):
+    row = candidate("test", "w", "s", "verification")
+    row["state"][field] = (
+        [data.VERIFICATION_MARKER]
+        if field == "constraints"
+        else {"constraints": [data.VERIFICATION_MARKER]}
+    )
+    row["state_sha256"] = data.digest(row["state"])
+    report, prepared = data.prepare_reviewed([row], minimum=1)
+    assert not prepared and any("Review-only" in e for e in report["errors"])
 
 
 def test_groups_keep_transitive_work_and_source_overlap_together():
@@ -142,8 +167,32 @@ def test_groups_keep_transitive_work_and_source_overlap_together():
     assert groups == data.assign_groups(rows)
 
 
+def test_reaudit_keeps_exposure_but_rejects_changed_input():
+    original = candidate("a", "w", "s", "original")
+    original["eligible_for_independent_test"] = False
+    original["agent_review"] = {"draft_label": "relevant", "human_reviewed": False}
+    fresh = candidate("a", "w", "s", "original")
+    assert data.retain_reviews([fresh], [original]) == 1
+    assert fresh["eligible_for_independent_test"] is False
+    assert fresh["agent_review"] == original["agent_review"]
+    original["state"]["query"] = "changed"
+    with pytest.raises(ValueError, match="state changed"):
+        data.retain_reviews([fresh], [original])
+
+
 def test_identical_source_text_cannot_cross_groups_even_when_ids_differ():
     rows = [candidate("a", "work1", "doc1", "same"), candidate("b", "work2", "doc2", "same")]
+    assert len(set(data.assign_groups(rows))) == 1
+
+
+def test_shared_raw_result_cannot_cross_groups():
+    rows = [candidate("a", "w1", "s1", "one"), candidate("b", "w2", "s2", "two")]
+    for row in rows:
+        row["automatic_checks"] = {
+            "raw_observation_check": {
+                "files": [{"path": "local/result.json", "sha256": "same-run"}]
+            }
+        }
     assert len(set(data.assign_groups(rows))) == 1
 
 

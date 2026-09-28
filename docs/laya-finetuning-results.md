@@ -117,6 +117,67 @@ Ollaya v0.7.3의 동일 구조 fp32 ONNX graph를 재사용하는 제한된 패�
 
 남은 입력은 **실제 질문·후보·당시 제약·결과가 함께 기록된 관련성/도구 적합성 사례와, 기존 자료와 출처가 분리된 세 목적의 검토 자료**다. 저장 기능을 위해 새 요청을 억지로 생성하지 않았고, 제품 수명·권한 검사의 모의 사례를 실제 업무 자료로 세지 않았다. 충분한 실제 기록과 정답 근거가 갖춰지면 문서에 정한 기준 측정 → 별도 후보 학습 → 같은 독립 시험 비교 순서로 진행한다.
 
+## 2026-09-29 연결·저장 검증과 자료 재검토
+
+결론은 **개선 미확인**이다. 새 코드의 실제 stdio 저장 경로는 통과했지만 **현재 Codex에 연결된 구 서버는 재시작이 필요하다.** 두 결과를 합쳐 연결 완료로 보고하지 않는다.
+
+### 현재 연결과 별도 서버의 차이
+
+| 확인 대상 | 실제 관측 |
+|---|---|
+| 현재 Codex 도구 | runtime `4910f59c…`, 시작 `2026-09-28T02:02:25Z`(한국 11:02), `restart_required` |
+| 현재 프로세스 | Codex app-server PID 573864 → venv 실행기 583180 → 실제 Python MCP 602552. 9월 29일 최종 OS 조회에서도 남아 있음 |
+| 실행 코드 / 디스크 | `12573682…` / `3d568a5a…`. 시작 시 코드 해시가 다르므로 일부 지연 import가 새 코드여도 갱신 완료로 볼 수 없음 |
+| 현재 연결의 실제 요청 | 관련성·근거 관계를 포함한 `context_prepare`, 도구 적합성 `capability_recommend`를 직접 호출. 둘 다 `engine_busy`로 보류. 문맥 packet은 원요청이 없고 도구 판단은 packet ID가 null |
+| 별도 SDK stdio 서버 | 동일 제품 설정·DB·로컬 모델로 실행. build와 disk가 모두 `3d568a5a…`, `matches_disk` |
+| 실제 모델 판단 | 관련성·근거 관계·도구 적합성 모두 `observed`. 품질 평가나 사람 정답 일치 검사는 아님 |
+| 저장·복원 | 두 성공 packet의 원입력·질문·프로필·시점·결과와 DB/`work_inspect` 일치. 첫 서버 종료 후 새 runtime `d588b3d1…`에서 같은 packet 전체가 동일함을 확인 |
+| 종료 | 실제 모델 하나만 실행. 최종 OS 조회에 모델 worker·broker가 없고 구 MCP 두 Python 프로세스만 남음 |
+
+구 서버는 이전 코드 기준 프로필 fingerprint `9d573676…`를 유지하고 새 서버는 `3dc54b2c…`다. fingerprint에는 판단/실행 코드 hash도 포함되며 모델 가중치를 바꿨다는 뜻은 아니다. 다른 fingerprint의 broker가 점유한 동안 구 연결은 `engine_busy`로 거절되어 두 모델이 동시에 실행되지 않았다. 새 서버에서 모델 준비 총 49.688초를 관측했지만 이는 이번 저장 경로 검증의 준비 시간이고 기준 성능 비교 수치가 아니다.
+
+현재 Codex 연결의 재시작 후 세 목적 재검증은 **미완료**다. 현재 호스트의 MCP 연결을 다시 여는 도구가 제공되지 않아 임의로 프로세스를 죽이지 않았다. [공식 MCP 안내](https://developers.openai.com/codex/mcp)의 MCP 서버 재시작 기능을 사용할 수 있으면 `jev_context`만 재시작한다. 해당 기능이 없으면 **Jev 관리 앱이 아니라 Codex 앱을 완전히 종료 후 다시 열어야 한다.** 이후 현재 대화의 `workspace_status`에서 새 instance와 `matches_disk`를 확인한 뒤 동일한 저장 검증을 수행한다. 별도 `codex app-server`를 실행하는 것은 현재 호스트의 재시작이 아니다.
+
+### 검증 자료 제외와 실제 업무 자료
+
+검증 작업 `work-0efa3a462b044fb4a0c51d33476fde53`의 scope에는 `data_usage:verification_only`를 저장했다. 새 모델 준비 시도의 packet 1개, 성공 packet 2개, 구 연결의 보류 packet 1개, 총 **4개 packet/4개 evaluation 묶음**을 실제 자료 감사에서 제외했다. 질문 수와 evaluation 묶음 수는 다르다. 구 연결의 도구 적합성은 저장되지 않았으며 로컬 수신 기록에만 남겼다.
+
+기존 추출기에 검증 작업·packet 제외를 추가했고, 복사된 검증 state에도 표시가 있으면 준비 검사가 거절한다. `--previous-review`는 같은 ID의 입력·원기록·출처가 일치할 때만 검토·개발 노출 상태를 이어받는다. 감사에서 내보낸 후보는 기본적으로 개발 자료로 표시해 최종 시험에 자동 유입되지 않는다. raw 결과의 경로/hash를 공유하는 사례도 같은 분할 그룹으로 연결한다.
+
+앱을 열어 두는 것만으로 정답 자료가 쌓이지 않는다. `desktop/renderer/renderer.js`의 주기 조회는 상태/작업 목록을 읽고 `desktop_bridge.py`는 `workspace_status`와 모델 상태를 조회한다. 온보딩의 연결 검사도 `workspace_status`다. 이 경로에는 `context_prepare`나 `capability_recommend` 모델 판단이 없다. 실제 Codex 작업에서 해당 도구를 호출해야 판단 시도가 저장되고, `work_record(evidence_reported)`를 호출해야 실행 보고가 생긴다. 셸 실행 결과나 대화 전체가 자동 수집되는 기능은 없다. 상태 조회 메타데이터·모델 준비 로그·실제 판단·사람 정답은 각각 다르다.
+
+| 자료 상태 | 9월 29일 결과 |
+|---|---|
+| 실제 업무에서 보존된 원래 모델 요청 | 0개. 과거 19개는 원입력 누락, 새 검증 요청은 제외 |
+| 저장된 보고에서 재구성한 후보 | 82개. 기존 81개와 전날 수행한 실제 감사의 완료 보고 1개. 새 업무 요청 82개가 아님 |
+| 목적 / 연결 그룹 | 근거 관계 82, 관련성 0, 도구 적합성 0 / 15그룹 |
+| 에이전트 초안 | 지지 50, 일부 지지 31, 보류 1. 사람 검토 0 |
+| 원시 근거 대조 | 13사례·19파일. 이전 6사례·10파일에서 확대. 69사례는 원시 결과 독립 대조 미실행 |
+| 최종 시험 적격 | 0개. 기존 44개 설명 사례와 개발 노출 자료를 제외 |
+| 준비 검사 | `not_ready`, 262개 조건 위반, frozen 파일 없음 |
+
+추가 대조에서는 당시 실행 결과와 저장된 target hash가 같은 모델 수명·캐시 재기동·revision 충돌·과거 native 검증 파일을 확인했다. 문맥 복원 원본 hash, 구/신 MCP의 예산 응답 차이, 전날 실제 검사 로그도 대조했다. 과거 native 성공은 **오늘 연결의 성공을 증명하지 않는다.** 원시 파일에서 더 많은 사실을 확인해도 원래 후보에 없는 내용을 몰래 넣어 판정 초안을 바꾸지 않았다.
+
+보류 사례는 여전히 과거 UI 17개 검사다. 현재 같은 경로의 파일은 나중의 58개 검사이므로 추천은 **보류 유지**다. 필요한 것은 당시 17개 실행의 원본 결과나 그 hash가 맞는 사본이며, 기억으로 정답을 고르는 질문이 아니다. 지금 사용자에게 모호한 의미 판정을 추가로 묻지 않는다. 다른 초안도 사람 검토 완료로 표시하지 않는다.
+
+분할 진단은 train 71개/12그룹, development 8개/2그룹, test 3개/1그룹, calibration 0이며 모두 미검토 근거 관계다. 이는 준비 상태 진단일 뿐 확정 분할이 아니다. 기존 하한 600개, 시험 목적별 30개, 세 목적의 네 분할, 사람 정답 조건을 충족하지 않는다. 반박·무관 라벨 초안도 없고 독립 시험 적격이 0이므로 표본 수를 채워도 현재 자료만으로 전체 성능을 주장할 수 없다. 기준 성능(SemIf / 미학습 Laya), 본 학습, 후보 비교, 정확도·중요 오류·추론 시간/메모리·차이의 불확실성 측정은 실행하지 않았다. 기존 모델·제품 설정·자동 승격 상태를 유지했다.
+
+### 재현과 로컬 검사
+
+원시 증거는 `.local/laya-finetuning/verification-20260929/`의 `stdio-storage.json`, `native-storage.json`, `final-processes.json`에 있다. SDK 성공 packet은 `packet-59ccb7935a0941f882dcc27e2d41474b`, `packet-134671fa373944129e24cdc046cf731c`다. 재시작 전후 전체 packet hash는 각각 `ffc0e1c8…`, `4149dba2…`로 동일하다. 현재 native 실패 packet은 `packet-be3fe547df9d4d34aeb52fa901d1a5a3`다. 이 기록은 검증용이며 독립 품질 평가에 포함하지 않는다.
+
+후보·초안·자동 확인 사실·원시 파일 hash는 `.local/laya-finetuning/actual-20260929/`의 `review-candidates.jsonl`, `grounding-review.json`, `review.html`, `readiness/prepare.json`에 보존했다. 원격에는 개인 원문을 올리지 않는다.
+
+```powershell
+# 추가 모델이 실행 중이지 않을 때. 새 출력 파일 사용, 검증 전용 내부 작업을 생성함.
+.venv/Scripts/python.exe -X utf8 -m scripts.validate_model_lifecycle --config .local/project.toml --verify-request-storage --output .local/laya-finetuning/verification-next/stdio-storage.json
+# 이전 검토/노출 상태를 보존하며 현재 DB를 읽기 전용 감사
+.venv/Scripts/python.exe -X utf8 -m scripts.prepare_laya_training_data audit --db .local/state/projects/project-89095613680449da8ab8c438dfcf826a/state.sqlite --previous-review .local/laya-finetuning/actual-20260929/review-candidates.jsonl --output .local/laya-finetuning/actual-next
+.venv/Scripts/python.exe -X utf8 -m scripts.prepare_laya_training_data prepare --reviewed .local/laya-finetuning/actual-next/review-candidates.jsonl --output .local/laya-finetuning/actual-next/readiness
+```
+
+전체 로컬 회귀는 **329 passed / 2 skipped**. 이후 raw 출처 그룹 연결 및 분포 보고 보완을 포함한 최종 관련 검사는 **20 passed**, 전체 Ruff lint와 95파일 format 검사를 통과했다. 첫 제한 환경 pytest는 Temp 권한/임시 부모 폴더 문제로 fixture 4개가 실행되지 않아, 프로젝트 내부 새 임시 경로로 수정한 뒤 실행했다. 검사 실패를 제품 성공으로 세지 않았다. 원격 CI·유료 자원·제품 기본 모델 교체는 사용하지 않았다.
+
 ## 재현 도구와 결과
 
 - [자료 조사·검토·분리](../scripts/prepare_laya_training_data.py), [검토 화면 템플릿](../scripts/laya_training_review.html)

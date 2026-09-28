@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import sqlite3
 import sys
 import time
 from contextlib import asynccontextmanager
@@ -13,9 +14,15 @@ import anyio
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-from jev_context.common import uid
+from jev_context.common import now, uid
+from jev_context.judgment import question
 from jev_context.policy import Config
 from jev_context.shared_engine import SharedLocalEngine
+
+if __package__:
+    from scripts.prepare_laya_training_data import VERIFICATION_MARKER, audit_records, digest
+else:
+    from prepare_laya_training_data import VERIFICATION_MARKER, audit_records, digest
 
 
 @asynccontextmanager
@@ -215,10 +222,222 @@ async def run(args):
     )
 
 
+async def verify_storage(args):
+    """Real stdio + local model; this is explicitly not the current desktop connection."""
+    output = args.output.resolve()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    if output.exists():
+        raise ValueError("Use a new output path to preserve earlier verification evidence")
+    config = Config.load(args.config)
+    report = {"desktop_current_session": False, "usage": "verification_only", "calls": []}
+
+    def save(**values):
+        report.update(values)
+        output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    async def call(session, tool, **arguments):
+        arguments.update(contract_version="2.0", request_id=uid("req"))
+        if tool in {"source_sync", "work_open"} and "work_id" not in arguments:
+            arguments["mutation_id"] = uid("mut")
+        sent_at = now()
+        reply = await session.call_tool(tool, arguments)
+        value = reply.structuredContent
+        report["calls"].append(
+            {
+                "tool": tool,
+                "arguments": arguments,
+                "sent_at": sent_at,
+                "received_at": now(),
+                "response": value,
+            }
+        )
+        save()
+        assert not reply.isError and value["outcome"] not in {"error", "conflict"}, value
+        return value["data"]
+
+    def stored(packet_id):
+        with sqlite3.connect(config.db_path.as_uri() + "?mode=ro", uri=True) as db:
+            (body,) = db.execute("SELECT body FROM packets WHERE id=?", (packet_id,)).fetchone()
+        return json.loads(body)
+
+    async def check_packet(session, packet_id, expected_state, purposes, call_times):
+        body = stored(packet_id)
+        rows = body["judgment"]["evaluations"]
+        assert len(rows) == 1, rows
+        item = rows[0]
+        request = item["request"]
+        assert request["state"] == expected_state, request
+        assert request["questions"] == [question(p) for p in purposes]
+        assert request["profile_fingerprint"] == first_status["engine"]["profile_fingerprint"]
+        assert request["project_id"] == config.project_id and request["work_id"] == work["work_id"]
+        assert item["request_dispatched"] and item["input_hash"] == digest(expected_state)
+        assert call_times[0] <= item["captured_at"] <= call_times[1]
+        assert item["status"] == "observed", item
+        assert {a["question_id"] for a in item["answers"]} == set(purposes)
+        inspected = await call(
+            session, "work_inspect", work_id=work["work_id"], view="judgments", packet_id=packet_id
+        )
+        assert inspected["items"] == rows and inspected["next_cursor"] is None
+        return body
+
+    try:
+        async with server(args.config) as first:
+            first_status = await call(first, "workspace_status")
+            assert first_status["runtime"]["code_state"] == "matches_disk", first_status["runtime"]
+            assert first_status["engine"]["worker_pid"] is None, "Another model is already running"
+            work = await call(
+                first,
+                "work_open",
+                create={
+                    "title": "[검증 전용] 세 목적 요청 저장과 재시작 복원",
+                    "goal": "실제 MCP 요청의 입력·질문·결과 저장과 재시작 복원을 검증한다.",
+                    "origin": {
+                        "quote": "검증용 요청은 따로 표시하고 실제 업무 자료나 독립 성능평가에 포함하지 마."
+                    },
+                    "scope": {
+                        "mode": "investigate",
+                        "constraints": [VERIFICATION_MARKER],
+                        "allowed_actions": ["read", "run_checks"],
+                    },
+                },
+            )
+            save(work_id=work["work_id"], phase="prepare")
+            synced = await call(
+                first,
+                "source_sync",
+                items=[{"kind": "file", "relative_path": "docs/model-lifecycle-case.md"}],
+            )
+            source = synced["items"][0]
+            parameters = {
+                "work_id": work["work_id"],
+                "expected_work_revision": work["revision"],
+                "query": "사용하지 않는 연결의 모델 점유 문제와 검증 조건은 무엇인가?",
+                "claim": "이 기록은 모델 품질이 향상됐다는 실측 결과다.",
+                "source_ids": [source["source_id"]],
+                "budget_bytes": 65536,
+                "language": "ko",
+                "judge_mode": "required",
+            }
+            await call(first, "context_prepare", **parameters)
+            profile = json.loads(Path(config.engine["profile_file"]).read_text("utf-8"))
+            deadline = time.monotonic() + profile.get("prepare_timeout_seconds", 300) + 10
+            while True:
+                status = await call(first, "workspace_status")
+                if status["engine"]["state"] == "shadow":
+                    break
+                assert status["engine"]["state"] in {"idle", "preparing"}, status["engine"]
+                assert time.monotonic() < deadline, "Model preparation timed out"
+                await anyio.sleep(5)
+            save(phase="request_checks", model_ready=status["engine"])
+            context = await call(first, "context_prepare", **parameters)
+            times = report["calls"][-1]
+            body = stored(context["packet_id"])
+            candidate = next(e for e in body["evidence"] if e["source_id"] == source["source_id"])
+            assert candidate["text"] == (
+                config.project_root / "docs/model-lifecycle-case.md"
+            ).read_text(encoding="utf-8")
+            state = {
+                "query": parameters["query"],
+                "goal": work["goal"],
+                "constraints": work["scope"]["constraints"],
+                "candidate": candidate["text"],
+                "claim": parameters["claim"],
+            }
+            before = {
+                context["packet_id"]: await check_packet(
+                    first,
+                    context["packet_id"],
+                    state,
+                    ["relevance", "evidence_relation"],
+                    (times["sent_at"], times["received_at"]),
+                )
+            }
+            available = next(
+                t for t in (await first.list_tools()).tools if t.name == "workspace_status"
+            )
+            inventory = {
+                "complete": False,
+                "observed_at": now(),
+                "revision": uid("inventory"),
+                "items": [
+                    {
+                        "id": available.name,
+                        "kind": "tool",
+                        "description": available.description,
+                        "version": "2.0",
+                        "available": True,
+                        "mandatory": False,
+                    }
+                ],
+            }
+            query = "현재 프로젝트의 모델 실행 상태를 읽어서 확인할 수 있는 도구인가?"
+            recommended = await call(
+                first,
+                "capability_recommend",
+                work_id=work["work_id"],
+                query=query,
+                inventory=inventory,
+                language="ko",
+                budget_bytes=32768,
+            )
+            times = report["calls"][-1]
+            pid = recommended["inspection"]["packet_id"]
+            state = {
+                "query": query,
+                "goal": work["goal"],
+                "scope": work["scope"],
+                "candidate": inventory["items"][0],
+            }
+            before[pid] = await check_packet(
+                first, pid, state, ["capability_fit"], (times["sent_at"], times["received_at"])
+            )
+            assert recommended["evaluations"] == [
+                {k: v for k, v in item.items() if k != "request"}
+                for item in before[pid]["judgment"]["evaluations"]
+            ]
+            save(
+                phase="restart",
+                packet_ids=list(before),
+                before_sha256={k: digest(v) for k, v in before.items()},
+            )
+        async with server(args.config) as second:
+            second_status = await call(second, "workspace_status")
+            assert first_status["runtime"]["instance_id"] != second_status["runtime"]["instance_id"]
+            assert first_status["runtime"]["build_hash"] == second_status["runtime"]["build_hash"]
+            assert second_status["runtime"]["code_state"] == "matches_disk"
+            for pid, body in before.items():
+                assert stored(pid) == body
+                inspected = await call(
+                    second, "work_inspect", work_id=work["work_id"], view="judgments", packet_id=pid
+                )
+                assert inspected["items"] == body["judgment"]["evaluations"]
+            rows, audit = audit_records(config.db_path)
+            assert not any(r["work_id"] == work["work_id"] for r in rows)
+            save(
+                passed=True,
+                phase="finished",
+                restarted_runtime=second_status["runtime"],
+                audit=audit,
+                verification_excluded=True,
+                restart_persistence_passed=True,
+            )
+    except BaseException as exc:
+        save(passed=False, failure=repr(exc))
+        raise
+    print(
+        json.dumps({k: v for k, v in report.items() if k != "calls"}, ensure_ascii=False, indent=2)
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", required=True, type=Path)
-    parser.add_argument("--work-id", required=True)
+    parser.add_argument("--work-id")
+    parser.add_argument(
+        "--verify-request-storage",
+        action="store_true",
+        help="Create a marked verification work and check real stdio request persistence",
+    )
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument(
         "--repeat-after-idle",
@@ -232,7 +451,9 @@ def main():
     )
     args = parser.parse_args()
     args.config = args.config.resolve()
-    anyio.run(run, args)
+    if not args.verify_request_storage and not args.work_id:
+        parser.error("--work-id required for lifecycle mode")
+    anyio.run(verify_storage if args.verify_request_storage else run, args)
 
 
 if __name__ == "__main__":

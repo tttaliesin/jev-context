@@ -19,6 +19,21 @@ LABELS = {
     ],
     "capability_fit": ["fit", "unfit", "insufficient_evidence"],
 }
+VERIFICATION_MARKER = "data_usage:verification_only"
+
+
+def verification_only(scope):
+    return VERIFICATION_MARKER in scope.get("constraints", [])
+
+
+def verification_works(db):
+    if not db.execute("SELECT 1 FROM sqlite_master WHERE name='works'").fetchone():
+        return set()
+    return {
+        wid
+        for wid, raw in db.execute("SELECT id,body FROM works")
+        if verification_only(json.loads(raw).get("scope", {}))
+    }
 
 
 def canonical(value):
@@ -40,11 +55,15 @@ def inventory(db_path):
     candidates, seen = [], set()
     stats = Counter()
     try:
+        excluded = verification_works(db)
         for packet_id, work_id, raw in db.execute(
             "SELECT id,work_id,body FROM packets ORDER BY id"
         ):
             packet = json.loads(raw)
             stats["packets"] += 1
+            if work_id in excluded or verification_only(packet.get("scope", {})):
+                stats["verification_packets_excluded"] += 1
+                continue
             evaluations = packet.get("judgment", {}).get("evaluations", [])
             stats["past_evaluations"] += len(evaluations)
             stats["evaluations_without_original_state"] += sum(
@@ -123,12 +142,21 @@ def audit_records(db_path):
             "critical": None,
             "review": {"status": "pending", "reviewer": None, "reviewed_at": None},
             "automatic_checks": {"record_read_from_project_db": True, "gold_label_verified": False},
+            "eligible_for_independent_test": False,
+            "exposure": "development_audit",
         }
 
     try:
+        excluded = verification_works(db)
         for pid, wid, raw in db.execute("SELECT id,work_id,body FROM packets ORDER BY id"):
             packet = json.loads(raw)
             stats["packets"] += 1
+            if wid in excluded or verification_only(packet.get("scope", {})):
+                stats["verification_packets_excluded"] += 1
+                stats["verification_evaluations_excluded"] += len(
+                    packet.get("judgment", {}).get("evaluations", [])
+                )
+                continue
             for index, result in enumerate(packet.get("judgment", {}).get("evaluations", [])):
                 stats["past_evaluations"] += 1
                 request = result.get("request")
@@ -161,6 +189,9 @@ def audit_records(db_path):
         for eid, wid, raw in db.execute("SELECT id,work_id,body FROM evidence ORDER BY id"):
             record = json.loads(raw)
             stats["evidence_records"] += 1
+            if wid in excluded:
+                stats["verification_evidence_excluded"] += 1
+                continue
             observation = record.get("observation")
             if not record.get("claim") or not isinstance(observation, dict):
                 stats["incomplete_evidence_records"] += 1
@@ -226,6 +257,12 @@ def assign_groups(rows):
             keys.append("source-id:" + ref["source_id"])
             if ref.get("locator"):
                 keys.append("source-locator:" + ref["locator"])
+        raw = row.get("automatic_checks", {}).get("raw_observation_check", {})
+        for ref in raw.get("files", []):
+            if ref.get("path"):
+                keys.append("source-locator:" + ref["path"])
+            if ref.get("sha256"):
+                keys.append("raw-file:" + ref["sha256"])
         for key in keys[1:]:
             a, b = find(keys[0]), find(key)
             parents[max(a, b)] = min(a, b)
@@ -235,6 +272,38 @@ def assign_groups(rows):
         groups.setdefault(find(keys[0]), []).extend(keys)
     group_ids = {root: digest(sorted(set(keys))) for root, keys in groups.items()}
     return [group_ids[find(keys[0])] for keys in keys_by_row]
+
+
+def retain_reviews(rows, previous):
+    """Carry review/exposure forward only for the exact same recorded case."""
+    old = {r["id"]: r for r in previous}
+    if len(old) != len(previous):
+        raise ValueError("Duplicate previous review IDs")
+    count = 0
+    for row in rows:
+        prior = old.get(row["id"])
+        if prior is None:
+            continue
+        for field in ("state", "source_record"):
+            if digest(prior[field]) != row[field + "_sha256"]:
+                raise ValueError(f"Previous {field} changed: {row['id']}")
+        if any(prior.get(k) != row.get(k) for k in ("purpose", "work_id", "source_refs")):
+            raise ValueError(f"Previous provenance changed: {row['id']}")
+        for field in (
+            "review",
+            "expected",
+            "critical",
+            "agent_review",
+            "automatic_checks",
+            "exposure",
+            "eligible_for_training",
+            "eligible_for_independent_test",
+            "usage",
+        ):
+            if field in prior:
+                row[field] = prior[field]
+        count += 1
+    return count
 
 
 def prepare_reviewed(rows, minimum=600):
@@ -253,7 +322,13 @@ def prepare_reviewed(rows, minimum=600):
     for case in json.loads(rubric.read_text("utf-8"))["cases"]:
         exposed.add(digest(case["state"]))
     for row in rows:
-        if row.get("usage") == "rubric_review_only" or row.get("eligible_for_training") is False:
+        state = row["state"]
+        if (
+            row.get("usage") in {"rubric_review_only", "verification_only"}
+            or row.get("eligible_for_training") is False
+            or verification_only(state)
+            or verification_only(state.get("scope", {}))
+        ):
             errors.append(f"Review-only case: {row['id']}")
         if row.get("provenance") not in {"captured_model_request", "reconstructed_record_pair"}:
             errors.append(f"Actual record provenance missing: {row['id']}")
@@ -290,6 +365,22 @@ def prepare_reviewed(rows, minimum=600):
         )
         prepared.append({**row, "group_id": group, "split": split})
     counts = Counter((r["split"], r["purpose"]) for r in prepared)
+    distribution = {
+        "split_purpose_label_counts": {
+            f"{split}/{purpose}/{label}": count
+            for (split, purpose, label), count in sorted(
+                Counter(
+                    (r["split"], r["purpose"], r.get("expected") or "unreviewed") for r in prepared
+                ).items()
+            )
+        },
+        "split_purpose_group_counts": {
+            f"{split}/{purpose}": len(
+                {r["group_id"] for r in prepared if r["split"] == split and r["purpose"] == purpose}
+            )
+            for split, purpose in sorted(counts)
+        },
+    }
     exposed_groups = {
         r["group_id"] for r in prepared if r.get("eligible_for_independent_test") is False
     }
@@ -308,6 +399,7 @@ def prepare_reviewed(rows, minimum=600):
     if errors:
         return {
             "status": "not_ready",
+            **distribution,
             "errors": errors,
             "groups": len({r["group_id"] for r in prepared}),
             "split_purpose_counts": {
@@ -316,6 +408,7 @@ def prepare_reviewed(rows, minimum=600):
         }, []
     return {
         "status": "ready",
+        **distribution,
         "rows": len(rows),
         "data_sha256": digest(prepared),
         "groups": len({r["group_id"] for r in prepared}),
@@ -336,6 +429,9 @@ def main():
     parser.add_argument("stage", choices=["inventory", "audit", "prepare"])
     parser.add_argument("--db", type=Path)
     parser.add_argument("--reviewed", type=Path)
+    parser.add_argument(
+        "--previous-review", type=Path, help="Preserve exact-case review/exposure on audit"
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
@@ -343,6 +439,18 @@ def main():
         if not args.db:
             parser.error("inventory needs --db")
         rows, stats = (inventory if args.stage == "inventory" else audit_records)(args.db)
+        if args.previous_review:
+            if args.stage != "audit":
+                parser.error("--previous-review requires audit")
+            previous = [
+                json.loads(line)
+                for line in args.previous_review.read_text("utf-8").splitlines()
+                if line
+            ]
+            stats["reviews_retained"] = retain_reviews(rows, previous)
+        stats["human_reviewed"] = sum(
+            r.get("review", {}).get("status") == "human_reviewed" for r in rows
+        )
         jsonl(args.output / "review-candidates.jsonl", rows)
         write_review_html(args.output / "review.html", rows)
         stats["connected_groups"] = len(set(assign_groups(rows)))
