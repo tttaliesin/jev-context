@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "provenance": "agent_authored_diagnostic",
+  "promotion_eligible": false,
+  "files": {
+    "cases.json": "a734c59b9802929a5a0a65f69c51cf9b5f860c30f782c8400cee971b7192ce0f",
+    "questions.json": "6682ab803f4fa16de973eb58f584ad4d61cf976833b89af1bc629621333fcf23"
+  }
+}

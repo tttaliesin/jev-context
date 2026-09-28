@@ -1,0 +1,87 @@
+{
+  "source": "https://github.com/ollaya-dev/ollaya/blob/v0.7.3/crates/ollaya-decision/src/layout.rs",
+  "rows": [
+    {
+      "variant": "baseline",
+      "purpose": "relevance",
+      "head_tokens": 22,
+      "head_budget": 236,
+      "head_truncated": false,
+      "option_raw_tokens": [
+        4,
+        4,
+        9
+      ],
+      "option_truncated": false
+    },
+    {
+      "variant": "baseline",
+      "purpose": "evidence_relation",
+      "head_tokens": 135,
+      "head_budget": 185,
+      "head_truncated": false,
+      "option_raw_tokens": [
+        7,
+        15,
+        20,
+        15,
+        9
+      ],
+      "option_truncated": false
+    },
+    {
+      "variant": "baseline",
+      "purpose": "capability_fit",
+      "head_tokens": 106,
+      "head_budget": 217,
+      "head_truncated": false,
+      "option_raw_tokens": [
+        13,
+        14,
+        9
+      ],
+      "option_truncated": false
+    },
+    {
+      "variant": "concise_ko",
+      "purpose": "relevance",
+      "head_tokens": 31,
+      "head_budget": 220,
+      "head_truncated": false,
+      "option_raw_tokens": [
+        7,
+        7,
+        19
+      ],
+      "option_truncated": false
+    },
+    {
+      "variant": "concise_ko",
+      "purpose": "evidence_relation",
+      "head_tokens": 82,
+      "head_budget": 177,
+      "head_truncated": false,
+      "option_raw_tokens": [
+        8,
+        13,
+        25,
+        8,
+        20
+      ],
+      "option_truncated": false
+    },
+    {
+      "variant": "concise_ko",
+      "purpose": "capability_fit",
+      "head_tokens": 54,
+      "head_budget": 203,
+      "head_truncated": false,
+      "option_raw_tokens": [
+        18,
+        19,
+        13
+      ],
+      "option_truncated": false
+    }
+  ]
+}

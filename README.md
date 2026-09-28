@@ -183,7 +183,7 @@ Ruff lint·format 검사와 pytest를 순서대로 실행하고 첫 실패의 �
 | 제품 방향과 구현 범위 | [통합 설계 2.0](docs/design/unified-design.md) · [구현과 검증](docs/implementation-v2.md) |
 | 유사 목적 제품 비교와 보완 우선순위 | [에이전트 기억 제품 연구](docs/agent-memory-competitive-research.md) · [운영 경험 연구](docs/desktop-operations-research.md) |
 | 모델 준비와 공유 실행기 | [모델 안내](docs/models.md) · [모델 수명 설계](docs/model-lifecycle-design.md) |
-| 외부 판단 모델 실행기 | [Ollaya 조사와 통합 조건](docs/ollaya-research.md) |
+| 외부 판단 모델 실행기 | [Ollaya 조사](docs/ollaya-research.md) · [비교 계획](docs/ollaya-evaluation-plan.md) · [사전 검토](docs/ollaya-evaluation-review.md) · [튜닝·비교 결과](docs/ollaya-evaluation-results.md) |
 | 문맥 전달 개선 | [외부 조사](docs/context-efficiency-research.md) · [적용 계획](docs/context-efficiency-implementation-plan.md) · [검증 결과](docs/context-efficiency-results.md) |
 | README 구성과 실제 화면 캡처 | [레퍼런스와 촬영 기록](docs/readme-design-references.md) |
 

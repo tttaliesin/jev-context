@@ -1,0 +1,5 @@
+FROM laya:multilingual
+QUESTIONS ./selected-questions.json
+CALIBRATION ./calibration.json
+PARAMETER precision fp32
+DESCRIPTION Jev Korean diagnostic only; not approved for production
