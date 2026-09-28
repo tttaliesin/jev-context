@@ -71,7 +71,16 @@
       ],
       "usage": "rubric_review_only",
       "eligible_for_training": false,
-      "eligible_for_independent_test": false
+      "eligible_for_independent_test": false,
+      "agent_review": {
+        "reviewer": "Codex",
+        "kind": "author_self_review",
+        "reviewed_on": "2026-09-28",
+        "disposition": "유지",
+        "label_assessment": "retain_for_stated_scenario",
+        "comment": "관련 있음이 맞다. 다만 R01과 E01은 같은 실행 결과를 쓰므로 독립적인 사례 수처럼 계산하면 안 된다. 이 사례는 관련성, E01은 주장 범위를 다루는 교육용 쌍으로 유지하자.",
+        "proposed_changes_applied": false
+      }
     },
     {
       "id": "R02",
@@ -109,7 +118,16 @@
       ],
       "usage": "rubric_review_only",
       "eligible_for_training": false,
-      "eligible_for_independent_test": false
+      "eligible_for_independent_test": false,
+      "agent_review": {
+        "reviewer": "Codex",
+        "kind": "author_self_review",
+        "reviewed_on": "2026-09-28",
+        "disposition": "보완 권고",
+        "label_assessment": "retain_for_stated_scenario",
+        "comment": "관련 있음은 유지한다. 질문의 “조사 자료로 남겨야 하는가”는 보관 정책까지 묻는다. “이 결과가 첫 반입 실패 원인 조사와 관련 있는가”로 바꾸면 관련성만 평가할 수 있다.",
+        "proposed_changes_applied": false
+      }
     },
     {
       "id": "R03",
@@ -147,7 +165,16 @@
       ],
       "usage": "rubric_review_only",
       "eligible_for_training": false,
-      "eligible_for_independent_test": false
+      "eligible_for_independent_test": false,
+      "agent_review": {
+        "reviewer": "Codex",
+        "kind": "author_self_review",
+        "reviewed_on": "2026-09-28",
+        "disposition": "보완 권고",
+        "label_assessment": "retain_for_stated_scenario",
+        "comment": "관련 없음은 타당하다. 다만 “필요한가”는 관련이 있어도 필수는 아닌 자료를 탈락시킬 수 있으므로 “관련 있는가”로 맞추자. 아이콘은 쉬운 오답이어서 이후에는 같은 모델의 다른 오류에 관한 문서도 비교 후보로 추가해야 한다.",
+        "proposed_changes_applied": false
+      }
     },
     {
       "id": "R04",
@@ -185,7 +212,16 @@
       ],
       "usage": "rubric_review_only",
       "eligible_for_training": false,
-      "eligible_for_independent_test": false
+      "eligible_for_independent_test": false,
+      "agent_review": {
+        "reviewer": "Codex",
+        "kind": "author_self_review",
+        "reviewed_on": "2026-09-28",
+        "disposition": "보완 권고",
+        "label_assessment": "retain_for_stated_scenario",
+        "comment": "관련 있음은 타당하다. R03과 같이 “필요한가”를 “관련 있는가”로 통일하자. 이 문서는 기능 설명의 근거이며 실제 설치된 버전에서 동작까지 검사했다는 근거는 아니다.",
+        "proposed_changes_applied": false
+      }
     },
     {
       "id": "R05",
@@ -213,7 +249,16 @@
       "source_refs": [],
       "usage": "rubric_review_only",
       "eligible_for_training": false,
-      "eligible_for_independent_test": false
+      "eligible_for_independent_test": false,
+      "agent_review": {
+        "reviewer": "Codex",
+        "kind": "author_self_review",
+        "reviewed_on": "2026-09-28",
+        "disposition": "유지",
+        "label_assessment": "retain_for_stated_scenario",
+        "comment": "관련 없음이 명확한 입문 사례다. 다만 화면 잠금과 DB 잠금은 차이가 커서 이 문제를 맞힌 것만으로 검색 품질이 좋다고 볼 수 없다. 후속 자료에는 서로 다른 DB의 잠금 문제처럼 더 가까운 오답이 필요하다.",
+        "proposed_changes_applied": false
+      }
     },
     {
       "id": "R06",
@@ -241,7 +286,16 @@
       "source_refs": [],
       "usage": "rubric_review_only",
       "eligible_for_training": false,
-      "eligible_for_independent_test": false
+      "eligible_for_independent_test": false,
+      "agent_review": {
+        "reviewer": "Codex",
+        "kind": "author_self_review",
+        "reviewed_on": "2026-09-28",
+        "disposition": "유지",
+        "label_assessment": "retain_for_stated_scenario",
+        "comment": "현재 제목은 너무 일반적이므로 정보 부족이 맞다. 본문이 없으면 항상 보류한다는 규칙을 학습시키지는 말자. 제목에 정확한 오류 코드와 모델·버전이 있다면 제목만으로 관련성을 판단할 수도 있다.",
+        "proposed_changes_applied": false
+      }
     },
     {
       "id": "R07",
@@ -279,7 +333,16 @@
       ],
       "usage": "rubric_review_only",
       "eligible_for_training": false,
-      "eligible_for_independent_test": false
+      "eligible_for_independent_test": false,
+      "agent_review": {
+        "reviewer": "Codex",
+        "kind": "author_self_review",
+        "reviewed_on": "2026-09-28",
+        "disposition": "보완 권고",
+        "label_assessment": "retain_for_stated_scenario",
+        "comment": "관련 있음은 유지하되 최신성 확인이 필요하다는 설명을 함께 남겨야 한다. 이 사례에서 “이전 버전”은 가정이며 실제 최신 안내가 틀렸다는 발견이 아니다. 같은 주제의 구문서와 현재 버전에 적용 가능한 절차를 구분하는 비교 사례를 추가하자.",
+        "proposed_changes_applied": false
+      }
     },
     {
       "id": "R08",
@@ -307,7 +370,16 @@
       "source_refs": [],
       "usage": "rubric_review_only",
       "eligible_for_training": false,
-      "eligible_for_independent_test": false
+      "eligible_for_independent_test": false,
+      "agent_review": {
+        "reviewer": "Codex",
+        "kind": "author_self_review",
+        "reviewed_on": "2026-09-28",
+        "disposition": "보완 권고",
+        "label_assessment": "retain_for_stated_scenario",
+        "comment": "질문을 관련성으로 한정하면 관련 있음이 맞다. 그러나 이 라벨만으로 앱이 해당 문서의 지시를 실행해서는 안 된다. 관련성 판정과 별개로 문서 속 명령을 신뢰하지 않는 동작을 검증해야 한다. 단순히 relevant를 unfit으로 바꾸면 서로 다른 판단 목적을 섞게 된다.",
+        "proposed_changes_applied": false
+      }
     },
     {
       "id": "R09",
@@ -335,7 +407,16 @@
       "source_refs": [],
       "usage": "rubric_review_only",
       "eligible_for_training": false,
-      "eligible_for_independent_test": false
+      "eligible_for_independent_test": false,
+      "agent_review": {
+        "reviewer": "Codex",
+        "kind": "author_self_review",
+        "reviewed_on": "2026-09-28",
+        "disposition": "보완 권고",
+        "label_assessment": "retain_for_stated_scenario",
+        "comment": "정보 부족은 맞다. “관련성을 판단할 수 있는가”는 yes/no로도 읽히므로 “이 발췌가 설정 유지 동작에 관련 있는가”로 질문을 직접 쓰자. 원문이 잘려도 핵심 내용이 남은 경우에는 보류하지 않는 비교 사례가 필요하다.",
+        "proposed_changes_applied": false
+      }
     },
     {
       "id": "R10",
@@ -373,7 +454,16 @@
       ],
       "usage": "rubric_review_only",
       "eligible_for_training": false,
-      "eligible_for_independent_test": false
+      "eligible_for_independent_test": false,
+      "agent_review": {
+        "reviewer": "Codex",
+        "kind": "author_self_review",
+        "reviewed_on": "2026-09-28",
+        "disposition": "유지",
+        "label_assessment": "retain_for_stated_scenario",
+        "comment": "관련 있음에 동의한다. 사용자가 기대한 답을 부정하는 자료도 검색에서 보존해야 한다는 중요한 사례다. 질문에 대한 답은 부정적이어도 자료의 관련성은 긍정일 수 있음을 유지하자.",
+        "proposed_changes_applied": false
+      }
     },
     {
       "id": "E01",
@@ -420,7 +510,16 @@
       ],
       "usage": "rubric_review_only",
       "eligible_for_training": false,
-      "eligible_for_independent_test": false
+      "eligible_for_independent_test": false,
+      "agent_review": {
+        "reviewer": "Codex",
+        "kind": "author_self_review",
+        "reviewed_on": "2026-09-28",
+        "disposition": "유지",
+        "label_assessment": "retain_for_stated_scenario",
+        "comment": "검사한 12개라는 한정이 있어 뒷받침함이 맞다. 실제 관측 범위와 주장 범위를 일치시킨 좋은 기준 사례다. 출력이 비슷했다는 요약보다 선택 일치 여부가 기록된 결과를 출처로 유지하자.",
+        "proposed_changes_applied": false
+      }
     },
     {
       "id": "E02",
@@ -458,7 +557,16 @@
       ],
       "usage": "rubric_review_only",
       "eligible_for_training": false,
-      "eligible_for_independent_test": false
+      "eligible_for_independent_test": false,
+      "agent_review": {
+        "reviewer": "Codex",
+        "kind": "author_self_review",
+        "reviewed_on": "2026-09-28",
+        "disposition": "유지",
+        "label_assessment": "retain_for_stated_scenario",
+        "comment": "정보 부족에 동의한다. 12개에서 일치했다는 사실만으로 모든 입력에서 같다고 보장할 수 없지만, 불일치가 있었다고 말할 수도 없다. 같은 질문에 실제 불일치 1개가 주어진 경우는 반박함으로 바뀌는 비교 사례가 필요하다.",
+        "proposed_changes_applied": false
+      }
     },
     {
       "id": "E03",
@@ -496,7 +604,16 @@
       ],
       "usage": "rubric_review_only",
       "eligible_for_training": false,
-      "eligible_for_independent_test": false
+      "eligible_for_independent_test": false,
+      "agent_review": {
+        "reviewer": "Codex",
+        "kind": "author_self_review",
+        "reviewed_on": "2026-09-28",
+        "disposition": "유지",
+        "label_assessment": "retain_for_stated_scenario",
+        "comment": "첫 실행을 가리키는 한 반박함이 맞다. 이후 성공 기록이 생겼더라도 이전 실행의 실패를 바꾸지 않는다. 학습 자료에는 실행 ID나 checkpoint 식별자를 넣어 서로 다른 실행을 섞지 않게 하자.",
+        "proposed_changes_applied": false
+      }
     },
     {
       "id": "E04",
@@ -543,7 +660,16 @@
       ],
       "usage": "rubric_review_only",
       "eligible_for_training": false,
-      "eligible_for_independent_test": false
+      "eligible_for_independent_test": false,
+      "agent_review": {
+        "reviewer": "Codex",
+        "kind": "author_self_review",
+        "reviewed_on": "2026-09-28",
+        "disposition": "유지",
+        "label_assessment": "retain_for_stated_scenario",
+        "comment": "정보 부족이 맞다. “학습 완료”와 “성능 향상”은 다른 관측이다. 후속 실제 자료에는 quality_evaluation=false처럼 답을 쉽게 짐작하게 하는 요약 플래그 외에 실제 비교 결과와 표본 범위를 넣자.",
+        "proposed_changes_applied": false
+      }
     },
     {
       "id": "E05",
@@ -590,7 +716,16 @@
       ],
       "usage": "rubric_review_only",
       "eligible_for_training": false,
-      "eligible_for_independent_test": false
+      "eligible_for_independent_test": false,
+      "agent_review": {
+        "reviewer": "Codex",
+        "kind": "author_self_review",
+        "reviewed_on": "2026-09-28",
+        "disposition": "보완 권고",
+        "label_assessment": "retain_for_stated_scenario",
+        "comment": "현재 사례의 partial은 맞다. 단, 확인된 절이 하나 있고 나머지는 미확인일 때에만 쓰자. “100 step 학습했고 정확도가 올랐다”에서 실제 정확도 하락이 관측됐다면 전체 복합 주장은 반박함이다. 이 우선순위를 기준표에도 명시해야 한다.",
+        "proposed_changes_applied": false
+      }
     },
     {
       "id": "E06",
@@ -628,7 +763,16 @@
       ],
       "usage": "rubric_review_only",
       "eligible_for_training": false,
-      "eligible_for_independent_test": false
+      "eligible_for_independent_test": false,
+      "agent_review": {
+        "reviewer": "Codex",
+        "kind": "author_self_review",
+        "reviewed_on": "2026-09-28",
+        "disposition": "유지",
+        "label_assessment": "retain_for_stated_scenario",
+        "comment": "human_reviewed=0이 명시돼 있어 반박함이 맞다. 후보 수를 정답 수로 바꾸지 않는 데 유용하다. 이 결과는 조사 당시 상태에 관한 것이므로 나중에 검토한 수가 늘어도 이 과거 기록을 현재 수량처럼 쓰지 않아야 한다.",
+        "proposed_changes_applied": false
+      }
     },
     {
       "id": "E07",
@@ -666,7 +810,16 @@
       ],
       "usage": "rubric_review_only",
       "eligible_for_training": false,
-      "eligible_for_independent_test": false
+      "eligible_for_independent_test": false,
+      "agent_review": {
+        "reviewer": "Codex",
+        "kind": "author_self_review",
+        "reviewed_on": "2026-09-28",
+        "disposition": "보완 권고",
+        "label_assessment": "retain_for_stated_scenario",
+        "comment": "이 사례의 전제인 정리 결과를 근거로 뒷받침함은 유지한다. 다만 결과 파일의 true 값과 실제 프로세스 관측은 증거 수준이 다르다. 실제 자료를 모을 때에는 소유 PID·관측 시점·종료 후 조회 결과를 함께 보존하자. 이 의견은 당시 서버가 종료되지 않았다는 반례가 아니다.",
+        "proposed_changes_applied": false
+      }
     },
     {
       "id": "E08",
@@ -694,7 +847,16 @@
       "source_refs": [],
       "usage": "rubric_review_only",
       "eligible_for_training": false,
-      "eligible_for_independent_test": false
+      "eligible_for_independent_test": false,
+      "agent_review": {
+        "reviewer": "Codex",
+        "kind": "author_self_review",
+        "reviewed_on": "2026-09-28",
+        "disposition": "유지",
+        "label_assessment": "retain_for_stated_scenario",
+        "comment": "정보 부족이 정확하다. 시작 로그는 성공도 실패도 확정하지 않는다. 나중에 통과 결과가 도착하면 판정이 바뀌는 연속 사례를 같은 작업 그룹으로 묶어 준비하면 좋겠다.",
+        "proposed_changes_applied": false
+      }
     },
     {
       "id": "E09",
@@ -722,7 +884,16 @@
       "source_refs": [],
       "usage": "rubric_review_only",
       "eligible_for_training": false,
-      "eligible_for_independent_test": false
+      "eligible_for_independent_test": false,
+      "agent_review": {
+        "reviewer": "Codex",
+        "kind": "author_self_review",
+        "reviewed_on": "2026-09-28",
+        "disposition": "유지",
+        "label_assessment": "retain_for_stated_scenario",
+        "comment": "실패 1개가 전체 통과 주장을 반박한다. skipped를 곧바로 failed와 동일 취급하는 규칙은 추가하지 말자. 실행한 검사 통과 여부와 필수 검사를 모두 수행했는지는 따로 판단해야 한다.",
+        "proposed_changes_applied": false
+      }
     },
     {
       "id": "E10",
@@ -750,7 +921,16 @@
       "source_refs": [],
       "usage": "rubric_review_only",
       "eligible_for_training": false,
-      "eligible_for_independent_test": false
+      "eligible_for_independent_test": false,
+      "agent_review": {
+        "reviewer": "Codex",
+        "kind": "author_self_review",
+        "reviewed_on": "2026-09-28",
+        "disposition": "유지",
+        "label_assessment": "retain_for_stated_scenario",
+        "comment": "주장과 무관함이 맞다. 단, 아이콘과 모델 정확도는 매우 쉬운 구분이다. 후속 자료에는 모델 시작 속도 개선을 판단 정확도 개선 근거로 오인하는 경우처럼 같은 모델의 다른 지표를 섞은 사례도 필요하다.",
+        "proposed_changes_applied": false
+      }
     },
     {
       "id": "C01",
@@ -788,7 +968,16 @@
       ],
       "usage": "rubric_review_only",
       "eligible_for_training": false,
-      "eligible_for_independent_test": false
+      "eligible_for_independent_test": false,
+      "agent_review": {
+        "reviewer": "Codex",
+        "kind": "author_self_review",
+        "reviewed_on": "2026-09-28",
+        "disposition": "유지",
+        "label_assessment": "retain_for_stated_scenario",
+        "comment": "명시된 허용 범위와 기능이 맞으므로 적합하다. 도구가 적합해도 실제 저장 성공은 호출 결과로 확인해야 한다. 정상적으로 허용된 작업도 포함돼 있어 부적합만 고르는 모델을 방지하는 데 도움이 된다.",
+        "proposed_changes_applied": false
+      }
     },
     {
       "id": "C02",
@@ -826,7 +1015,16 @@
       ],
       "usage": "rubric_review_only",
       "eligible_for_training": false,
-      "eligible_for_independent_test": false
+      "eligible_for_independent_test": false,
+      "agent_review": {
+        "reviewer": "Codex",
+        "kind": "author_self_review",
+        "reviewed_on": "2026-09-28",
+        "disposition": "유지",
+        "label_assessment": "retain_for_stated_scenario",
+        "comment": "요청 범위를 넘는 수집이므로 부적합하다. 사용자가 허용한 공개 요약만 기록하는 C01과 차이를 비교해 학습할 수 있다. 판단 모델의 답과 별개로 수집 허용 범위는 프로그램에서도 확인해야 한다.",
+        "proposed_changes_applied": false
+      }
     },
     {
       "id": "C03",
@@ -864,7 +1062,16 @@
       ],
       "usage": "rubric_review_only",
       "eligible_for_training": false,
-      "eligible_for_independent_test": false
+      "eligible_for_independent_test": false,
+      "agent_review": {
+        "reviewer": "Codex",
+        "kind": "author_self_review",
+        "reviewed_on": "2026-09-28",
+        "disposition": "유지",
+        "label_assessment": "retain_for_stated_scenario",
+        "comment": "대상 작업을 확인한 뒤 근거를 복원하는 용도이므로 적합하다. 이 사례에서 모델이 별도의 새 작업을 생성하거나 다른 작업 ID로 바꾸는 선택까지 정당화하지 않도록 확인된 작업 ID를 보존하자.",
+        "proposed_changes_applied": false
+      }
     },
     {
       "id": "C04",
@@ -892,7 +1099,16 @@
       "source_refs": [],
       "usage": "rubric_review_only",
       "eligible_for_training": false,
-      "eligible_for_independent_test": false
+      "eligible_for_independent_test": false,
+      "agent_review": {
+        "reviewer": "Codex",
+        "kind": "author_self_review",
+        "reviewed_on": "2026-09-28",
+        "disposition": "보완 권고",
+        "label_assessment": "retain_for_stated_scenario",
+        "comment": "제시된 호출 내용 전체를 평가하면 부적합하다. work_record 자체가 나쁜 도구인 것은 아니다. 같은 도구에 “수정 완료, 테스트 미실행”이라는 진행 이벤트를 저장하는 경우는 적합할 수 있다. 두 사례를 짝지어 도구 이름만 보고 판단하지 않게 하자.",
+        "proposed_changes_applied": false
+      }
     },
     {
       "id": "C05",
@@ -920,7 +1136,16 @@
       "source_refs": [],
       "usage": "rubric_review_only",
       "eligible_for_training": false,
-      "eligible_for_independent_test": false
+      "eligible_for_independent_test": false,
+      "agent_review": {
+        "reviewer": "Codex",
+        "kind": "author_self_review",
+        "reviewed_on": "2026-09-28",
+        "disposition": "유지",
+        "label_assessment": "retain_for_stated_scenario",
+        "comment": "삭제 금지가 명시돼 있어 부적합하다. 읽기 전용 목록 조회처럼 제약을 지키는 대안도 함께 준비하자. 금지된 실행은 판단 모델의 오답 하나로 허용되지 않도록 실행 경로에서도 제약을 유지해야 한다.",
+        "proposed_changes_applied": false
+      }
     },
     {
       "id": "C06",
@@ -948,7 +1173,16 @@
       "source_refs": [],
       "usage": "rubric_review_only",
       "eligible_for_training": false,
-      "eligible_for_independent_test": false
+      "eligible_for_independent_test": false,
+      "agent_review": {
+        "reviewer": "Codex",
+        "kind": "author_self_review",
+        "reviewed_on": "2026-09-28",
+        "disposition": "유지",
+        "label_assessment": "retain_for_stated_scenario",
+        "comment": "정보 부족이 맞다. 모르는 도구를 위험하다고 단정하는 것과 확인 전 실행을 보류하는 것은 다르다. 먼저 도구 설명·코드·읽기 전용 옵션을 확인하고, 부작용이 밝혀지면 다시 평가하면 된다. 모든 경우를 사용자 재승인으로 넘길 필요는 없다.",
+        "proposed_changes_applied": false
+      }
     },
     {
       "id": "C07",
@@ -976,7 +1210,16 @@
       "source_refs": [],
       "usage": "rubric_review_only",
       "eligible_for_training": false,
-      "eligible_for_independent_test": false
+      "eligible_for_independent_test": false,
+      "agent_review": {
+        "reviewer": "Codex",
+        "kind": "author_self_review",
+        "reviewed_on": "2026-09-28",
+        "disposition": "유지",
+        "label_assessment": "retain_for_stated_scenario",
+        "comment": "가정에 제시된 계약과 권한 범위에서는 적합하다. read-only라는 이름만 있고 실제 동작 설명이 없는 도구에도 같은 답을 주면 안 된다. 이 사례의 전제는 검증된 계약이라는 점을 유지하자.",
+        "proposed_changes_applied": false
+      }
     },
     {
       "id": "C08",
@@ -1004,7 +1247,16 @@
       "source_refs": [],
       "usage": "rubric_review_only",
       "eligible_for_training": false,
-      "eligible_for_independent_test": false
+      "eligible_for_independent_test": false,
+      "agent_review": {
+        "reviewer": "Codex",
+        "kind": "author_self_review",
+        "reviewed_on": "2026-09-28",
+        "disposition": "보완 권고",
+        "label_assessment": "retain_for_stated_scenario",
+        "comment": "현재 질문은 이 도구만으로 전체 검증을 끝낼 수 있느냐이므로 부적합하다. 단위 검사 실행 자체가 무용하다는 뜻은 아니다. 보조 검사로는 적합한 비교 사례를 만들고, 허위 완료로 이어질 위험은 C04와 같은 기준으로 중요 오류 표시를 재검토하자.",
+        "proposed_changes_applied": false
+      }
     },
     {
       "id": "C09",
@@ -1032,7 +1284,16 @@
       "source_refs": [],
       "usage": "rubric_review_only",
       "eligible_for_training": false,
-      "eligible_for_independent_test": false
+      "eligible_for_independent_test": false,
+      "agent_review": {
+        "reviewer": "Codex",
+        "kind": "author_self_review",
+        "reviewed_on": "2026-09-28",
+        "disposition": "보완 권고",
+        "label_assessment": "retain_for_stated_scenario",
+        "comment": "지금 호출할 수 없음이 확인됐으므로 부적합하다. 다만 이 판단은 현재 도구 목록과 호출 경로를 프로그램에서 대조해 먼저 처리하는 편이 낫다. 모델은 실제 사용 가능한 후보들의 기능 적합성을 판단하게 하자. 설치 후 사용 여부는 다른 질문이다.",
+        "proposed_changes_applied": false
+      }
     },
     {
       "id": "C10",
@@ -1060,7 +1321,31 @@
       "source_refs": [],
       "usage": "rubric_review_only",
       "eligible_for_training": false,
-      "eligible_for_independent_test": false
+      "eligible_for_independent_test": false,
+      "agent_review": {
+        "reviewer": "Codex",
+        "kind": "author_self_review",
+        "reviewed_on": "2026-09-28",
+        "disposition": "유지",
+        "label_assessment": "retain_for_stated_scenario",
+        "comment": "정보 부족에 동의한다. 외부 전송 여부를 모른다는 이유만으로 실제 유출을 주장해서는 안 된다. 설명을 확인할 때까지 비공개 원문 전달을 보류하고, 로컬 처리임이 확인되는 비교 사례도 추가하자.",
+        "proposed_changes_applied": false
+      }
     }
-  ]
+  ],
+  "agent_review": {
+    "reviewer": "Codex",
+    "kind": "author_self_review",
+    "reviewed_on": "2026-09-28",
+    "target_revision": "a911cdca83b33f260260703e8cdd0a6d2924801b",
+    "cases_reviewed": 30,
+    "counts": {
+      "유지": 19,
+      "보완 권고": 11
+    },
+    "original_labels_changed": 0,
+    "human_review_completed": false,
+    "proposed_changes_applied": false,
+    "conclusion": "유용한 판정 기준 초안이지만 본 학습 자료로는 질문·증거·비교 사례 보완이 필요하다."
+  }
 }
