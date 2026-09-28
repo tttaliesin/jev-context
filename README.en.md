@@ -14,7 +14,6 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/tttaliesin/jev-context/actions/workflows/check.yml"><code>CI</code></a> &nbsp;
   <a href="LICENSE"><code>MIT</code></a> &nbsp;
   <a href="docs/desktop-manager.md"><code>Windows x64</code></a> &nbsp;
   <a href="docs/development.md"><code>Python 3.12</code></a>

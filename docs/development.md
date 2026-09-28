@@ -32,11 +32,11 @@ mise 없이 설치할 때는 `--python`으로 Python 3.12 실행 파일을 지�
 
 검사 명령은 의존성을 설치하거나 lock을 바꾸지 않고, 첫 실패의 종료 코드를 그대로 돌려줍니다. build 도구(hatchling)는 dev 의존성에 고정돼 있어 offline build 중 추가로 내려받지 않습니다.
 
-GitHub Actions([check.yml](../.github/workflows/check.yml))는 `master` push와 pull request마다 Windows 러너에서 같은 순서로 검사하고, 창 상태·언어·프로젝트 전환·bridge 복구 Node 테스트도 실행합니다.
+검사는 변경 범위에 맞게 로컬에서 실행합니다. 문서 변경은 내용·링크, Python 변경은 관련 검사, 데스크톱 변경은 아래 Node·Electron 검사를 확인합니다. 여러 기능에 걸친 변경에는 전체 검사와 빌드를 사용합니다. 원격 CI는 사용하지 않습니다.
 
 기본 pytest는 `tests/`의 제품 검사를 실행합니다. `test_coding_benchmark.py`는 격리된 pytest를 프로젝트의 `.t/` 아래에서 실행하고, 끝나면 그 임시 폴더를 지웁니다.
 
-중단한 출력 축약 실험은 `experiments/output_filter/`에 분리했습니다. 제품 wheel과 기본 pytest에 포함하지 않으며, `python -m pytest experiments/output_filter -q`로 따로 검사합니다. CI도 별도 단계로 실행합니다. 새 벤치마크 생성기는 분리된 실험 파일을 사용하고, 이전에 동결한 입력·결과는 그대로 유지합니다.
+중단한 출력 축약 실험은 `experiments/output_filter/`에 분리했습니다. 제품 wheel과 기본 pytest에 포함하지 않으며, 해당 실험을 수정할 때 `python -m pytest experiments/output_filter -q`로 따로 검사합니다. 새 벤치마크 생성기는 분리된 실험 파일을 사용하고, 이전에 동결한 입력·결과는 그대로 유지합니다.
 
 공통 파일 경로·원자적 쓰기는 `project_files.py`가 담당합니다. 관측 기록은 `.local/jev-runtime/observation.lock`, 온보딩은 기존 `.local/jev-setup/setup.lock`을 사용합니다. 엔진 식별값은 공통 코드와 선택한 엔진 실행 코드만 포함하므로 다른 엔진 worker 수정으로 무효화되지 않습니다. 이번 식별 규칙 변경 이전의 프로세스·평가·Modal 세션은 새 식별값과 혼용할 수 없습니다. 실행 중인 앱과 MCP는 재연결 후 변경을 읽습니다.
 

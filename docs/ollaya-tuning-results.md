@@ -110,4 +110,4 @@ $env:PYTEST_ADDOPTS='--basetemp=.t/ot2full1 -p no:cacheprovider'
 .venv/Scripts/python.exe -X utf8 scripts/check.py
 ```
 
-재검사 시 새 임시 경로를 사용한다. 원격의 Python·build·격리 실험·데스크톱 검사는 [check 워크플로](https://github.com/tttaliesin/jev-context/actions/workflows/check.yml)에서 해당 commit 기준으로 확인할 수 있다.
+재검사 시 새 임시 경로를 사용한다. 2026-09-28 사용자 요청으로 원격 검사 워크플로를 제거했다. 이후 재검사는 [개발 안내](development.md)의 로컬 명령을 사용한다.
