@@ -1,0 +1,74 @@
+{
+  "stage": "prepare",
+  "frozen": {
+    "version": 2,
+    "provenance": "agent_authored_diagnostic",
+    "promotion_eligible": false,
+    "files": {
+      "development.json": "31e1a0797c511f4f464d67d7e4e9782e76e13bef65c069afeef35534c87449b2",
+      "validation.json": "ab1c01bb1615c98b154e23806b7921912e70cbdacee9556c8ee92daabc2fd356",
+      "candidates.json": "342c9b4aa4945248fd6608443c8875cd4510b32327f82081e60531c9582d78c7"
+    }
+  },
+  "promotion_eligible": false,
+  "created_at": 1790556585.731057,
+  "models": {
+    "laya:multilingual": {
+      "status": "ready",
+      "available_gib": 11.379772186279297,
+      "identity": {
+        "hashes": {
+          "manifest": "2840506e1f978aeb696a6f84af43ecc7fca95754cb63a67bafe6132532d384eb",
+          "sha256-05b7fd1e50a9bfc27e9547783b382f2bb2769cb4adc0eebb85bb57ae3060f06d": "05b7fd1e50a9bfc27e9547783b382f2bb2769cb4adc0eebb85bb57ae3060f06d",
+          "sha256-ace962240e4cf7c69c0e65ea7224aa791777880003950a81347a206f6bfbed45": "ace962240e4cf7c69c0e65ea7224aa791777880003950a81347a206f6bfbed45",
+          "sha256-236fbdec33bd2aa44ee4dae43a83173ef3351c4eed6afd073df387c9486ec7d6": "236fbdec33bd2aa44ee4dae43a83173ef3351c4eed6afd073df387c9486ec7d6",
+          "sha256-9d628fd971b700382ac6f65920a86f149777b2e748e0c955fb3b19695aa8f204": "9d628fd971b700382ac6f65920a86f149777b2e748e0c955fb3b19695aa8f204",
+          "sha256-609d8f4c067cd3950f88594c5a802616cea245823836ef5848ee4fc40aab5b6f": "609d8f4c067cd3950f88594c5a802616cea245823836ef5848ee4fc40aab5b6f",
+          "sha256-70fd2a20d3e0f259063958071637b2047a01f4d8dd5681ab2f3d647ee9193fac": "70fd2a20d3e0f259063958071637b2047a01f4d8dd5681ab2f3d647ee9193fac",
+          "sha256-316915b3e458dcd3df2154562613132542e20244103338f6a150b712e9185e10": "316915b3e458dcd3df2154562613132542e20244103338f6a150b712e9185e10",
+          "sha256-ec56c3e69fab09b41de6f1c80fdcc13b83ec1eef1f72d3022baaafde3d9307e9": "ec56c3e69fab09b41de6f1c80fdcc13b83ec1eef1f72d3022baaafde3d9307e9",
+          "sha256-0bed1ebe7d32a74299026e2f1167af59a25a9ba747281d71a1857b17a92c5eb5": "0bed1ebe7d32a74299026e2f1167af59a25a9ba747281d71a1857b17a92c5eb5"
+        },
+        "calibration": {
+          "temperature": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "temperature_by_options": {}
+        }
+      }
+    },
+    "decider:0.8b": {
+      "status": "ready",
+      "available_gib": 11.380722045898438,
+      "identity": {
+        "hashes": {
+          "manifest": "97a22ac9c6c42eebb762ddb5eb47f0542b5e0788cf1cea31cee6205d5bd1064a",
+          "sha256-3868904915abe75aaf5ccba19a830e80fd8c3a3730de488af5e45a154ca6b8f5": "3868904915abe75aaf5ccba19a830e80fd8c3a3730de488af5e45a154ca6b8f5",
+          "sha256-b40655f69ed911cd37c8bf23d6ab82615745db25c0776216fd954ead6f62b200": "b40655f69ed911cd37c8bf23d6ab82615745db25c0776216fd954ead6f62b200",
+          "sha256-6926f82ef7e9ea408ad881555204daa6bb694ca82509c4d1514b7be2e713563d": "6926f82ef7e9ea408ad881555204daa6bb694ca82509c4d1514b7be2e713563d",
+          "sha256-06b9509352d2af50381ab2247e083b80d32d5c0aba91c272ca9ff729b6a0e523": "06b9509352d2af50381ab2247e083b80d32d5c0aba91c272ca9ff729b6a0e523",
+          "sha256-7b0cda8992a5c24115a98667780d9fea2f1299b11d987ba922631dd68506e1d0": "7b0cda8992a5c24115a98667780d9fea2f1299b11d987ba922631dd68506e1d0",
+          "sha256-5651856f1a740eb8d17d35132e901b43b93e84a7c85a3a26b9ccf52ec1ed5f02": "5651856f1a740eb8d17d35132e901b43b93e84a7c85a3a26b9ccf52ec1ed5f02",
+          "sha256-b4d9d0d19903c735682520519fbd533c604c092dc80098efd5407806e38f0057": "b4d9d0d19903c735682520519fbd533c604c092dc80098efd5407806e38f0057"
+        },
+        "calibration": {
+          "temperature": [
+            1.03,
+            1.0,
+            1.03
+          ],
+          "temperature_by_options": {},
+          "source": "decider_config.json temperature (fitted upstream on in-task data); score is 1.0 because the isolated-row temperature is applied inside the score option logits"
+        }
+      }
+    },
+    "decider:2b": {
+      "status": "excluded",
+      "reason": "memory_precondition",
+      "available_gib": 10.719268798828125,
+      "required_gib": 12
+    }
+  }
+}

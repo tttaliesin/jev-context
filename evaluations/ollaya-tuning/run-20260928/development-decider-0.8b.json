@@ -1,0 +1,2163 @@
+{
+  "stage": "development-decider-0.8b",
+  "frozen": {
+    "version": 2,
+    "provenance": "agent_authored_diagnostic",
+    "promotion_eligible": false,
+    "files": {
+      "development.json": "31e1a0797c511f4f464d67d7e4e9782e76e13bef65c069afeef35534c87449b2",
+      "validation.json": "ab1c01bb1615c98b154e23806b7921912e70cbdacee9556c8ee92daabc2fd356",
+      "candidates.json": "342c9b4aa4945248fd6608443c8875cd4510b32327f82081e60531c9582d78c7"
+    }
+  },
+  "promotion_eligible": false,
+  "created_at": 1790556761.136242,
+  "preparation_seconds": 7.920748900156468,
+  "memory_loaded": {
+    "processes": [
+      {
+        "ProcessId": 583796,
+        "ParentProcessId": 569596,
+        "Name": "ollaya.exe",
+        "WorkingSetSize": 27234304
+      },
+      {
+        "ProcessId": 574092,
+        "ParentProcessId": 583796,
+        "Name": "conhost.exe",
+        "WorkingSetSize": 10506240
+      },
+      {
+        "ProcessId": 564060,
+        "ParentProcessId": 583796,
+        "Name": "ollaya.exe",
+        "WorkingSetSize": 3232264192
+      },
+      {
+        "ProcessId": 593752,
+        "ParentProcessId": 564060,
+        "Name": "conhost.exe",
+        "WorkingSetSize": 7815168
+      }
+    ],
+    "working_set_sum_bytes": 3277819904
+  },
+  "runs": {
+    "c_korean_fields": {
+      "rows": [
+        {
+          "id": "development-relevance-1",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "relevant",
+          "critical": false,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.6111,
+          "probabilities": {
+            "relevant": 0.0678,
+            "irrelevant": 0.3211,
+            "insufficient_evidence": 0.6111
+          },
+          "status": "observed",
+          "latency_ms": 406.9336000829935
+        },
+        {
+          "id": "development-relevance-2",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "relevant",
+          "critical": false,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.4491,
+          "probabilities": {
+            "relevant": 0.1726,
+            "irrelevant": 0.3784,
+            "insufficient_evidence": 0.4491
+          },
+          "status": "observed",
+          "latency_ms": 371.5666001662612
+        },
+        {
+          "id": "development-relevance-3",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "irrelevant",
+          "critical": false,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.5618,
+          "probabilities": {
+            "relevant": 0.0077,
+            "irrelevant": 0.4304,
+            "insufficient_evidence": 0.5618
+          },
+          "status": "observed",
+          "latency_ms": 334.24610015936196
+        },
+        {
+          "id": "development-relevance-4",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "irrelevant",
+          "critical": false,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.5094,
+          "probabilities": {
+            "relevant": 0.0325,
+            "irrelevant": 0.4582,
+            "insufficient_evidence": 0.5094
+          },
+          "status": "observed",
+          "latency_ms": 355.07829999551177
+        },
+        {
+          "id": "development-relevance-5",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "relevant",
+          "critical": false,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.5377,
+          "probabilities": {
+            "relevant": 0.1691,
+            "irrelevant": 0.2932,
+            "insufficient_evidence": 0.5377
+          },
+          "status": "observed",
+          "latency_ms": 332.7572999987751
+        },
+        {
+          "id": "development-relevance-6",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "insufficient_evidence",
+          "critical": false,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.6827,
+          "probabilities": {
+            "relevant": 0.021,
+            "irrelevant": 0.2963,
+            "insufficient_evidence": 0.6827
+          },
+          "status": "observed",
+          "latency_ms": 351.7068000510335
+        },
+        {
+          "id": "development-relevance-7",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "irrelevant",
+          "critical": false,
+          "choice": "irrelevant",
+          "decision_score": 0.7106,
+          "probabilities": {
+            "relevant": 0.0074,
+            "irrelevant": 0.7106,
+            "insufficient_evidence": 0.282
+          },
+          "status": "observed",
+          "latency_ms": 359.1381998267025
+        },
+        {
+          "id": "development-relevance-8",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "relevant",
+          "critical": false,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.5108,
+          "probabilities": {
+            "relevant": 0.0339,
+            "irrelevant": 0.4552,
+            "insufficient_evidence": 0.5108
+          },
+          "status": "observed",
+          "latency_ms": 390.67570003680885
+        },
+        {
+          "id": "development-relevance-9",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "irrelevant",
+          "critical": true,
+          "choice": "irrelevant",
+          "decision_score": 0.5707,
+          "probabilities": {
+            "relevant": 0.01,
+            "irrelevant": 0.5707,
+            "insufficient_evidence": 0.4193
+          },
+          "status": "observed",
+          "latency_ms": 348.4651001635939
+        },
+        {
+          "id": "development-relevance-10",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "relevant",
+          "critical": false,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.5664,
+          "probabilities": {
+            "relevant": 0.0411,
+            "irrelevant": 0.3925,
+            "insufficient_evidence": 0.5664
+          },
+          "status": "observed",
+          "latency_ms": 353.52399991825223
+        },
+        {
+          "id": "development-evidence_relation-1",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "supports",
+          "critical": false,
+          "choice": "supports",
+          "decision_score": 0.777,
+          "probabilities": {
+            "supports": 0.777,
+            "contradicts": 0.0647,
+            "partial": 0.0908,
+            "unrelated": 0.02,
+            "insufficient_evidence": 0.0474
+          },
+          "status": "observed",
+          "latency_ms": 680.723899975419
+        },
+        {
+          "id": "development-evidence_relation-2",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "contradicts",
+          "critical": true,
+          "choice": "contradicts",
+          "decision_score": 0.3584,
+          "probabilities": {
+            "supports": 0.2384,
+            "contradicts": 0.3584,
+            "partial": 0.1039,
+            "unrelated": 0.0906,
+            "insufficient_evidence": 0.2086
+          },
+          "status": "observed",
+          "latency_ms": 688.6024000123143
+        },
+        {
+          "id": "development-evidence_relation-3",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "partial",
+          "critical": false,
+          "choice": "partial",
+          "decision_score": 0.5082,
+          "probabilities": {
+            "supports": 0.209,
+            "contradicts": 0.135,
+            "partial": 0.5082,
+            "unrelated": 0.0112,
+            "insufficient_evidence": 0.1366
+          },
+          "status": "observed",
+          "latency_ms": 681.5227998886257
+        },
+        {
+          "id": "development-evidence_relation-4",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "insufficient_evidence",
+          "critical": true,
+          "choice": "contradicts",
+          "decision_score": 0.6494,
+          "probabilities": {
+            "supports": 0.0204,
+            "contradicts": 0.6494,
+            "partial": 0.0306,
+            "unrelated": 0.0748,
+            "insufficient_evidence": 0.2248
+          },
+          "status": "observed",
+          "latency_ms": 655.2641000598669
+        },
+        {
+          "id": "development-evidence_relation-5",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "insufficient_evidence",
+          "critical": true,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.343,
+          "probabilities": {
+            "supports": 0.1135,
+            "contradicts": 0.3385,
+            "partial": 0.1749,
+            "unrelated": 0.0301,
+            "insufficient_evidence": 0.343
+          },
+          "status": "observed",
+          "latency_ms": 710.1060999557376
+        },
+        {
+          "id": "development-evidence_relation-6",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "unrelated",
+          "critical": false,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.3786,
+          "probabilities": {
+            "supports": 0.0656,
+            "contradicts": 0.2413,
+            "partial": 0.0992,
+            "unrelated": 0.2153,
+            "insufficient_evidence": 0.3786
+          },
+          "status": "observed",
+          "latency_ms": 687.1028998866677
+        },
+        {
+          "id": "development-evidence_relation-7",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "contradicts",
+          "critical": true,
+          "choice": "contradicts",
+          "decision_score": 0.7136,
+          "probabilities": {
+            "supports": 0.0484,
+            "contradicts": 0.7136,
+            "partial": 0.0358,
+            "unrelated": 0.0156,
+            "insufficient_evidence": 0.1866
+          },
+          "status": "observed",
+          "latency_ms": 688.7590999249369
+        },
+        {
+          "id": "development-evidence_relation-8",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "insufficient_evidence",
+          "critical": true,
+          "choice": "contradicts",
+          "decision_score": 0.5204,
+          "probabilities": {
+            "supports": 0.0837,
+            "contradicts": 0.5204,
+            "partial": 0.0892,
+            "unrelated": 0.0281,
+            "insufficient_evidence": 0.2786
+          },
+          "status": "observed",
+          "latency_ms": 657.5544001534581
+        },
+        {
+          "id": "development-evidence_relation-9",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "supports",
+          "critical": false,
+          "choice": "supports",
+          "decision_score": 0.6822,
+          "probabilities": {
+            "supports": 0.6822,
+            "contradicts": 0.1146,
+            "partial": 0.1117,
+            "unrelated": 0.0134,
+            "insufficient_evidence": 0.0781
+          },
+          "status": "observed",
+          "latency_ms": 678.4057000186294
+        },
+        {
+          "id": "development-evidence_relation-10",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "supports",
+          "critical": false,
+          "choice": "supports",
+          "decision_score": 0.8139,
+          "probabilities": {
+            "supports": 0.8139,
+            "contradicts": 0.0818,
+            "partial": 0.0554,
+            "unrelated": 0.0053,
+            "insufficient_evidence": 0.0436
+          },
+          "status": "observed",
+          "latency_ms": 688.9979001134634
+        },
+        {
+          "id": "development-capability_fit-1",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "fit",
+          "critical": false,
+          "choice": "fit",
+          "decision_score": 0.4654,
+          "probabilities": {
+            "fit": 0.4654,
+            "unfit": 0.1763,
+            "insufficient_evidence": 0.3583
+          },
+          "status": "observed",
+          "latency_ms": 513.6624998413026
+        },
+        {
+          "id": "development-capability_fit-2",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "unfit",
+          "critical": true,
+          "choice": "unfit",
+          "decision_score": 0.7179,
+          "probabilities": {
+            "fit": 0.0954,
+            "unfit": 0.7179,
+            "insufficient_evidence": 0.1866
+          },
+          "status": "observed",
+          "latency_ms": 513.9862999785691
+        },
+        {
+          "id": "development-capability_fit-3",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "unfit",
+          "critical": true,
+          "choice": "unfit",
+          "decision_score": 0.9229,
+          "probabilities": {
+            "fit": 0.0445,
+            "unfit": 0.9229,
+            "insufficient_evidence": 0.0325
+          },
+          "status": "observed",
+          "latency_ms": 525.8754999376833
+        },
+        {
+          "id": "development-capability_fit-4",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "insufficient_evidence",
+          "critical": false,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.6566,
+          "probabilities": {
+            "fit": 0.007,
+            "unfit": 0.3364,
+            "insufficient_evidence": 0.6566
+          },
+          "status": "observed",
+          "latency_ms": 537.4847000930458
+        },
+        {
+          "id": "development-capability_fit-5",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "unfit",
+          "critical": true,
+          "choice": "unfit",
+          "decision_score": 0.8867,
+          "probabilities": {
+            "fit": 0.041,
+            "unfit": 0.8867,
+            "insufficient_evidence": 0.0723
+          },
+          "status": "observed",
+          "latency_ms": 557.6640998478979
+        },
+        {
+          "id": "development-capability_fit-6",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "fit",
+          "critical": false,
+          "choice": "fit",
+          "decision_score": 0.7928,
+          "probabilities": {
+            "fit": 0.7928,
+            "unfit": 0.1551,
+            "insufficient_evidence": 0.0522
+          },
+          "status": "observed",
+          "latency_ms": 532.9962999094278
+        },
+        {
+          "id": "development-capability_fit-7",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "fit",
+          "critical": false,
+          "choice": "fit",
+          "decision_score": 0.8934,
+          "probabilities": {
+            "fit": 0.8934,
+            "unfit": 0.0527,
+            "insufficient_evidence": 0.0539
+          },
+          "status": "observed",
+          "latency_ms": 532.3397999163717
+        },
+        {
+          "id": "development-capability_fit-8",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "unfit",
+          "critical": false,
+          "choice": "unfit",
+          "decision_score": 0.8755,
+          "probabilities": {
+            "fit": 0.0148,
+            "unfit": 0.8755,
+            "insufficient_evidence": 0.1096
+          },
+          "status": "observed",
+          "latency_ms": 555.557900108397
+        },
+        {
+          "id": "development-capability_fit-9",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "fit",
+          "critical": false,
+          "choice": "unfit",
+          "decision_score": 0.4016,
+          "probabilities": {
+            "fit": 0.3206,
+            "unfit": 0.4016,
+            "insufficient_evidence": 0.2779
+          },
+          "status": "observed",
+          "latency_ms": 537.8648000769317
+        },
+        {
+          "id": "development-capability_fit-10",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "insufficient_evidence",
+          "critical": true,
+          "choice": "unfit",
+          "decision_score": 0.5183,
+          "probabilities": {
+            "fit": 0.0133,
+            "unfit": 0.5183,
+            "insufficient_evidence": 0.4684
+          },
+          "status": "observed",
+          "latency_ms": 556.4888999797404
+        },
+        {
+          "id": "validation-relevance-1",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "relevant",
+          "critical": false,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.6144,
+          "probabilities": {
+            "relevant": 0.0143,
+            "irrelevant": 0.3713,
+            "insufficient_evidence": 0.6144
+          },
+          "status": "observed",
+          "latency_ms": 375.63350005075336
+        },
+        {
+          "id": "validation-relevance-2",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "relevant",
+          "critical": false,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.5349,
+          "probabilities": {
+            "relevant": 0.1216,
+            "irrelevant": 0.3435,
+            "insufficient_evidence": 0.5349
+          },
+          "status": "observed",
+          "latency_ms": 582.5425998773426
+        },
+        {
+          "id": "validation-relevance-3",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "irrelevant",
+          "critical": false,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.6529,
+          "probabilities": {
+            "relevant": 0.0146,
+            "irrelevant": 0.3325,
+            "insufficient_evidence": 0.6529
+          },
+          "status": "observed",
+          "latency_ms": 417.3224000260234
+        },
+        {
+          "id": "validation-relevance-4",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "irrelevant",
+          "critical": false,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.561,
+          "probabilities": {
+            "relevant": 0.0199,
+            "irrelevant": 0.4191,
+            "insufficient_evidence": 0.561
+          },
+          "status": "observed",
+          "latency_ms": 397.51859987154603
+        },
+        {
+          "id": "validation-relevance-5",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "relevant",
+          "critical": false,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.6063,
+          "probabilities": {
+            "relevant": 0.1226,
+            "irrelevant": 0.2711,
+            "insufficient_evidence": 0.6063
+          },
+          "status": "observed",
+          "latency_ms": 424.9602002091706
+        },
+        {
+          "id": "validation-relevance-6",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "insufficient_evidence",
+          "critical": false,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.8498,
+          "probabilities": {
+            "relevant": 0.0227,
+            "irrelevant": 0.1275,
+            "insufficient_evidence": 0.8498
+          },
+          "status": "observed",
+          "latency_ms": 399.7949999757111
+        },
+        {
+          "id": "validation-relevance-7",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "irrelevant",
+          "critical": false,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.5143,
+          "probabilities": {
+            "relevant": 0.0347,
+            "irrelevant": 0.451,
+            "insufficient_evidence": 0.5143
+          },
+          "status": "observed",
+          "latency_ms": 384.087499929592
+        },
+        {
+          "id": "validation-relevance-8",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "relevant",
+          "critical": false,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.485,
+          "probabilities": {
+            "relevant": 0.0734,
+            "irrelevant": 0.4416,
+            "insufficient_evidence": 0.485
+          },
+          "status": "observed",
+          "latency_ms": 515.4143001418561
+        },
+        {
+          "id": "validation-relevance-9",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "irrelevant",
+          "critical": true,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.6119,
+          "probabilities": {
+            "relevant": 0.0162,
+            "irrelevant": 0.3718,
+            "insufficient_evidence": 0.6119
+          },
+          "status": "observed",
+          "latency_ms": 383.0776000395417
+        },
+        {
+          "id": "validation-relevance-10",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "relevant",
+          "critical": false,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.5774,
+          "probabilities": {
+            "relevant": 0.0616,
+            "irrelevant": 0.3611,
+            "insufficient_evidence": 0.5774
+          },
+          "status": "observed",
+          "latency_ms": 354.74550002254546
+        },
+        {
+          "id": "validation-evidence_relation-1",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "supports",
+          "critical": false,
+          "choice": "supports",
+          "decision_score": 0.3669,
+          "probabilities": {
+            "supports": 0.3669,
+            "contradicts": 0.1327,
+            "partial": 0.3405,
+            "unrelated": 0.0123,
+            "insufficient_evidence": 0.1475
+          },
+          "status": "observed",
+          "latency_ms": 684.8325999453664
+        },
+        {
+          "id": "validation-evidence_relation-2",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "contradicts",
+          "critical": true,
+          "choice": "partial",
+          "decision_score": 0.3583,
+          "probabilities": {
+            "supports": 0.0728,
+            "contradicts": 0.2492,
+            "partial": 0.3583,
+            "unrelated": 0.0364,
+            "insufficient_evidence": 0.2834
+          },
+          "status": "observed",
+          "latency_ms": 695.0866000261158
+        },
+        {
+          "id": "validation-evidence_relation-3",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "partial",
+          "critical": false,
+          "choice": "partial",
+          "decision_score": 0.7072,
+          "probabilities": {
+            "supports": 0.1244,
+            "contradicts": 0.0319,
+            "partial": 0.7072,
+            "unrelated": 0.0093,
+            "insufficient_evidence": 0.1272
+          },
+          "status": "observed",
+          "latency_ms": 713.155800011009
+        },
+        {
+          "id": "validation-evidence_relation-4",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "insufficient_evidence",
+          "critical": true,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.3515,
+          "probabilities": {
+            "supports": 0.088,
+            "contradicts": 0.2768,
+            "partial": 0.2141,
+            "unrelated": 0.0696,
+            "insufficient_evidence": 0.3515
+          },
+          "status": "observed",
+          "latency_ms": 776.7413000110537
+        },
+        {
+          "id": "validation-evidence_relation-5",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "insufficient_evidence",
+          "critical": true,
+          "choice": "partial",
+          "decision_score": 0.4662,
+          "probabilities": {
+            "supports": 0.0232,
+            "contradicts": 0.161,
+            "partial": 0.4662,
+            "unrelated": 0.0172,
+            "insufficient_evidence": 0.3324
+          },
+          "status": "observed",
+          "latency_ms": 750.6126998923719
+        },
+        {
+          "id": "validation-evidence_relation-6",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "unrelated",
+          "critical": false,
+          "choice": "contradicts",
+          "decision_score": 0.2787,
+          "probabilities": {
+            "supports": 0.1355,
+            "contradicts": 0.2787,
+            "partial": 0.1687,
+            "unrelated": 0.1524,
+            "insufficient_evidence": 0.2646
+          },
+          "status": "observed",
+          "latency_ms": 678.1361999455839
+        },
+        {
+          "id": "validation-evidence_relation-7",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "contradicts",
+          "critical": true,
+          "choice": "contradicts",
+          "decision_score": 0.6623,
+          "probabilities": {
+            "supports": 0.2064,
+            "contradicts": 0.6623,
+            "partial": 0.0294,
+            "unrelated": 0.0109,
+            "insufficient_evidence": 0.091
+          },
+          "status": "observed",
+          "latency_ms": 668.8111999537796
+        },
+        {
+          "id": "validation-evidence_relation-8",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "insufficient_evidence",
+          "critical": true,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.2973,
+          "probabilities": {
+            "supports": 0.1816,
+            "contradicts": 0.2299,
+            "partial": 0.2524,
+            "unrelated": 0.0388,
+            "insufficient_evidence": 0.2973
+          },
+          "status": "observed",
+          "latency_ms": 677.1402999293059
+        },
+        {
+          "id": "validation-evidence_relation-9",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "supports",
+          "critical": false,
+          "choice": "supports",
+          "decision_score": 0.626,
+          "probabilities": {
+            "supports": 0.626,
+            "contradicts": 0.2298,
+            "partial": 0.0593,
+            "unrelated": 0.0109,
+            "insufficient_evidence": 0.074
+          },
+          "status": "observed",
+          "latency_ms": 674.7959000058472
+        },
+        {
+          "id": "validation-evidence_relation-10",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "supports",
+          "critical": false,
+          "choice": "supports",
+          "decision_score": 0.6194,
+          "probabilities": {
+            "supports": 0.6194,
+            "contradicts": 0.2102,
+            "partial": 0.0786,
+            "unrelated": 0.0098,
+            "insufficient_evidence": 0.0821
+          },
+          "status": "observed",
+          "latency_ms": 727.676099864766
+        },
+        {
+          "id": "validation-capability_fit-1",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "fit",
+          "critical": false,
+          "choice": "fit",
+          "decision_score": 0.5067,
+          "probabilities": {
+            "fit": 0.5067,
+            "unfit": 0.3974,
+            "insufficient_evidence": 0.096
+          },
+          "status": "observed",
+          "latency_ms": 589.3051000311971
+        },
+        {
+          "id": "validation-capability_fit-2",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "unfit",
+          "critical": true,
+          "choice": "unfit",
+          "decision_score": 0.8855,
+          "probabilities": {
+            "fit": 0.027,
+            "unfit": 0.8855,
+            "insufficient_evidence": 0.0875
+          },
+          "status": "observed",
+          "latency_ms": 586.9514998048544
+        },
+        {
+          "id": "validation-capability_fit-3",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "unfit",
+          "critical": true,
+          "choice": "unfit",
+          "decision_score": 0.7795,
+          "probabilities": {
+            "fit": 0.0726,
+            "unfit": 0.7795,
+            "insufficient_evidence": 0.1479
+          },
+          "status": "observed",
+          "latency_ms": 576.5748000703752
+        },
+        {
+          "id": "validation-capability_fit-4",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "insufficient_evidence",
+          "critical": false,
+          "choice": "unfit",
+          "decision_score": 0.5498,
+          "probabilities": {
+            "fit": 0.0112,
+            "unfit": 0.5498,
+            "insufficient_evidence": 0.439
+          },
+          "status": "observed",
+          "latency_ms": 525.2001001499593
+        },
+        {
+          "id": "validation-capability_fit-5",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "unfit",
+          "critical": true,
+          "choice": "fit",
+          "decision_score": 0.7201,
+          "probabilities": {
+            "fit": 0.7201,
+            "unfit": 0.2345,
+            "insufficient_evidence": 0.0454
+          },
+          "status": "observed",
+          "latency_ms": 514.7913000546396
+        },
+        {
+          "id": "validation-capability_fit-6",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "fit",
+          "critical": false,
+          "choice": "fit",
+          "decision_score": 0.822,
+          "probabilities": {
+            "fit": 0.822,
+            "unfit": 0.122,
+            "insufficient_evidence": 0.0561
+          },
+          "status": "observed",
+          "latency_ms": 515.8993001095951
+        },
+        {
+          "id": "validation-capability_fit-7",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "fit",
+          "critical": false,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.4059,
+          "probabilities": {
+            "fit": 0.1904,
+            "unfit": 0.4036,
+            "insufficient_evidence": 0.4059
+          },
+          "status": "observed",
+          "latency_ms": 538.6218000203371
+        },
+        {
+          "id": "validation-capability_fit-8",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "unfit",
+          "critical": false,
+          "choice": "unfit",
+          "decision_score": 0.7907,
+          "probabilities": {
+            "fit": 0.1218,
+            "unfit": 0.7907,
+            "insufficient_evidence": 0.0875
+          },
+          "status": "observed",
+          "latency_ms": 506.39470014721155
+        },
+        {
+          "id": "validation-capability_fit-9",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "fit",
+          "critical": false,
+          "choice": "fit",
+          "decision_score": 0.4672,
+          "probabilities": {
+            "fit": 0.4672,
+            "unfit": 0.237,
+            "insufficient_evidence": 0.2958
+          },
+          "status": "observed",
+          "latency_ms": 504.5759999193251
+        },
+        {
+          "id": "validation-capability_fit-10",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "insufficient_evidence",
+          "critical": true,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.7762,
+          "probabilities": {
+            "fit": 0.0117,
+            "unfit": 0.2121,
+            "insufficient_evidence": 0.7762
+          },
+          "status": "observed",
+          "latency_ms": 513.4866998996586
+        }
+      ],
+      "summary": {
+        "count": 60,
+        "observed": 60,
+        "correct": 33,
+        "critical_errors": 7,
+        "errors": 0,
+        "not_run": 0,
+        "accepted": 35,
+        "accepted_correct": 26,
+        "critical_wrong_accepts": 6,
+        "p50_ms": 535.2405000012368,
+        "p95_ms": 713.155800011009,
+        "within_2s": 60,
+        "within_6s": 60,
+        "nll": 1.0266062296211227,
+        "confusion": {
+          "relevance:relevant->insufficient_evidence": 10,
+          "relevance:irrelevant->insufficient_evidence": 6,
+          "relevance:insufficient_evidence->insufficient_evidence": 2,
+          "relevance:irrelevant->irrelevant": 2,
+          "evidence_relation:supports->supports": 6,
+          "evidence_relation:contradicts->contradicts": 3,
+          "evidence_relation:partial->partial": 2,
+          "evidence_relation:insufficient_evidence->contradicts": 2,
+          "evidence_relation:insufficient_evidence->insufficient_evidence": 3,
+          "evidence_relation:unrelated->insufficient_evidence": 1,
+          "capability_fit:fit->fit": 6,
+          "capability_fit:unfit->unfit": 7,
+          "capability_fit:insufficient_evidence->insufficient_evidence": 2,
+          "capability_fit:fit->unfit": 1,
+          "capability_fit:insufficient_evidence->unfit": 2,
+          "evidence_relation:contradicts->partial": 1,
+          "evidence_relation:insufficient_evidence->partial": 1,
+          "evidence_relation:unrelated->contradicts": 1,
+          "capability_fit:unfit->fit": 1,
+          "capability_fit:fit->insufficient_evidence": 1
+        },
+        "by_purpose": {
+          "capability_fit": {
+            "count": 20,
+            "correct": 15
+          },
+          "evidence_relation": {
+            "count": 20,
+            "correct": 14
+          },
+          "relevance": {
+            "count": 20,
+            "correct": 4
+          }
+        }
+      }
+    },
+    "d_english_fields": {
+      "rows": [
+        {
+          "id": "development-relevance-1",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "relevant",
+          "critical": false,
+          "choice": "relevant",
+          "decision_score": 0.7447,
+          "probabilities": {
+            "relevant": 0.7447,
+            "irrelevant": 0.0613,
+            "insufficient_evidence": 0.194
+          },
+          "status": "observed",
+          "latency_ms": 513.5820000432432
+        },
+        {
+          "id": "development-relevance-2",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "relevant",
+          "critical": false,
+          "choice": "relevant",
+          "decision_score": 0.8595,
+          "probabilities": {
+            "relevant": 0.8595,
+            "irrelevant": 0.0567,
+            "insufficient_evidence": 0.0838
+          },
+          "status": "observed",
+          "latency_ms": 389.6240999456495
+        },
+        {
+          "id": "development-relevance-3",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "irrelevant",
+          "critical": false,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.5045,
+          "probabilities": {
+            "relevant": 0.0124,
+            "irrelevant": 0.4832,
+            "insufficient_evidence": 0.5045
+          },
+          "status": "observed",
+          "latency_ms": 360.03149999305606
+        },
+        {
+          "id": "development-relevance-4",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "irrelevant",
+          "critical": false,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.7384,
+          "probabilities": {
+            "relevant": 0.0136,
+            "irrelevant": 0.248,
+            "insufficient_evidence": 0.7384
+          },
+          "status": "observed",
+          "latency_ms": 366.3821998052299
+        },
+        {
+          "id": "development-relevance-5",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "relevant",
+          "critical": false,
+          "choice": "relevant",
+          "decision_score": 0.853,
+          "probabilities": {
+            "relevant": 0.853,
+            "irrelevant": 0.0222,
+            "insufficient_evidence": 0.1248
+          },
+          "status": "observed",
+          "latency_ms": 534.8348000552505
+        },
+        {
+          "id": "development-relevance-6",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "insufficient_evidence",
+          "critical": false,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.8279,
+          "probabilities": {
+            "relevant": 0.0278,
+            "irrelevant": 0.1443,
+            "insufficient_evidence": 0.8279
+          },
+          "status": "observed",
+          "latency_ms": 376.76390004344285
+        },
+        {
+          "id": "development-relevance-7",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "irrelevant",
+          "critical": false,
+          "choice": "irrelevant",
+          "decision_score": 0.6375,
+          "probabilities": {
+            "relevant": 0.0052,
+            "irrelevant": 0.6375,
+            "insufficient_evidence": 0.3573
+          },
+          "status": "observed",
+          "latency_ms": 392.93089997954667
+        },
+        {
+          "id": "development-relevance-8",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "relevant",
+          "critical": false,
+          "choice": "relevant",
+          "decision_score": 0.7602,
+          "probabilities": {
+            "relevant": 0.7602,
+            "irrelevant": 0.1013,
+            "insufficient_evidence": 0.1384
+          },
+          "status": "observed",
+          "latency_ms": 601.3853000476956
+        },
+        {
+          "id": "development-relevance-9",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "irrelevant",
+          "critical": true,
+          "choice": "irrelevant",
+          "decision_score": 0.6531,
+          "probabilities": {
+            "relevant": 0.0116,
+            "irrelevant": 0.6531,
+            "insufficient_evidence": 0.3353
+          },
+          "status": "observed",
+          "latency_ms": 568.8251000829041
+        },
+        {
+          "id": "development-relevance-10",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "relevant",
+          "critical": false,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.4629,
+          "probabilities": {
+            "relevant": 0.3693,
+            "irrelevant": 0.1678,
+            "insufficient_evidence": 0.4629
+          },
+          "status": "observed",
+          "latency_ms": 560.4579001665115
+        },
+        {
+          "id": "development-evidence_relation-1",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "supports",
+          "critical": false,
+          "choice": "supports",
+          "decision_score": 0.8937,
+          "probabilities": {
+            "supports": 0.8937,
+            "contradicts": 0.0122,
+            "partial": 0.0713,
+            "unrelated": 0.0033,
+            "insufficient_evidence": 0.0195
+          },
+          "status": "observed",
+          "latency_ms": 561.807099962607
+        },
+        {
+          "id": "development-evidence_relation-2",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "contradicts",
+          "critical": true,
+          "choice": "partial",
+          "decision_score": 0.318,
+          "probabilities": {
+            "supports": 0.3012,
+            "contradicts": 0.2179,
+            "partial": 0.318,
+            "unrelated": 0.0392,
+            "insufficient_evidence": 0.1236
+          },
+          "status": "observed",
+          "latency_ms": 595.4281000886112
+        },
+        {
+          "id": "development-evidence_relation-3",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "partial",
+          "critical": false,
+          "choice": "partial",
+          "decision_score": 0.5494,
+          "probabilities": {
+            "supports": 0.2129,
+            "contradicts": 0.1419,
+            "partial": 0.5494,
+            "unrelated": 0.0081,
+            "insufficient_evidence": 0.0876
+          },
+          "status": "observed",
+          "latency_ms": 776.3918999116868
+        },
+        {
+          "id": "development-evidence_relation-4",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "insufficient_evidence",
+          "critical": true,
+          "choice": "contradicts",
+          "decision_score": 0.4475,
+          "probabilities": {
+            "supports": 0.0471,
+            "contradicts": 0.4475,
+            "partial": 0.2624,
+            "unrelated": 0.0439,
+            "insufficient_evidence": 0.1991
+          },
+          "status": "observed",
+          "latency_ms": 811.6705999709666
+        },
+        {
+          "id": "development-evidence_relation-5",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "insufficient_evidence",
+          "critical": true,
+          "choice": "partial",
+          "decision_score": 0.5454,
+          "probabilities": {
+            "supports": 0.0701,
+            "contradicts": 0.1093,
+            "partial": 0.5454,
+            "unrelated": 0.0085,
+            "insufficient_evidence": 0.2667
+          },
+          "status": "observed",
+          "latency_ms": 1143.1678000371903
+        },
+        {
+          "id": "development-evidence_relation-6",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "unrelated",
+          "critical": false,
+          "choice": "supports",
+          "decision_score": 0.3186,
+          "probabilities": {
+            "supports": 0.3186,
+            "contradicts": 0.0542,
+            "partial": 0.2877,
+            "unrelated": 0.0492,
+            "insufficient_evidence": 0.2903
+          },
+          "status": "observed",
+          "latency_ms": 902.5349000003189
+        },
+        {
+          "id": "development-evidence_relation-7",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "contradicts",
+          "critical": true,
+          "choice": "contradicts",
+          "decision_score": 0.6931,
+          "probabilities": {
+            "supports": 0.1693,
+            "contradicts": 0.6931,
+            "partial": 0.0951,
+            "unrelated": 0.0071,
+            "insufficient_evidence": 0.0355
+          },
+          "status": "observed",
+          "latency_ms": 839.0971999615431
+        },
+        {
+          "id": "development-evidence_relation-8",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "insufficient_evidence",
+          "critical": true,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.3882,
+          "probabilities": {
+            "supports": 0.0794,
+            "contradicts": 0.2617,
+            "partial": 0.2581,
+            "unrelated": 0.0126,
+            "insufficient_evidence": 0.3882
+          },
+          "status": "observed",
+          "latency_ms": 805.0706000067294
+        },
+        {
+          "id": "development-evidence_relation-9",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "supports",
+          "critical": false,
+          "choice": "supports",
+          "decision_score": 0.6798,
+          "probabilities": {
+            "supports": 0.6798,
+            "contradicts": 0.0416,
+            "partial": 0.201,
+            "unrelated": 0.0076,
+            "insufficient_evidence": 0.07
+          },
+          "status": "observed",
+          "latency_ms": 726.9557002000511
+        },
+        {
+          "id": "development-evidence_relation-10",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "supports",
+          "critical": false,
+          "choice": "supports",
+          "decision_score": 0.9129,
+          "probabilities": {
+            "supports": 0.9129,
+            "contradicts": 0.0119,
+            "partial": 0.0569,
+            "unrelated": 0.0019,
+            "insufficient_evidence": 0.0165
+          },
+          "status": "observed",
+          "latency_ms": 881.9519998505712
+        },
+        {
+          "id": "development-capability_fit-1",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "fit",
+          "critical": false,
+          "choice": "fit",
+          "decision_score": 0.6494,
+          "probabilities": {
+            "fit": 0.6494,
+            "unfit": 0.0894,
+            "insufficient_evidence": 0.2612
+          },
+          "status": "observed",
+          "latency_ms": 570.7080999854952
+        },
+        {
+          "id": "development-capability_fit-2",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "unfit",
+          "critical": true,
+          "choice": "unfit",
+          "decision_score": 0.7048,
+          "probabilities": {
+            "fit": 0.1686,
+            "unfit": 0.7048,
+            "insufficient_evidence": 0.1266
+          },
+          "status": "observed",
+          "latency_ms": 605.1095998845994
+        },
+        {
+          "id": "development-capability_fit-3",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "unfit",
+          "critical": true,
+          "choice": "unfit",
+          "decision_score": 0.7169,
+          "probabilities": {
+            "fit": 0.1989,
+            "unfit": 0.7169,
+            "insufficient_evidence": 0.0841
+          },
+          "status": "observed",
+          "latency_ms": 738.6213999707252
+        },
+        {
+          "id": "development-capability_fit-4",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "insufficient_evidence",
+          "critical": false,
+          "choice": "unfit",
+          "decision_score": 0.5302,
+          "probabilities": {
+            "fit": 0.0259,
+            "unfit": 0.5302,
+            "insufficient_evidence": 0.4439
+          },
+          "status": "observed",
+          "latency_ms": 745.4484000336379
+        },
+        {
+          "id": "development-capability_fit-5",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "unfit",
+          "critical": true,
+          "choice": "unfit",
+          "decision_score": 0.7814,
+          "probabilities": {
+            "fit": 0.1607,
+            "unfit": 0.7814,
+            "insufficient_evidence": 0.0579
+          },
+          "status": "observed",
+          "latency_ms": 856.1382999178022
+        },
+        {
+          "id": "development-capability_fit-6",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "fit",
+          "critical": false,
+          "choice": "fit",
+          "decision_score": 0.8877,
+          "probabilities": {
+            "fit": 0.8877,
+            "unfit": 0.0667,
+            "insufficient_evidence": 0.0455
+          },
+          "status": "observed",
+          "latency_ms": 655.4996999911964
+        },
+        {
+          "id": "development-capability_fit-7",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "fit",
+          "critical": false,
+          "choice": "fit",
+          "decision_score": 0.9552,
+          "probabilities": {
+            "fit": 0.9552,
+            "unfit": 0.0095,
+            "insufficient_evidence": 0.0353
+          },
+          "status": "observed",
+          "latency_ms": 649.5576999150217
+        },
+        {
+          "id": "development-capability_fit-8",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "unfit",
+          "critical": false,
+          "choice": "unfit",
+          "decision_score": 0.912,
+          "probabilities": {
+            "fit": 0.0098,
+            "unfit": 0.912,
+            "insufficient_evidence": 0.0782
+          },
+          "status": "observed",
+          "latency_ms": 745.6151999067515
+        },
+        {
+          "id": "development-capability_fit-9",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "fit",
+          "critical": false,
+          "choice": "fit",
+          "decision_score": 0.7325,
+          "probabilities": {
+            "fit": 0.7325,
+            "unfit": 0.1285,
+            "insufficient_evidence": 0.1389
+          },
+          "status": "observed",
+          "latency_ms": 748.6046999692917
+        },
+        {
+          "id": "development-capability_fit-10",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "insufficient_evidence",
+          "critical": true,
+          "choice": "unfit",
+          "decision_score": 0.646,
+          "probabilities": {
+            "fit": 0.0264,
+            "unfit": 0.646,
+            "insufficient_evidence": 0.3276
+          },
+          "status": "observed",
+          "latency_ms": 755.6545999832451
+        },
+        {
+          "id": "validation-relevance-1",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "relevant",
+          "critical": false,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.8105,
+          "probabilities": {
+            "relevant": 0.013,
+            "irrelevant": 0.1765,
+            "insufficient_evidence": 0.8105
+          },
+          "status": "observed",
+          "latency_ms": 672.3752000834793
+        },
+        {
+          "id": "validation-relevance-2",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "relevant",
+          "critical": false,
+          "choice": "relevant",
+          "decision_score": 0.6698,
+          "probabilities": {
+            "relevant": 0.6698,
+            "irrelevant": 0.1537,
+            "insufficient_evidence": 0.1765
+          },
+          "status": "observed",
+          "latency_ms": 728.6684000864625
+        },
+        {
+          "id": "validation-relevance-3",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "irrelevant",
+          "critical": false,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.8273,
+          "probabilities": {
+            "relevant": 0.0204,
+            "irrelevant": 0.1523,
+            "insufficient_evidence": 0.8273
+          },
+          "status": "observed",
+          "latency_ms": 666.773300152272
+        },
+        {
+          "id": "validation-relevance-4",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "irrelevant",
+          "critical": false,
+          "choice": "irrelevant",
+          "decision_score": 0.5985,
+          "probabilities": {
+            "relevant": 0.0741,
+            "irrelevant": 0.5985,
+            "insufficient_evidence": 0.3274
+          },
+          "status": "observed",
+          "latency_ms": 523.6969001125544
+        },
+        {
+          "id": "validation-relevance-5",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "relevant",
+          "critical": false,
+          "choice": "relevant",
+          "decision_score": 0.86,
+          "probabilities": {
+            "relevant": 0.86,
+            "irrelevant": 0.0288,
+            "insufficient_evidence": 0.1112
+          },
+          "status": "observed",
+          "latency_ms": 618.1568999309093
+        },
+        {
+          "id": "validation-relevance-6",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "insufficient_evidence",
+          "critical": false,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.8145,
+          "probabilities": {
+            "relevant": 0.038,
+            "irrelevant": 0.1475,
+            "insufficient_evidence": 0.8145
+          },
+          "status": "observed",
+          "latency_ms": 574.7583999764174
+        },
+        {
+          "id": "validation-relevance-7",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "irrelevant",
+          "critical": false,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.767,
+          "probabilities": {
+            "relevant": 0.0407,
+            "irrelevant": 0.1923,
+            "insufficient_evidence": 0.767
+          },
+          "status": "observed",
+          "latency_ms": 602.5936999358237
+        },
+        {
+          "id": "validation-relevance-8",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "relevant",
+          "critical": false,
+          "choice": "relevant",
+          "decision_score": 0.7842,
+          "probabilities": {
+            "relevant": 0.7842,
+            "irrelevant": 0.1017,
+            "insufficient_evidence": 0.1141
+          },
+          "status": "observed",
+          "latency_ms": 773.4499999787658
+        },
+        {
+          "id": "validation-relevance-9",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "irrelevant",
+          "critical": true,
+          "choice": "irrelevant",
+          "decision_score": 0.5697,
+          "probabilities": {
+            "relevant": 0.0349,
+            "irrelevant": 0.5697,
+            "insufficient_evidence": 0.3954
+          },
+          "status": "observed",
+          "latency_ms": 800.4416001494974
+        },
+        {
+          "id": "validation-relevance-10",
+          "split": "development",
+          "purpose": "relevance",
+          "expected": "relevant",
+          "critical": false,
+          "choice": "relevant",
+          "decision_score": 0.7676,
+          "probabilities": {
+            "relevant": 0.7676,
+            "irrelevant": 0.037,
+            "insufficient_evidence": 0.1954
+          },
+          "status": "observed",
+          "latency_ms": 872.6893998682499
+        },
+        {
+          "id": "validation-evidence_relation-1",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "supports",
+          "critical": false,
+          "choice": "supports",
+          "decision_score": 0.683,
+          "probabilities": {
+            "supports": 0.683,
+            "contradicts": 0.0346,
+            "partial": 0.1862,
+            "unrelated": 0.0049,
+            "insufficient_evidence": 0.0912
+          },
+          "status": "observed",
+          "latency_ms": 776.3103998731822
+        },
+        {
+          "id": "validation-evidence_relation-2",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "contradicts",
+          "critical": true,
+          "choice": "partial",
+          "decision_score": 0.5777,
+          "probabilities": {
+            "supports": 0.0756,
+            "contradicts": 0.2579,
+            "partial": 0.5777,
+            "unrelated": 0.0103,
+            "insufficient_evidence": 0.0784
+          },
+          "status": "observed",
+          "latency_ms": 742.359499912709
+        },
+        {
+          "id": "validation-evidence_relation-3",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "partial",
+          "critical": false,
+          "choice": "partial",
+          "decision_score": 0.7462,
+          "probabilities": {
+            "supports": 0.1903,
+            "contradicts": 0.0101,
+            "partial": 0.7462,
+            "unrelated": 0.0024,
+            "insufficient_evidence": 0.051
+          },
+          "status": "observed",
+          "latency_ms": 718.5428999364376
+        },
+        {
+          "id": "validation-evidence_relation-4",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "insufficient_evidence",
+          "critical": true,
+          "choice": "partial",
+          "decision_score": 0.4631,
+          "probabilities": {
+            "supports": 0.2176,
+            "contradicts": 0.0554,
+            "partial": 0.4631,
+            "unrelated": 0.0107,
+            "insufficient_evidence": 0.2533
+          },
+          "status": "observed",
+          "latency_ms": 667.30109998025
+        },
+        {
+          "id": "validation-evidence_relation-5",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "insufficient_evidence",
+          "critical": true,
+          "choice": "partial",
+          "decision_score": 0.5514,
+          "probabilities": {
+            "supports": 0.007,
+            "contradicts": 0.0563,
+            "partial": 0.5514,
+            "unrelated": 0.0031,
+            "insufficient_evidence": 0.3822
+          },
+          "status": "observed",
+          "latency_ms": 689.3537999130785
+        },
+        {
+          "id": "validation-evidence_relation-6",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "unrelated",
+          "critical": false,
+          "choice": "partial",
+          "decision_score": 0.4157,
+          "probabilities": {
+            "supports": 0.3155,
+            "contradicts": 0.081,
+            "partial": 0.4157,
+            "unrelated": 0.0215,
+            "insufficient_evidence": 0.1663
+          },
+          "status": "observed",
+          "latency_ms": 651.5492999460548
+        },
+        {
+          "id": "validation-evidence_relation-7",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "contradicts",
+          "critical": true,
+          "choice": "supports",
+          "decision_score": 0.418,
+          "probabilities": {
+            "supports": 0.418,
+            "contradicts": 0.41,
+            "partial": 0.1374,
+            "unrelated": 0.0057,
+            "insufficient_evidence": 0.0289
+          },
+          "status": "observed",
+          "latency_ms": 629.1513999458402
+        },
+        {
+          "id": "validation-evidence_relation-8",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "insufficient_evidence",
+          "critical": true,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.3895,
+          "probabilities": {
+            "supports": 0.1868,
+            "contradicts": 0.1104,
+            "partial": 0.3018,
+            "unrelated": 0.0116,
+            "insufficient_evidence": 0.3895
+          },
+          "status": "observed",
+          "latency_ms": 583.4896999876946
+        },
+        {
+          "id": "validation-evidence_relation-9",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "supports",
+          "critical": false,
+          "choice": "supports",
+          "decision_score": 0.7497,
+          "probabilities": {
+            "supports": 0.7497,
+            "contradicts": 0.1153,
+            "partial": 0.0835,
+            "unrelated": 0.0067,
+            "insufficient_evidence": 0.0448
+          },
+          "status": "observed",
+          "latency_ms": 553.1658998224884
+        },
+        {
+          "id": "validation-evidence_relation-10",
+          "split": "development",
+          "purpose": "evidence_relation",
+          "expected": "supports",
+          "critical": false,
+          "choice": "supports",
+          "decision_score": 0.7668,
+          "probabilities": {
+            "supports": 0.7668,
+            "contradicts": 0.0487,
+            "partial": 0.1431,
+            "unrelated": 0.0046,
+            "insufficient_evidence": 0.0368
+          },
+          "status": "observed",
+          "latency_ms": 813.9486000873148
+        },
+        {
+          "id": "validation-capability_fit-1",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "fit",
+          "critical": false,
+          "choice": "fit",
+          "decision_score": 0.8835,
+          "probabilities": {
+            "fit": 0.8835,
+            "unfit": 0.0497,
+            "insufficient_evidence": 0.0667
+          },
+          "status": "observed",
+          "latency_ms": 593.3466001879424
+        },
+        {
+          "id": "validation-capability_fit-2",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "unfit",
+          "critical": true,
+          "choice": "unfit",
+          "decision_score": 0.6732,
+          "probabilities": {
+            "fit": 0.1205,
+            "unfit": 0.6732,
+            "insufficient_evidence": 0.2063
+          },
+          "status": "observed",
+          "latency_ms": 650.0043000560254
+        },
+        {
+          "id": "validation-capability_fit-3",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "unfit",
+          "critical": true,
+          "choice": "unfit",
+          "decision_score": 0.4781,
+          "probabilities": {
+            "fit": 0.3237,
+            "unfit": 0.4781,
+            "insufficient_evidence": 0.1982
+          },
+          "status": "observed",
+          "latency_ms": 709.5246000681072
+        },
+        {
+          "id": "validation-capability_fit-4",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "insufficient_evidence",
+          "critical": false,
+          "choice": "unfit",
+          "decision_score": 0.6952,
+          "probabilities": {
+            "fit": 0.1099,
+            "unfit": 0.6952,
+            "insufficient_evidence": 0.195
+          },
+          "status": "observed",
+          "latency_ms": 873.1273000594229
+        },
+        {
+          "id": "validation-capability_fit-5",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "unfit",
+          "critical": true,
+          "choice": "fit",
+          "decision_score": 0.7466,
+          "probabilities": {
+            "fit": 0.7466,
+            "unfit": 0.1626,
+            "insufficient_evidence": 0.0909
+          },
+          "status": "observed",
+          "latency_ms": 739.5558999851346
+        },
+        {
+          "id": "validation-capability_fit-6",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "fit",
+          "critical": false,
+          "choice": "fit",
+          "decision_score": 0.8886,
+          "probabilities": {
+            "fit": 0.8886,
+            "unfit": 0.0386,
+            "insufficient_evidence": 0.0727
+          },
+          "status": "observed",
+          "latency_ms": 745.1054998673499
+        },
+        {
+          "id": "validation-capability_fit-7",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "fit",
+          "critical": false,
+          "choice": "fit",
+          "decision_score": 0.4608,
+          "probabilities": {
+            "fit": 0.4608,
+            "unfit": 0.2298,
+            "insufficient_evidence": 0.3093
+          },
+          "status": "observed",
+          "latency_ms": 760.6805998366326
+        },
+        {
+          "id": "validation-capability_fit-8",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "unfit",
+          "critical": false,
+          "choice": "unfit",
+          "decision_score": 0.6853,
+          "probabilities": {
+            "fit": 0.1496,
+            "unfit": 0.6853,
+            "insufficient_evidence": 0.1651
+          },
+          "status": "observed",
+          "latency_ms": 725.0663000158966
+        },
+        {
+          "id": "validation-capability_fit-9",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "fit",
+          "critical": false,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.4584,
+          "probabilities": {
+            "fit": 0.329,
+            "unfit": 0.2126,
+            "insufficient_evidence": 0.4584
+          },
+          "status": "observed",
+          "latency_ms": 778.231400065124
+        },
+        {
+          "id": "validation-capability_fit-10",
+          "split": "development",
+          "purpose": "capability_fit",
+          "expected": "insufficient_evidence",
+          "critical": true,
+          "choice": "insufficient_evidence",
+          "decision_score": 0.7267,
+          "probabilities": {
+            "fit": 0.0687,
+            "unfit": 0.2046,
+            "insufficient_evidence": 0.7267
+          },
+          "status": "observed",
+          "latency_ms": 762.7668001223356
+        }
+      ],
+      "summary": {
+        "count": 60,
+        "observed": 60,
+        "correct": 40,
+        "critical_errors": 9,
+        "errors": 0,
+        "not_run": 0,
+        "accepted": 48,
+        "accepted_correct": 35,
+        "critical_wrong_accepts": 9,
+        "p50_ms": 699.4391999905929,
+        "p95_ms": 873.1273000594229,
+        "within_2s": 60,
+        "within_6s": 60,
+        "nll": 0.7851388455647034,
+        "confusion": {
+          "relevance:relevant->relevant": 8,
+          "relevance:irrelevant->insufficient_evidence": 4,
+          "relevance:insufficient_evidence->insufficient_evidence": 2,
+          "relevance:irrelevant->irrelevant": 4,
+          "relevance:relevant->insufficient_evidence": 2,
+          "evidence_relation:supports->supports": 6,
+          "evidence_relation:contradicts->partial": 2,
+          "evidence_relation:partial->partial": 2,
+          "evidence_relation:insufficient_evidence->contradicts": 1,
+          "evidence_relation:insufficient_evidence->partial": 3,
+          "evidence_relation:unrelated->supports": 1,
+          "evidence_relation:contradicts->contradicts": 1,
+          "evidence_relation:insufficient_evidence->insufficient_evidence": 2,
+          "capability_fit:fit->fit": 7,
+          "capability_fit:unfit->unfit": 7,
+          "capability_fit:insufficient_evidence->unfit": 3,
+          "evidence_relation:unrelated->partial": 1,
+          "evidence_relation:contradicts->supports": 1,
+          "capability_fit:unfit->fit": 1,
+          "capability_fit:fit->insufficient_evidence": 1,
+          "capability_fit:insufficient_evidence->insufficient_evidence": 1
+        },
+        "by_purpose": {
+          "capability_fit": {
+            "count": 20,
+            "correct": 15
+          },
+          "evidence_relation": {
+            "count": 20,
+            "correct": 11
+          },
+          "relevance": {
+            "count": 20,
+            "correct": 14
+          }
+        }
+      }
+    }
+  },
+  "after_unload": {
+    "models": []
+  }
+}

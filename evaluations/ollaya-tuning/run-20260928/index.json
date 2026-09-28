@@ -1,0 +1,23 @@
+{
+  "date": "2026-09-28",
+  "provenance": "agent_authored_diagnostic",
+  "promotion_eligible": false,
+  "runtime": "Ollaya 0.7.3 CPU, one model at a time",
+  "base_commit": "4c884eb39dfa13ac07530558de2e3a1ed77fd85f",
+  "runner_sha256": "b3d00c1055892731d3eaf8ae8532c6e34bba70bb93fe46add0d3f2d1265d0fa5",
+  "files": {
+    "prepare.json": "4618e45e76503412f5b729c9b41f246ecd8f0f516ca1b2dd8460401e8f35daf6",
+    "development-laya-multilingual.json": "e521ca00d12d1e6925b65fa1bff8e40819b979ab6f4e1e986cd67bc4963f2f8f",
+    "development-decider-0.8b.json": "fe0ae1687ccba35e7eb0aa6a08188b36130fa6c68b2f04a21dd5ae70ee53a5b3",
+    "select.json": "2f7160c2e8a29b9250f2fa9236fa92275fded0c3f4a388866292d4de97e61fdf",
+    "validation-laya-multilingual.json": "4fc74c0e4971ff21ba9d654ddcf59425534a28717425fbdad05a1fa7a09cb0d5",
+    "validation-decider-0.8b.json": "80969d8e046e16ef5db3ea076ebdd9e6b4c177eacae63ce997fc38e30d843236",
+    "semif.json": "b926235627785bee677427eb02d1c540c226f7baeb0f11f1f6dd8e450ce1b73d",
+    "cleanup.json": "fb7b0b5a5025dc7f9b6f0a16923becf968a6bd43dcb35c809949345f6b898520"
+  },
+  "notes": [
+    "Raw stage bytes preserved; select.json predates every validation inference.",
+    "Windows process working-set samples are not peak, private-memory or VRAM measurements.",
+    "SemIf used the existing Qwen3.5-4B INT8 OpenVINO GPU profile; profile fingerprint is in semif.json."
+  ]
+}

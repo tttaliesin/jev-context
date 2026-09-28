@@ -1,0 +1,209 @@
+[
+  {
+    "candidate": "a_original",
+    "purpose": "relevance",
+    "id": "relevance",
+    "head_tokens": 22,
+    "head_budget": 236,
+    "option_max_tokens": 9,
+    "truncated": false
+  },
+  {
+    "candidate": "a_original",
+    "purpose": "evidence_relation",
+    "id": "evidence_relation",
+    "head_tokens": 135,
+    "head_budget": 185,
+    "option_max_tokens": 20,
+    "truncated": false
+  },
+  {
+    "candidate": "a_original",
+    "purpose": "capability_fit",
+    "id": "capability_fit",
+    "head_tokens": 106,
+    "head_budget": 217,
+    "option_max_tokens": 14,
+    "truncated": false
+  },
+  {
+    "candidate": "b_korean_json",
+    "purpose": "relevance",
+    "id": "relevance",
+    "head_tokens": 31,
+    "head_budget": 220,
+    "option_max_tokens": 19,
+    "truncated": false
+  },
+  {
+    "candidate": "b_korean_json",
+    "purpose": "evidence_relation",
+    "id": "evidence_relation",
+    "head_tokens": 82,
+    "head_budget": 177,
+    "option_max_tokens": 25,
+    "truncated": false
+  },
+  {
+    "candidate": "b_korean_json",
+    "purpose": "capability_fit",
+    "id": "capability_fit",
+    "head_tokens": 54,
+    "head_budget": 203,
+    "option_max_tokens": 19,
+    "truncated": false
+  },
+  {
+    "candidate": "c_korean_fields",
+    "purpose": "relevance",
+    "id": "relevance",
+    "head_tokens": 31,
+    "head_budget": 220,
+    "option_max_tokens": 19,
+    "truncated": false
+  },
+  {
+    "candidate": "c_korean_fields",
+    "purpose": "evidence_relation",
+    "id": "evidence_relation",
+    "head_tokens": 82,
+    "head_budget": 177,
+    "option_max_tokens": 25,
+    "truncated": false
+  },
+  {
+    "candidate": "c_korean_fields",
+    "purpose": "capability_fit",
+    "id": "capability_fit",
+    "head_tokens": 54,
+    "head_budget": 203,
+    "option_max_tokens": 19,
+    "truncated": false
+  },
+  {
+    "candidate": "d_english_fields",
+    "purpose": "relevance",
+    "id": "relevance",
+    "head_tokens": 30,
+    "head_budget": 231,
+    "option_max_tokens": 9,
+    "truncated": false
+  },
+  {
+    "candidate": "d_english_fields",
+    "purpose": "evidence_relation",
+    "id": "evidence_relation",
+    "head_tokens": 44,
+    "head_budget": 201,
+    "option_max_tokens": 16,
+    "truncated": false
+  },
+  {
+    "candidate": "d_english_fields",
+    "purpose": "capability_fit",
+    "id": "capability_fit",
+    "head_tokens": 32,
+    "head_budget": 222,
+    "option_max_tokens": 11,
+    "truncated": false
+  },
+  {
+    "candidate": "e_neutral_fields",
+    "purpose": "relevance",
+    "id": "relevance",
+    "head_tokens": 30,
+    "head_budget": 233,
+    "option_max_tokens": 7,
+    "truncated": false
+  },
+  {
+    "candidate": "e_neutral_fields",
+    "purpose": "evidence_relation",
+    "id": "evidence_relation",
+    "head_tokens": 44,
+    "head_budget": 203,
+    "option_max_tokens": 16,
+    "truncated": false
+  },
+  {
+    "candidate": "e_neutral_fields",
+    "purpose": "capability_fit",
+    "id": "capability_fit",
+    "head_tokens": 32,
+    "head_budget": 224,
+    "option_max_tokens": 11,
+    "truncated": false
+  },
+  {
+    "candidate": "f_decomposed",
+    "purpose": "relevance",
+    "id": "related",
+    "head_tokens": 39,
+    "head_budget": 230,
+    "option_max_tokens": 10,
+    "truncated": false
+  },
+  {
+    "candidate": "f_decomposed",
+    "purpose": "evidence_relation",
+    "id": "contradicts",
+    "head_tokens": 45,
+    "head_budget": 230,
+    "option_max_tokens": 10,
+    "truncated": false
+  },
+  {
+    "candidate": "f_decomposed",
+    "purpose": "evidence_relation",
+    "id": "supports",
+    "head_tokens": 44,
+    "head_budget": 230,
+    "option_max_tokens": 10,
+    "truncated": false
+  },
+  {
+    "candidate": "f_decomposed",
+    "purpose": "evidence_relation",
+    "id": "partial",
+    "head_tokens": 49,
+    "head_budget": 230,
+    "option_max_tokens": 10,
+    "truncated": false
+  },
+  {
+    "candidate": "f_decomposed",
+    "purpose": "evidence_relation",
+    "id": "unrelated",
+    "head_tokens": 38,
+    "head_budget": 230,
+    "option_max_tokens": 10,
+    "truncated": false
+  },
+  {
+    "candidate": "f_decomposed",
+    "purpose": "capability_fit",
+    "id": "blocked",
+    "head_tokens": 40,
+    "head_budget": 230,
+    "option_max_tokens": 10,
+    "truncated": false
+  },
+  {
+    "candidate": "f_decomposed",
+    "purpose": "capability_fit",
+    "id": "unspecified",
+    "head_tokens": 36,
+    "head_budget": 230,
+    "option_max_tokens": 10,
+    "truncated": false
+  },
+  {
+    "candidate": "f_decomposed",
+    "purpose": "capability_fit",
+    "id": "helpful",
+    "head_tokens": 27,
+    "head_budget": 230,
+    "option_max_tokens": 10,
+    "truncated": false
+  }
+]

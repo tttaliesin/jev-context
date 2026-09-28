@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "provenance": "agent_authored_diagnostic",
+  "promotion_eligible": false,
+  "files": {
+    "development.json": "31e1a0797c511f4f464d67d7e4e9782e76e13bef65c069afeef35534c87449b2",
+    "validation.json": "ab1c01bb1615c98b154e23806b7921912e70cbdacee9556c8ee92daabc2fd356",
+    "candidates.json": "342c9b4aa4945248fd6608443c8875cd4510b32327f82081e60531c9582d78c7"
+  }
+}

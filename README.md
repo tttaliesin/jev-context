@@ -184,6 +184,7 @@ Ruff lint·format 검사와 pytest를 순서대로 실행하고 첫 실패의 �
 | 유사 목적 제품 비교와 보완 우선순위 | [에이전트 기억 제품 연구](docs/agent-memory-competitive-research.md) · [운영 경험 연구](docs/desktop-operations-research.md) |
 | 모델 준비와 공유 실행기 | [모델 안내](docs/models.md) · [모델 수명 설계](docs/model-lifecycle-design.md) |
 | 외부 판단 모델 실행기 | [Ollaya 조사](docs/ollaya-research.md) · [비교 계획](docs/ollaya-evaluation-plan.md) · [사전 검토](docs/ollaya-evaluation-review.md) · [튜닝·비교 결과](docs/ollaya-evaluation-results.md) |
+| Ollaya 추가 튜닝·모델 변경·학습 가능성 | [2차 계획](docs/ollaya-tuning-plan.md) · [사전 검토](docs/ollaya-tuning-review.md) · [새 사례 비교 결과](docs/ollaya-tuning-results.md) · [실제 추가 학습 준비](docs/ollaya-finetuning-readiness.md) |
 | 문맥 전달 개선 | [외부 조사](docs/context-efficiency-research.md) · [적용 계획](docs/context-efficiency-implementation-plan.md) · [검증 결과](docs/context-efficiency-results.md) |
 | README 구성과 실제 화면 캡처 | [레퍼런스와 촬영 기록](docs/readme-design-references.md) |
 

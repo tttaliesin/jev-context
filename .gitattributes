@@ -1,3 +1,7 @@
 # Frozen evaluation inputs retain their measured bytes on every checkout.
 evaluations/ollaya/cases.json -text
 evaluations/ollaya/questions.json -text whitespace=cr-at-eol
+evaluations/ollaya-tuning/development.json text eol=lf
+evaluations/ollaya-tuning/validation.json text eol=lf
+evaluations/ollaya-tuning/candidates.json text eol=lf
+evaluations/ollaya-tuning/run-20260928/*.json -text whitespace=cr-at-eol

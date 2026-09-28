@@ -1,0 +1,143 @@
+{
+  "stage": "select",
+  "frozen": {
+    "version": 2,
+    "provenance": "agent_authored_diagnostic",
+    "promotion_eligible": false,
+    "files": {
+      "development.json": "31e1a0797c511f4f464d67d7e4e9782e76e13bef65c069afeef35534c87449b2",
+      "validation.json": "ab1c01bb1615c98b154e23806b7921912e70cbdacee9556c8ee92daabc2fd356",
+      "candidates.json": "342c9b4aa4945248fd6608443c8875cd4510b32327f82081e60531c9582d78c7"
+    }
+  },
+  "promotion_eligible": false,
+  "created_at": 1790557089.313807,
+  "selections": {
+    "laya:multilingual": {
+      "status": "selected",
+      "candidate": "d_english_fields",
+      "threshold": 1.01,
+      "summary_with_threshold": {
+        "count": 60,
+        "observed": 60,
+        "correct": 22,
+        "critical_errors": 8,
+        "errors": 0,
+        "not_run": 0,
+        "accepted": 0,
+        "accepted_correct": 0,
+        "critical_wrong_accepts": 0,
+        "p50_ms": 105.10335001163185,
+        "p95_ms": 137.08250015042722,
+        "within_2s": 60,
+        "within_6s": 60,
+        "nll": 1.3844288323198393,
+        "confusion": {
+          "relevance:relevant->insufficient_evidence": 9,
+          "relevance:irrelevant->insufficient_evidence": 6,
+          "relevance:relevant->relevant": 1,
+          "relevance:insufficient_evidence->insufficient_evidence": 1,
+          "relevance:irrelevant->irrelevant": 2,
+          "evidence_relation:supports->insufficient_evidence": 2,
+          "evidence_relation:contradicts->partial": 1,
+          "evidence_relation:partial->insufficient_evidence": 1,
+          "evidence_relation:insufficient_evidence->contradicts": 2,
+          "evidence_relation:insufficient_evidence->insufficient_evidence": 4,
+          "evidence_relation:unrelated->partial": 1,
+          "evidence_relation:contradicts->contradicts": 2,
+          "evidence_relation:supports->supports": 4,
+          "capability_fit:fit->fit": 2,
+          "capability_fit:unfit->fit": 1,
+          "capability_fit:unfit->unfit": 6,
+          "capability_fit:insufficient_evidence->unfit": 3,
+          "capability_fit:fit->unfit": 6,
+          "capability_fit:insufficient_evidence->fit": 1,
+          "relevance:insufficient_evidence->irrelevant": 1,
+          "evidence_relation:partial->supports": 1,
+          "evidence_relation:unrelated->supports": 1,
+          "evidence_relation:contradicts->supports": 1,
+          "capability_fit:unfit->insufficient_evidence": 1
+        },
+        "by_purpose": {
+          "capability_fit": {
+            "count": 20,
+            "correct": 8
+          },
+          "evidence_relation": {
+            "count": 20,
+            "correct": 10
+          },
+          "relevance": {
+            "count": 20,
+            "correct": 4
+          }
+        }
+      },
+      "development_sha256": "e521ca00d12d1e6925b65fa1bff8e40819b979ab6f4e1e986cd67bc4963f2f8f"
+    },
+    "decider:0.8b": {
+      "status": "selected",
+      "candidate": "c_korean_fields",
+      "threshold": 1.01,
+      "summary_with_threshold": {
+        "count": 60,
+        "observed": 60,
+        "correct": 33,
+        "critical_errors": 7,
+        "errors": 0,
+        "not_run": 0,
+        "accepted": 0,
+        "accepted_correct": 0,
+        "critical_wrong_accepts": 0,
+        "p50_ms": 535.2405000012368,
+        "p95_ms": 713.155800011009,
+        "within_2s": 60,
+        "within_6s": 60,
+        "nll": 1.0266062296211227,
+        "confusion": {
+          "relevance:relevant->insufficient_evidence": 10,
+          "relevance:irrelevant->insufficient_evidence": 6,
+          "relevance:insufficient_evidence->insufficient_evidence": 2,
+          "relevance:irrelevant->irrelevant": 2,
+          "evidence_relation:supports->supports": 6,
+          "evidence_relation:contradicts->contradicts": 3,
+          "evidence_relation:partial->partial": 2,
+          "evidence_relation:insufficient_evidence->contradicts": 2,
+          "evidence_relation:insufficient_evidence->insufficient_evidence": 3,
+          "evidence_relation:unrelated->insufficient_evidence": 1,
+          "capability_fit:fit->fit": 6,
+          "capability_fit:unfit->unfit": 7,
+          "capability_fit:insufficient_evidence->insufficient_evidence": 2,
+          "capability_fit:fit->unfit": 1,
+          "capability_fit:insufficient_evidence->unfit": 2,
+          "evidence_relation:contradicts->partial": 1,
+          "evidence_relation:insufficient_evidence->partial": 1,
+          "evidence_relation:unrelated->contradicts": 1,
+          "capability_fit:unfit->fit": 1,
+          "capability_fit:fit->insufficient_evidence": 1
+        },
+        "by_purpose": {
+          "capability_fit": {
+            "count": 20,
+            "correct": 15
+          },
+          "evidence_relation": {
+            "count": 20,
+            "correct": 14
+          },
+          "relevance": {
+            "count": 20,
+            "correct": 4
+          }
+        }
+      },
+      "development_sha256": "fe0ae1687ccba35e7eb0aa6a08188b36130fa6c68b2f04a21dd5ae70ee53a5b3"
+    },
+    "decider:2b": {
+      "status": "excluded",
+      "reason": "memory_precondition",
+      "available_gib": 10.719268798828125,
+      "required_gib": 12
+    }
+  }
+}
