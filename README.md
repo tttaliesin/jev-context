@@ -184,7 +184,7 @@ Ruff lint·format 검사와 pytest를 순서대로 실행하고 첫 실패의 �
 | 모델 준비와 공유 실행기 | [모델 안내](docs/models.md) · [모델 수명 설계](docs/model-lifecycle-design.md) |
 | 외부 판단 모델 실행기 | [Ollaya 조사](docs/ollaya-research.md) · [비교 계획](docs/ollaya-evaluation-plan.md) · [사전 검토](docs/ollaya-evaluation-review.md) · [튜닝·비교 결과](docs/ollaya-evaluation-results.md) |
 | Ollaya 추가 튜닝·모델 변경·학습 가능성 | [2차 계획](docs/ollaya-tuning-plan.md) · [사전 검토](docs/ollaya-tuning-review.md) · [새 사례 비교 결과](docs/ollaya-tuning-results.md) · [실제 추가 학습 준비](docs/ollaya-finetuning-readiness.md) |
-| 실제 가중치 학습과 Ollaya 반입 | [실행 계획·검토](docs/laya-finetuning-plan.md) · [예비 학습·변환 검증과 데이터 한계](docs/laya-finetuning-results.md) · [판정 기준과 검토용 예시 30개](docs/laya-label-review.md) |
+| 실제 가중치 학습과 Ollaya 반입 | [실행 계획·검토](docs/laya-finetuning-plan.md) · [예비 학습·변환 검증과 데이터 한계](docs/laya-finetuning-results.md) · [판정 기준·기본 및 비교 사례](docs/laya-label-review.md) |
 | 문맥 전달 개선 | [외부 조사](docs/context-efficiency-research.md) · [적용 계획](docs/context-efficiency-implementation-plan.md) · [검증 결과](docs/context-efficiency-results.md) |
 | README 구성과 실제 화면 캡처 | [레퍼런스와 촬영 기록](docs/readme-design-references.md) |
 
