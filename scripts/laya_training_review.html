@@ -9,7 +9,7 @@ button{cursor:pointer;margin:4px}textarea{width:100%;min-height:100px}pre{white-
 </style>
 <h1>학습 정답 검토</h1>
 <p>각 사례의 출처 종류를 확인하세요. 실제 요청과 기록을 다시 묶은 후보는 구분됩니다.
-원입력은 수정하지 않습니다. 자동 확인한 사실과 에이전트 초안은 사람 정답이 아닙니다.
+원입력은 수정하지 않습니다. 자동 확인·에이전트 초안·근거를 검증한 에이전트 답안·사람 검토를 구분합니다.
 판단할 수 없는 항목은 미검토로 남겨 주세요.</p>
 <label>검토자 이름 <input id="reviewer" autocomplete="name"></label>
 <nav><button id="previous">이전</button><span id="position"></span><button id="next">다음</button>
@@ -35,11 +35,11 @@ function show(){
  el('origin').textContent=`${row.id} · ${row.purpose} · ${row.provenance} · ${JSON.stringify(row.source_refs)}`;
  el('query').value=row.state.query;el('candidate').textContent=typeof row.state.candidate==='string'?row.state.candidate:JSON.stringify(row.state.candidate,null,2);
  el('state').textContent=JSON.stringify(row.state,null,2);
- el('checks').textContent=JSON.stringify({automatic_checks:row.automatic_checks,agent_review:row.agent_review},null,2);
+ el('checks').textContent=JSON.stringify({automatic_checks:row.automatic_checks,agent_review:row.agent_review,review:row.review},null,2);
  el('reason').value=row.review.reason||'';
  el('label').replaceChildren(new Option('선택 필요',''),...data.labels[row.purpose].map(x=>new Option(x,x)));
  el('label').value=row.expected||'';el('critical').value=typeof row.critical==='boolean'?String(row.critical):'';
- el('status').textContent=`검토 완료 ${rows.filter(x=>x.review.status==='human_reviewed').length}개 · 현재 ${row.review.status}`;
+ el('status').textContent=`사람 검토 ${rows.filter(x=>x.review.status==='human_reviewed').length}개 · 에이전트 검증 ${rows.filter(x=>x.review.status==='agent_verified').length}개 · 현재 ${row.review.status}`;
 }
 el('previous').onclick=()=>{index=Math.max(0,index-1);show()};
 el('next').onclick=()=>{index=Math.min(rows.length-1,index+1);show()};

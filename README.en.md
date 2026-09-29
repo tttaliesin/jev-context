@@ -124,6 +124,8 @@ Contract 2.0 removes obsolete next actions from completed work and exposes super
 
 New model judgments retain the original input, questions, profile fingerprint, and result in the project store. The [record audit and training readiness report](docs/laya-finetuning-results.md) distinguishes recorded reports, agent-proposed labels, and human review. Independent data remains insufficient to establish a fine-tuning improvement.
 
+Codex can verify reference labels against source text and execution evidence. Preparation accepts `agent_verified` reviews bound to the reviewed inputs, labels, and evidence; these are not recorded as human reviews. Data readiness and independent test separation remain required.
+
 Real stdio requests for all three purposes passed storage and server restart checks. An existing Codex MCP process may still need restarting; confirm its code matches disk through `workspace_status`. Verification requests are excluded from training data. Leaving the app open only polls status and does not generate training examples.
 
 | Tool | Purpose |

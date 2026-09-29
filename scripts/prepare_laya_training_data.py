@@ -1,4 +1,4 @@
-"""Read-only project-memory inventory and explicit human-label preparation. Never infer gold labels."""
+"""Read-only record inventory and explicit, attributed label preparation. Never infer labels."""
 
 import argparse
 import hashlib
@@ -306,6 +306,42 @@ def retain_reviews(rows, previous):
     return count
 
 
+def verified_review(row):
+    review = row.get("review", {})
+    if not all(review.get(k) for k in ("reviewer", "reviewed_at", "reason")):
+        return False
+    if review.get("status") == "human_reviewed":
+        return True
+    if review.get("status") != "agent_verified":
+        return False
+    if row.get("expected") not in LABELS.get(row.get("purpose"), []) or not isinstance(
+        row.get("critical"), bool
+    ):
+        return False
+    files = row.get("automatic_checks", {}).get("raw_observation_check", {}).get("files", [])
+    evidence = review.get("evidence", [])
+    return (
+        review.get("reviewer_type") == "agent"
+        and review.get("target_model_output_used_as_label") is False
+        and review.get("checked_state_sha256") == digest(row["state"])
+        and review.get("checked_record_sha256") == digest(row.get("source_record"))
+        and review.get("checked_label") == row.get("expected")
+        and review.get("checked_critical") is row.get("critical")
+        and bool(evidence)
+        and all(
+            isinstance(ref, dict)
+            and ref.get("path")
+            and isinstance(ref.get("sha256"), str)
+            and len(ref["sha256"]) == 64
+            and all(c in "0123456789abcdef" for c in ref["sha256"])
+            and any(
+                f.get("path") == ref["path"] and f.get("sha256") == ref["sha256"] for f in files
+            )
+            for ref in evidence
+        )
+    )
+
+
 def prepare_reviewed(rows, minimum=600):
     errors = []
     if len(rows) < minimum:
@@ -337,14 +373,8 @@ def prepare_reviewed(rows, minimum=600):
         record = row.get("source_record")
         if not record or digest(record) != row.get("source_record_sha256"):
             errors.append(f"Original record missing/changed: {row['id']}")
-        review = row.get("review", {})
-        if (
-            review.get("status") != "human_reviewed"
-            or not review.get("reviewer")
-            or not review.get("reviewed_at")
-            or not review.get("reason")
-        ):
-            errors.append(f"Human review missing: {row['id']}")
+        if not verified_review(row):
+            errors.append(f"Verified review missing/invalid: {row['id']}")
         if row.get("expected") not in LABELS.get(row.get("purpose"), []):
             errors.append(f"Gold label missing/invalid: {row['id']}")
         if not isinstance(row.get("critical"), bool) or not row.get("source_refs"):
@@ -366,6 +396,9 @@ def prepare_reviewed(rows, minimum=600):
         prepared.append({**row, "group_id": group, "split": split})
     counts = Counter((r["split"], r["purpose"]) for r in prepared)
     distribution = {
+        "review_status_counts": dict(
+            Counter(r.get("review", {}).get("status", "pending") for r in rows)
+        ),
         "split_purpose_label_counts": {
             f"{split}/{purpose}/{label}": count
             for (split, purpose, label), count in sorted(
@@ -450,6 +483,10 @@ def main():
             stats["reviews_retained"] = retain_reviews(rows, previous)
         stats["human_reviewed"] = sum(
             r.get("review", {}).get("status") == "human_reviewed" for r in rows
+        )
+        stats["agent_verified"] = sum(
+            r.get("review", {}).get("status") == "agent_verified" and verified_review(r)
+            for r in rows
         )
         jsonl(args.output / "review-candidates.jsonl", rows)
         write_review_html(args.output / "review.html", rows)

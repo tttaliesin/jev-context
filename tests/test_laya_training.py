@@ -201,9 +201,58 @@ def test_model_prediction_is_not_a_human_gold_label():
     row.update(expected=None, model_prediction="relevant", review={"status": "pending"})
     report, prepared = data.prepare_reviewed([row], minimum=1)
     assert report["status"] == "not_ready"
-    assert any("Human review" in e for e in report["errors"])
+    assert any("Verified review" in e for e in report["errors"])
     assert any("Gold label" in e for e in report["errors"])
     assert not prepared
+
+
+def agent_verified_candidate():
+    row = candidate("a", "work1", "doc1", "first")
+    evidence = [{"path": "result.json", "sha256": "a" * 64}]
+    row["automatic_checks"] = {"raw_observation_check": {"files": evidence}}
+    row["review"].update(
+        status="agent_verified",
+        reviewer="Codex",
+        reviewer_type="agent",
+        target_model_output_used_as_label=False,
+        checked_state_sha256=row["state_sha256"],
+        checked_record_sha256=row["source_record_sha256"],
+        checked_label=row["expected"],
+        checked_critical=row["critical"],
+        evidence=evidence,
+    )
+    return row
+
+
+def test_grounded_agent_review_is_accepted_without_claiming_human_review():
+    row = agent_verified_candidate()
+    assert data.verified_review(row)
+    report, prepared = data.prepare_reviewed([row], minimum=1)
+    assert not any("Verified review" in e for e in report["errors"])
+    assert report["review_status_counts"] == {"agent_verified": 1}
+    assert not prepared  # Other purposes and independent splits are still required.
+
+
+@pytest.mark.parametrize(
+    "change", ["label", "state", "record", "prediction", "evidence", "draft", "incomplete"]
+)
+def test_agent_review_rejects_unverified_or_changed_answers(change):
+    row = agent_verified_candidate()
+    if change == "label":
+        row["expected"] = "irrelevant"
+    elif change == "state":
+        row["state"]["query"] = "changed"
+    elif change == "record":
+        row["source_record"]["new"] = "changed"
+    elif change == "prediction":
+        row["review"]["target_model_output_used_as_label"] = True
+    elif change == "evidence":
+        row["review"]["evidence"] = []
+    elif change == "incomplete":
+        row["critical"] = row["review"]["checked_critical"] = None
+    else:
+        row["review"]["status"] = "agent_reviewed"
+    assert not data.verified_review(row)
 
 
 def test_previously_exposed_case_is_rejected_even_with_review_flag():
