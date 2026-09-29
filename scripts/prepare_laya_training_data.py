@@ -5,6 +5,7 @@ import hashlib
 import json
 import sqlite3
 from collections import Counter
+from datetime import UTC, datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -48,6 +49,10 @@ def jsonl(path, rows):
     Path(path).write_text(
         "".join(canonical(r) + "\n" for r in rows), encoding="utf-8", newline="\n"
     )
+
+
+def read_jsonl(path):
+    return [json.loads(line) for line in Path(path).read_text("utf-8").splitlines() if line]
 
 
 def inventory(db_path):
@@ -247,6 +252,13 @@ def assign_groups(rows):
     keys_by_row = []
     for row in rows:
         keys = ["id:" + row["id"], "text:" + digest(row["state"]["candidate"])]
+        candidate = row["state"]["candidate"]
+        if (
+            row.get("purpose") == "capability_fit"
+            and isinstance(candidate, dict)
+            and candidate.get("id")
+        ):
+            keys.append("capability:" + candidate["id"])
         if row.get("work_id"):
             keys.append("work:" + row["work_id"])
         if row.get("pair_group_id"):
@@ -255,6 +267,8 @@ def assign_groups(rows):
             keys.append("id:" + row["derived_from"])
         for ref in row.get("source_refs", []):
             keys.append("source-id:" + ref["source_id"])
+            if ref.get("sha256"):
+                keys.append("raw-file:" + ref["sha256"])
             if ref.get("locator"):
                 keys.append("source-locator:" + ref["locator"])
         raw = row.get("automatic_checks", {}).get("raw_observation_check", {})
@@ -299,6 +313,9 @@ def retain_reviews(rows, previous):
             "eligible_for_training",
             "eligible_for_independent_test",
             "usage",
+            "reservation_id",
+            "reservation_sha256",
+            "reservation_error",
         ):
             if field in prior:
                 row[field] = prior[field]
@@ -342,7 +359,275 @@ def verified_review(row):
     )
 
 
-def prepare_reviewed(rows, minimum=600):
+def utc_time(value):
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        raise ValueError("Timezone required")
+    return parsed
+
+
+def reserve_test(db_path, specs, previous):
+    """Reserve metadata before the first packet/evidence; never read source contents."""
+    db = sqlite3.connect(Path(db_path).resolve().as_uri() + "?mode=ro", uri=True)
+    db.execute("BEGIN")
+    scopes = []
+    try:
+        for spec in specs:
+            wid = spec["work_id"]
+            capabilities = spec.get("capability_sources", [])
+            if not spec.get("id") or not (spec.get("source_ids") or capabilities):
+                raise ValueError("Reservation needs ID and explicit source IDs")
+            found = db.execute("SELECT body FROM works WHERE id=?", (wid,)).fetchone()
+            if not found or verification_only(json.loads(found[0]).get("scope", {})):
+                raise ValueError("Reservation needs a real, non-verification work")
+            for table in ("packets", "evidence"):
+                if db.execute(f"SELECT 1 FROM {table} WHERE work_id=?", (wid,)).fetchone():
+                    raise ValueError("Work already has observations; cannot reserve retroactively")
+            refs = []
+            for sid in spec.get("source_ids", []):
+                source = db.execute(
+                    "SELECT s.locator,s.current_revision,r.sha256 FROM sources s "
+                    "JOIN source_revisions r ON s.current_revision=r.id "
+                    "WHERE s.id=? AND s.status='available'",
+                    (sid,),
+                ).fetchone()
+                if not source:
+                    raise ValueError("Reservation source missing or inactive")
+                if db.execute("SELECT 1 FROM source_refs WHERE source_id=?", (sid,)).fetchone():
+                    raise ValueError("Source already used; cannot reserve retroactively")
+                if db.execute(
+                    "SELECT 1 FROM source_refs f JOIN source_revisions r "
+                    "ON f.source_id=r.source_id AND f.revision=r.id WHERE r.sha256=?",
+                    (source[2],),
+                ).fetchone():
+                    raise ValueError("Duplicate source content already used")
+                refs.append(
+                    dict(source_id=sid, locator=source[0], revision=source[1], sha256=source[2])
+                )
+            for capability in capabilities:
+                if (
+                    not all(capability.get(k) for k in ("id", "version", "sha256"))
+                    or len(capability["sha256"]) != 64
+                    or any(c not in "0123456789abcdef" for c in capability["sha256"])
+                ):
+                    raise ValueError("Capability reservation needs ID/version/exact candidate hash")
+                if any(
+                    r.get("purpose") == "capability_fit"
+                    and isinstance(r["state"]["candidate"], dict)
+                    and r["state"]["candidate"].get("id") == capability["id"]
+                    for r in previous
+                ):
+                    raise ValueError("Capability source already exposed in development")
+            probe = {
+                "id": "reservation-" + spec["id"],
+                "work_id": wid,
+                "state": {"candidate": "reservation-" + spec["id"]},
+                "source_refs": refs,
+            }
+            groups = assign_groups([*previous, probe])
+            if groups[-1] in groups[:-1]:
+                raise ValueError("Reservation overlaps development history")
+            scopes.append(
+                {
+                    "id": spec["id"],
+                    "work_id": wid,
+                    "source_refs": refs,
+                    "capability_sources": capabilities,
+                }
+            )
+        if (
+            not scopes
+            or len({s["id"] for s in scopes}) != len(scopes)
+            or len({s["work_id"] for s in scopes}) != len(scopes)
+        ):
+            raise ValueError("Empty or duplicate reservation scopes")
+        body = {
+            "version": 1,
+            "reserved_at": datetime.now(UTC).isoformat(),
+            "previous_sha256": digest(previous),
+            "scopes": scopes,
+        }
+        return {**body, "sha256": digest(body)}
+    finally:
+        db.close()
+
+
+def validate_reservation(manifest):
+    if manifest.get("sha256") != digest({k: v for k, v in manifest.items() if k != "sha256"}):
+        raise ValueError("Reservation hash changed")
+    utc_time(manifest["reserved_at"])
+    return manifest
+
+
+def reservation_for(row, manifest):
+    if not manifest or row.get("provenance") != "captured_model_request":
+        return None
+    validate_reservation(manifest)
+    record = row.get("source_record", {})
+    try:
+        if utc_time(record["captured_at"]) <= utc_time(manifest["reserved_at"]):
+            return None
+    except (KeyError, ValueError, TypeError):
+        return None
+    ref = record.get("source_ref")
+    for scope in manifest["scopes"]:
+        if scope["work_id"] != row.get("work_id"):
+            continue
+        if ref and any(
+            all(ref.get(k) == s[k] for k in ("source_id", "revision")) for s in scope["source_refs"]
+        ):
+            return scope["id"]
+        candidate = row["state"]["candidate"]
+        if (
+            row.get("purpose") == "capability_fit"
+            and isinstance(candidate, dict)
+            and any(
+                c["id"] == candidate.get("id")
+                and c["version"] == candidate.get("version")
+                and c["sha256"] == digest(candidate)
+                for c in scope.get("capability_sources", [])
+            )
+        ):
+            return scope["id"]
+    return None
+
+
+def apply_reservations(rows, manifest, previous, previously_seen=()):
+    validate_reservation(manifest)
+    if digest(previous) != manifest["previous_sha256"]:
+        # History can grow, but must contain every original identity/input; callers
+        # supply the same immutable reservation-time audit for admission.
+        raise ValueError("Reservation requires its exact development history")
+    previous_ids = {
+        r["id"] for r in [*previous, *previously_seen] if r.get("exposure") != "test_reserved"
+    }
+    for row in rows:
+        identity = reservation_for(row, manifest)
+        if identity and row["id"] not in previous_ids:
+            row.update(
+                reservation_id=identity,
+                reservation_sha256=manifest["sha256"],
+                eligible_for_independent_test=True,
+                exposure="test_reserved",
+            )
+    combined = [*rows, *previous, *previously_seen]
+    groups = assign_groups(combined)
+    blocked = {
+        g for r, g in zip(combined, groups, strict=True) if r.get("exposure") != "test_reserved"
+    }
+    for row, group in zip(rows, groups[: len(rows)], strict=True):
+        if row.get("exposure") == "test_reserved" and group in blocked:
+            row.update(
+                eligible_for_independent_test=False,
+                exposure="reservation_invalidated",
+                reservation_error="Connected to development/unreserved data",
+            )
+
+
+def blind_review_rows(rows):
+    """Allowlist export: no source_record, answers, scores, drafts or prior labels."""
+    keys = (
+        "id",
+        "work_id",
+        "purpose",
+        "state",
+        "state_sha256",
+        "source_record_sha256",
+        "source_refs",
+        "provenance",
+        "reservation_id",
+        "reservation_sha256",
+    )
+    return [
+        {
+            **{k: r[k] for k in keys if k in r},
+            "expected": None,
+            "critical": None,
+            "review": {"status": "pending"},
+            "automatic_checks": {
+                "raw_observation_check": {
+                    "files": r.get("automatic_checks", {})
+                    .get("raw_observation_check", {})
+                    .get("files", [])
+                }
+            },
+        }
+        for r in rows
+    ]
+
+
+def merge_decisions(rows, decisions):
+    by_id = {r["id"]: r for r in rows}
+    if len({r["id"] for r in decisions}) != len(decisions):
+        raise ValueError("Duplicate review decisions")
+    for decision in decisions:
+        row = by_id.get(decision["id"])
+        if row is None or any(
+            decision.get(k) != row.get(k)
+            for k in ("state", "state_sha256", "source_record_sha256", "purpose", "source_refs")
+        ):
+            raise ValueError("Review decision input/provenance changed")
+        for key in ("expected", "critical", "review"):
+            row[key] = decision[key]
+
+
+def freeze_dataset(rows, report, questions, output):
+    if report.get("status") != "ready":
+        raise ValueError("Cannot freeze unready data")
+    if set(questions) != set(LABELS) or any(
+        not isinstance(questions[p], dict) or set(questions[p].get("criteria", {})) != set(labels)
+        for p, labels in LABELS.items()
+    ):
+        raise ValueError("Questions must cover every purpose and label exactly")
+    frozen = [{**r, "question": questions[r["purpose"]]} for r in rows]
+    target = Path(output) / "frozen.jsonl"
+    with target.open("x", encoding="utf-8", newline="\n") as stream:
+        stream.write("".join(canonical(r) + "\n" for r in frozen))
+    return {
+        **report,
+        "data_sha256": digest(frozen),
+        "questions_sha256": digest(questions),
+        "split_sha256": digest([[r["id"], r["group_id"], r["split"]] for r in frozen]),
+        "file_sha256": hashlib.sha256(target.read_bytes()).hexdigest(),
+    }
+
+
+def load_frozen(dataset, manifest, split):
+    """Fail closed; consumers choose one split, with no public-data fallback."""
+    if split not in {"train", "development", "calibration", "test"}:
+        raise ValueError("Explicit valid split required")
+    report = json.loads(Path(manifest).read_text("utf-8"))
+    if report.get("status") != "ready" or hashlib.sha256(
+        Path(dataset).read_bytes()
+    ).hexdigest() != report.get("file_sha256"):
+        raise ValueError("Dataset not ready or file hash changed")
+    rows = read_jsonl(dataset)
+    questions = {}
+    for row in rows:
+        purpose = row["purpose"]
+        if purpose in questions and questions[purpose] != row["question"]:
+            raise ValueError("Question changed within purpose")
+        questions[purpose] = row["question"]
+    if (
+        digest(rows) != report.get("data_sha256")
+        or digest(questions) != report.get("questions_sha256")
+        or digest([[r["id"], r["group_id"], r["split"]] for r in rows])
+        != report.get("split_sha256")
+    ):
+        raise ValueError("Frozen data/questions/split hash changed")
+    if len({r["id"] for r in rows}) != len(rows):
+        raise ValueError("Duplicate frozen IDs")
+    assigned = assign_groups(rows)
+    for group in set(assigned):
+        if len({r["split"] for r, g in zip(rows, assigned, strict=True) if g == group}) != 1:
+            raise ValueError("Frozen group crosses splits")
+    selected = [r for r in rows if r["split"] == split]
+    if not selected:
+        raise ValueError("Requested split is empty")
+    return selected
+
+
+def prepare_reviewed(rows, minimum=600, reservations=None):
     errors = []
     if len(rows) < minimum:
         errors.append(f"Need {minimum} reviewed candidates; received {len(rows)}")
@@ -383,16 +668,19 @@ def prepare_reviewed(rows, minimum=600):
             errors.append(f"Previously exposed diagnostic: {row['id']}; keep in pilot only")
     prepared = []
     for row, group in zip(rows, assign_groups(rows), strict=True):
-        bucket = int(group[:8], 16) % 100
-        split = (
-            "train"
-            if bucket < 70
-            else "development"
-            if bucket < 80
-            else "calibration"
-            if bucket < 90
-            else "test"
-        )
+        bucket = int(group[:8], 16) % 90
+        split = "train" if bucket < 70 else "development" if bucket < 80 else "calibration"
+        if row.get("exposure") == "test_reserved":
+            identity = reservation_for(row, reservations)
+            if (
+                not identity
+                or identity != row.get("reservation_id")
+                or row.get("reservation_sha256") != reservations["sha256"]
+            ):
+                errors.append(f"Invalid test reservation: {row['id']}")
+            split = "test"
+        elif row.get("eligible_for_independent_test") is True:
+            errors.append(f"Test eligibility without reservation: {row['id']}")
         prepared.append({**row, "group_id": group, "split": split})
     counts = Counter((r["split"], r["purpose"]) for r in prepared)
     distribution = {
@@ -415,11 +703,16 @@ def prepare_reviewed(rows, minimum=600):
         },
     }
     exposed_groups = {
-        r["group_id"] for r in prepared if r.get("eligible_for_independent_test") is False
+        r["group_id"]
+        for r in prepared
+        if r.get("exposure") != "test_reserved" or r.get("eligible_for_independent_test") is False
     }
     for row in prepared:
         if row["split"] == "test" and row["group_id"] in exposed_groups:
             errors.append(f"Development-exposed group cannot be heldout: {row['id']}")
+    for group in {r["group_id"] for r in prepared}:
+        if len({r["split"] for r in prepared if r["group_id"] == group}) != 1:
+            errors.append(f"Connected group crosses splits: {group}")
     for split in ("train", "development", "calibration", "test"):
         for purpose in LABELS:
             if counts[split, purpose] == 0:
@@ -429,6 +722,17 @@ def prepare_reviewed(rows, minimum=600):
             errors.append(
                 f"Need 30 heldout cases for {purpose}; received {counts['test', purpose]}"
             )
+        for label in LABELS[purpose]:
+            groups = {
+                r["group_id"]
+                for r in prepared
+                if r["split"] == "test" and r["purpose"] == purpose and r.get("expected") == label
+            }
+            if len(groups) < 2:
+                errors.append(
+                    f"Need independent replication for test/{purpose}/{label}; "
+                    f"received {len(groups)} groups (minimum 2, not a power guarantee)"
+                )
     if errors:
         return {
             "status": "not_ready",
@@ -453,25 +757,55 @@ def prepare_reviewed(rows, minimum=600):
 
 def write_review_html(path, rows):
     template = (ROOT / "scripts/laya_training_review.html").read_text(encoding="utf-8")
-    payload = canonical({"rows": rows, "labels": LABELS}).replace("<", "\\u003c")
+    visible = [
+        blind_review_rows([r])[0] if r.get("exposure") == "test_reserved" else r for r in rows
+    ]
+    payload = canonical({"rows": visible, "labels": LABELS}).replace("<", "\\u003c")
     path.write_text(template.replace("/*REVIEW_DATA*/", payload), encoding="utf-8")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("stage", choices=["inventory", "audit", "prepare"])
+    parser.add_argument("stage", choices=["inventory", "audit", "prepare", "reserve", "blind"])
     parser.add_argument("--db", type=Path)
     parser.add_argument("--reviewed", type=Path)
+    parser.add_argument("--reservation-spec", type=Path, help="New work/source IDs, before use")
+    parser.add_argument("--reservations", type=Path)
+    parser.add_argument("--reservation-history", type=Path)
+    parser.add_argument(
+        "--review-decisions", type=Path, help="Merge a blinded review by exact hash"
+    )
+    parser.add_argument(
+        "--questions", type=Path, help="Explicit purpose-to-question JSON to freeze"
+    )
     parser.add_argument(
         "--previous-review", type=Path, help="Preserve exact-case review/exposure on audit"
     )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
+    reservations = json.loads(args.reservations.read_text("utf-8")) if args.reservations else None
+    history = read_jsonl(args.reservation_history) if args.reservation_history else []
+    if args.stage == "reserve":
+        if not args.db or not args.reservation_spec or not args.reservation_history:
+            parser.error("reserve needs --db, --reservation-spec and --reservation-history")
+        stats = reserve_test(args.db, json.loads(args.reservation_spec.read_text("utf-8")), history)
+        with (args.output / "reservations.json").open("x", encoding="utf-8") as stream:
+            stream.write(canonical(stats) + "\n")
+        print(canonical({"reservation_sha256": stats["sha256"], "scopes": len(stats["scopes"])}))
+        return
+    if args.stage == "blind":
+        if not args.reviewed:
+            parser.error("blind needs --reviewed")
+        rows = blind_review_rows(read_jsonl(args.reviewed))
+        jsonl(args.output / "blind-review.jsonl", rows)
+        write_review_html(args.output / "review.html", rows)
+        return
     if args.stage in {"inventory", "audit"}:
         if not args.db:
             parser.error("inventory needs --db")
         rows, stats = (inventory if args.stage == "inventory" else audit_records)(args.db)
+        previous = []
         if args.previous_review:
             if args.stage != "audit":
                 parser.error("--previous-review requires audit")
@@ -481,6 +815,10 @@ def main():
                 if line
             ]
             stats["reviews_retained"] = retain_reviews(rows, previous)
+        if reservations:
+            if not args.reservation_history:
+                parser.error("--reservations needs its --reservation-history")
+            apply_reservations(rows, reservations, history, previous)
         stats["human_reviewed"] = sum(
             r.get("review", {}).get("status") == "human_reviewed" for r in rows
         )
@@ -499,11 +837,14 @@ def main():
         if not args.reviewed:
             parser.error("prepare needs --reviewed")
         rows = [json.loads(line) for line in args.reviewed.read_text("utf-8").splitlines() if line]
-        stats, prepared = prepare_reviewed(rows)
+        if args.review_decisions:
+            merge_decisions(rows, read_jsonl(args.review_decisions))
+        stats, prepared = prepare_reviewed(rows, reservations=reservations)
         if prepared:
-            target = args.output / "frozen.jsonl"
-            with target.open("x", encoding="utf-8", newline="\n") as stream:
-                stream.write("".join(canonical(r) + "\n" for r in prepared))
+            if not args.questions:
+                parser.error("Freezing ready data requires --questions")
+            questions = json.loads(args.questions.read_text("utf-8"))
+            stats = freeze_dataset(prepared, stats, questions, args.output)
     (args.output / (args.stage + ".json")).write_text(
         json.dumps(stats, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )

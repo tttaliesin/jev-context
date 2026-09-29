@@ -1,3 +1,4 @@
+import copy
 import json
 import sqlite3
 import struct
@@ -8,6 +9,149 @@ import pytest
 from jev_context.laya_worker import validate_rotary_config
 from scripts import prepare_laya_training_data as data
 from scripts.train_laya_pilot import compatible_encoder_config, safetensors_header
+
+
+def reservation_fixture(tmp_path):
+    path = tmp_path / "reservation.sqlite"
+    db = sqlite3.connect(path)
+    db.executescript("""
+        CREATE TABLE works(id TEXT,body TEXT);
+        CREATE TABLE packets(id TEXT,work_id TEXT,body TEXT);
+        CREATE TABLE evidence(id TEXT,work_id TEXT,body TEXT);
+        CREATE TABLE sources(id TEXT,locator TEXT,current_revision TEXT,status TEXT);
+        CREATE TABLE source_revisions(id TEXT,source_id TEXT,sha256 TEXT);
+        CREATE TABLE source_refs(source_id TEXT,revision TEXT);
+    """)
+    db.execute("INSERT INTO works VALUES('new-work','{}')")
+    db.execute("INSERT INTO sources VALUES('new-source','docs/new','rev-new','available')")
+    db.execute("INSERT INTO source_revisions VALUES('rev-new','new-source',?)", ("a" * 64,))
+    db.commit()
+    db.close()
+    spec = [{"id": "holdout-1", "work_id": "new-work", "source_ids": ["new-source"]}]
+    return path, spec
+
+
+def reserved_row(manifest):
+    row = candidate("new-case", "new-work", "new-source", "new input")
+    row["source_refs"][0].update(locator="docs/new", revision="rev-new")
+    row["source_record"].update(
+        captured_at="2099-01-01T00:00:00Z",
+        source_ref=row["source_refs"][0],
+        answers=["HIDDEN-PREDICTION"],
+    )
+    row["source_record_sha256"] = data.digest(row["source_record"])
+    row.update(exposure="development_audit", eligible_for_independent_test=False)
+    data.apply_reservations([row], manifest, [])
+    return row
+
+
+def test_reservation_is_readonly_blinds_prediction_and_preserves_record(tmp_path):
+    path, spec = reservation_fixture(tmp_path)
+    original = path.read_bytes()
+    manifest = data.reserve_test(path, spec, [])
+    assert path.read_bytes() == original
+    row = reserved_row(manifest)
+    assert row["exposure"] == "test_reserved"
+    assert data.reservation_for(row, manifest) == "holdout-1"
+    blinded = data.blind_review_rows([row])[0]
+    assert "HIDDEN-PREDICTION" not in json.dumps(blinded)
+    assert "source_record" not in blinded
+    html = tmp_path / "review.html"
+    data.write_review_html(html, [row])
+    assert "HIDDEN-PREDICTION" not in html.read_text("utf-8")
+    assert row["source_record"]["answers"] == ["HIDDEN-PREDICTION"]
+    blinded.update(expected="irrelevant", critical=True, review={"status": "pending"})
+    data.merge_decisions([row], [blinded])
+    assert row["expected"] == "irrelevant"
+    blinded["state"] = {"candidate": "edited"}
+    with pytest.raises(ValueError, match="changed"):
+        data.merge_decisions([row], [blinded])
+
+
+@pytest.mark.parametrize("existing", ["packet", "source", "history", "verification", "duplicate"])
+def test_cannot_reserve_exposed_or_verification_sources(tmp_path, existing):
+    path, spec = reservation_fixture(tmp_path)
+    db = sqlite3.connect(path)
+    history = []
+    if existing == "packet":
+        db.execute("INSERT INTO packets VALUES('p','new-work','{}')")
+    elif existing == "source":
+        db.execute("INSERT INTO source_refs VALUES('new-source','rev-new')")
+    elif existing == "duplicate":
+        db.execute("INSERT INTO source_revisions VALUES('rev-old','old-source',?)", ("a" * 64,))
+        db.execute("INSERT INTO source_refs VALUES('old-source','rev-old')")
+    elif existing == "verification":
+        db.execute(
+            "UPDATE works SET body=?",
+            (json.dumps({"scope": {"constraints": [data.VERIFICATION_MARKER]}}),),
+        )
+    else:
+        old = candidate("old", "old-work", "old-source", "old content")
+        old["source_refs"][0]["locator"] = "docs/new"
+        history = [old]
+    db.commit()
+    db.close()
+    with pytest.raises(ValueError):
+        data.reserve_test(path, spec, history)
+
+
+def test_reservation_cannot_promote_existing_development_or_cross_groups(tmp_path):
+    path, spec = reservation_fixture(tmp_path)
+    manifest = data.reserve_test(path, spec, [])
+    row = reserved_row(manifest)
+    older = copy.deepcopy(row)
+    older.update(exposure="development_audit", eligible_for_independent_test=False)
+    data.apply_reservations([row], manifest, [], [older])
+    assert row["eligible_for_independent_test"] is False
+    row = reserved_row(manifest)
+    other = candidate("derived", "other-work", "other-source", "different input")
+    other["derived_from"] = row["id"]
+    data.apply_reservations([row, other], manifest, [])
+    assert row["exposure"] == "reservation_invalidated"
+    assert row["eligible_for_independent_test"] is False
+
+
+def test_reservation_requires_time_hash_and_label_group_replication(tmp_path):
+    path, spec = reservation_fixture(tmp_path)
+    manifest = data.reserve_test(path, spec, [])
+    row = reserved_row(manifest)
+    report, frozen = data.prepare_reviewed([row], minimum=1, reservations=manifest)
+    assert not frozen
+    assert any("independent replication" in e for e in report["errors"])
+    row["source_record"]["captured_at"] = "2020-01-01T00:00:00Z"
+    assert data.reservation_for(row, manifest) is None
+    manifest["reserved_at"] = "2010-01-01T00:00:00Z"
+    with pytest.raises(ValueError, match="hash"):
+        data.reservation_for(row, manifest)
+
+
+def test_frozen_hashes_split_selection_and_no_overwrite(tmp_path):
+    questions = {
+        p: {"type": "choice", "criteria": {label: label for label in labels}}
+        for p, labels in data.LABELS.items()
+    }
+    rows = []
+    for split in ("train", "development", "calibration", "test"):
+        for purpose in data.LABELS:
+            identity = split + purpose
+            row = candidate(identity, identity, identity, identity)
+            row.update(purpose=purpose, split=split, group_id=identity)
+            rows.append(row)
+    report = data.freeze_dataset(rows, {"status": "ready"}, questions, tmp_path)
+    manifest = tmp_path / "prepare.json"
+    manifest.write_text(json.dumps(report), encoding="utf-8")
+    target = tmp_path / "frozen.jsonl"
+    selected = data.load_frozen(target, manifest, "train")
+    assert len(selected) == 3 and {r["split"] for r in selected} == {"train"}
+    with pytest.raises(FileExistsError):
+        data.freeze_dataset(rows, {"status": "ready"}, questions, tmp_path)
+    report["split_sha256"] = "changed"
+    manifest.write_text(json.dumps(report), encoding="utf-8")
+    with pytest.raises(ValueError, match="hash"):
+        data.load_frozen(target, manifest, "train")
+    target.write_text(target.read_text("utf-8") + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="hash"):
+        data.load_frozen(target, manifest, "train")
 
 
 def candidate(name, work, source, text):
@@ -37,6 +181,30 @@ def test_pair_parent_cannot_cross_groups_without_shared_work_or_source():
     rows = [candidate("a", "w1", "s1", "one"), candidate("b", "w2", "s2", "two")]
     rows[1]["derived_from"] = "a"
     assert len(set(data.assign_groups(rows))) == 1
+
+
+def test_capability_reservation_binds_exact_inventory_item_and_blocks_reused_tool(tmp_path):
+    path, spec = reservation_fixture(tmp_path)
+    item = {"id": "new-tool", "version": "1", "description": "Read files", "available": True}
+    spec[0]["source_ids"] = []
+    spec[0]["capability_sources"] = [
+        {"id": item["id"], "version": item["version"], "sha256": data.digest(item)}
+    ]
+    manifest = data.reserve_test(path, spec, [])
+    row = candidate("cap", "new-work", "packet", item)
+    row.update(
+        purpose="capability_fit", exposure="development_audit", eligible_for_independent_test=False
+    )
+    row["source_record"]["captured_at"] = "2099-01-01T00:00:00Z"
+    data.apply_reservations([row], manifest, [])
+    assert row["exposure"] == "test_reserved"
+    row["state"]["candidate"] = {**item, "description": "Changed"}
+    assert data.reservation_for(row, manifest) is None
+    with pytest.raises(ValueError, match="already exposed"):
+        data.reserve_test(path, spec, [row])
+    older = candidate("other", "old-work", "old-packet", {**item, "description": "Old"})
+    older["purpose"] = "capability_fit"
+    assert len(set(data.assign_groups([row, older]))) == 1
 
 
 def test_source_id_links_rows_even_when_only_one_has_a_locator():
@@ -84,7 +252,8 @@ def test_development_exposure_blocks_entire_heldout_group():
     row["eligible_for_independent_test"] = False
     report, prepared = data.prepare_reviewed([row], minimum=1)
     assert not prepared
-    assert any("Development-exposed group" in e for e in report["errors"])
+    assert report["split_purpose_counts"].get("test/relevance", 0) == 0
+    assert any("Need 30 heldout" in e for e in report["errors"])
 
 
 def test_review_only_case_and_changed_input_are_rejected_even_with_human_flag():

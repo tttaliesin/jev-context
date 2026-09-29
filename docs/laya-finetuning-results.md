@@ -213,6 +213,51 @@ Ollaya v0.7.3의 동일 구조 fp32 ONNX graph를 재사용하는 제한된 패�
 
 관련 로컬 검사 28개, 전체 Ruff lint/95파일 format, 생성된 검토 화면 JavaScript 문법, 문서 링크 159개를 확인했다. 검토 뒤 입력·라벨·원기록 변경, Jev 예측 복사, 근거 누락, 초안·중요 여부 미완료의 거절과 정상 Codex 검토 허용을 검사했다. 기존 후보 파일 hash는 보존했고 사람 정답 0개·시험 적격 0개·frozen 없음도 확인했다. 이번 변경에서 모델 실행·원격 CI·유료 자원을 사용하지 않았다.
 
+## 2026-09-29 승인 계획 실행: 검토 상태와 시험 분리
+
+기존 82개의 남은 78개를 검토해 **확정 38개(기존 4개 포함), 보류 44개**로 정리했다. 원시 대조 기록이 있던 8개는 재검토했고, 나머지는 프로젝트 안의 실행 결과 디렉터리 31개를 검색했다. 없는 원본을 만들거나 초안을 일괄 승인하지 않았다. 보류는 원본 미확보, 다른 실행으로 덮인 파일, 일부 원시 결과만으로 종합 주장을 확정하지 못한 경우다. 당시 원본이 없는 것과 입력의 답이 `insufficient_evidence`인 것은 구분했다. 일부 보류는 원시 파일이 남아 있어도 전체 대응 검토가 끝나지 않은 항목이며, 자료 자체가 존재하지 않는다고 주장하지 않는다.
+
+첫 산출물은 로컬 `.local/laya-finetuning/execution-20260929/review-results.json`과 `review-candidates.jsonl`/`review.html`이다. 사례별 입력·원기록 hash, 판정·중요 여부·이유·시각·원시 근거 또는 보류 이유가 있다. 첫 결과 JSON SHA256은 `2c3d61a0b656b12b4e214b4318ad3ccd4d1ba1f61f254446a58955987eedf379`이다. 사람 검토는 0개이며 기존 82개는 모두 최종 시험 제외다. 확정 라벨은 supports 26/partial 12다. UI 17개 과거 결과는 같은 경로에 남은 58개 결과로 검증하지 않았다.
+
+이번 실제 작업에서 계획의 제약 검색, 기존 자료의 시험 제외 주장 확인, 원시 로그 검사 도구 선택을 MCP로 요청했다. 입력을 나중에 만들어 붙이지 않고 DB의 실제 요청과 고정 원문 revision을 대조했다. 새 **26개 요청 사례**는 relevance 16/evidence_relation 8/capability_fit 2다. 모두 같은 프로젝트의 계획·도구 선택에서 나온 개발 자료이며 새로운 독립 출처로 세지 않는다. Jev 결과는 전부 `abstained / engine_preparing`였고, 문맥 호출 두 번은 필수 문맥 71,373 bytes가 최대 65,536 bytes보다 커서 `insufficient`였다. 요청 저장 성공을 추론 성공이나 품질 측정으로 표현하지 않는다. 필수 제약을 빼서 성공처럼 만들지도 않았다. 마지막 현재 MCP는 코드 일치, idle, worker/broker 없음이며 재시작 요청은 필요 없다.
+
+| 목적 | 확보 | Codex 답안 확정 | 최종 시험 | 부족한 라벨/출처 |
+|---|---:|---:|---:|---|
+| 관련성 | 16 | 16 | 0 | relevant만 있음. irrelevant/insufficient_evidence 및 독립 작업 필요 |
+| 근거 관계 | 90 | 46 | 0 | supports 27/partial 17/insufficient_evidence 2. contradicts/unrelated 없음 |
+| 도구 적합성 | 2 | 2 | 0 | fit/unfit 각1. insufficient_evidence 및 독립 도구/작업 필요 |
+| 합계 | 108 | 64 | 0 | 기존 하한600 대비 확정536개 부족. 세 목적 시험 각30개 모두 부족 |
+
+연결 그룹은 15개이며 관련성·도구 적합성 새 사례는 각각 하나의 기존 그룹에 속한다. `latest/reviewed.jsonl` SHA256은 `5e54e284d6d648207f750b7d15c40c78b4cc9d7648f0ddfa9e050465eb646172`다. 검증 전용 packet 7개·실행 보고 2개는 계속 제외했고 원요청이 없는 과거 판단19개를 복원하지 않았다. 앱을 켜두는 상태 조회는 판단 요청 자료를 만들지 않는다. `context_prepare`의 실제 판단 요청과 `capability_recommend` 호출에서만 이 유형의 원요청이 저장되며, 엔진 준비 중 보류 결과도 그대로 남는다.
+
+### 적용한 준비 기능과 자체 검토
+
+- `reserve`는 **아직 packet/실행 보고가 없는 실제 작업**과 사용하지 않은 출처의 ID/revision/hash 또는 도구 ID/version/정확한 후보 hash를 예약한다. 시각·기존 감사 hash·예약 hash를 기록하며 기존 파일은 덮어쓰지 않는다. 기존 개발 자료를 시험으로 바꾸지 않는다.
+- `audit --reservations --reservation-history --previous-review`는 예약 후의 정확한 원요청만 시험 후보로 표시한다. 같은 작업·출처·원문·파생 사례·원시 파일·도구 ID를 전이적으로 묶고 개발 자료와 연결된 예약은 무효화한다. 모르는 출처 관계는 시험 자격으로 추정하지 않는다.
+- `blind`와 예약 자료의 HTML은 허용 필드만 내보낸다. 입력·출처·근거 경로/hash는 보이지만 원기록의 Jev 답안/점수·기존 초안/라벨은 출력하지 않는다. 원래 요청/결과는 DB 및 로컬 원기록에 남는다. `--review-decisions` 병합은 동일 입력·원기록 hash·출처에만 적용한다.
+- `prepare`는 네 분할과 기존600/시험 목적별30을 유지한다. 시험 라벨별 최소2개 출처 그룹을 독립 반복의 최소 검사로 추가했다. 이는 충분한 표본이나 통계 검정력을 보장하는 숫자가 아니다. 준비 통과 시 명시적 질문 템플릿과 자료·분할·파일 hash를 함께 고정하고, 읽기 함수는 변경된 hash나 분할 혼입을 거절한다.
+
+예약 시각과 검토 주체는 로컬 기록이며 암호학적 독립 봉인이나 사람 독립 평가가 아니다. 동일 Codex의 구현·답안 검토 편향은 남는다. 실제 새 시험 작업/출처가 없으므로 시험 예약을 만들어 수량을 채우지 않았다. 예약·차단 경로는 격리 fixture로 검사했으며 그것도 업무 자료에 넣지 않았다.
+
+현재 준비 검사는 **not_ready, 154개 위반, frozen 파일 없음**이다. 44개 보류·라벨 분포·독립 분할·시험 부족이 남았다. 승인 계획 3단계의 실제 자료 학습 CLI 연결, 제품 SemIf/미학습 Laya 기준 측정, 후보 학습, 보정·최종 비교·bootstrap 분석은 준비 조건 때문에 **미실행**이다. 현재 학습/평가 CLI는 여전히 공개 기술 예비 실행 경로이며 실제 자료 학습 준비 완료로 표시하지 않는다. 이 경계를 숨기려고 도구만 더 늘리거나 공개 자료를 새 최종 시험으로 쓰지 않았다. 결론은 **개선 미확인**, 기본 모델과 설정은 유지했다.
+
+사용자가 지금 라벨을 붙이거나 Codex를 재시작할 필요는 없다. 후속 최소 입력은 개발에 노출되지 않은 실제 작업과 그 원문·후보·조건이다. 그런 작업이 생기면 내용 검토/모델 호출 전에 예약하며, 같은 출처의 사례를 늘리는 것만으로 독립 평가 부족이 해소되지는 않는다. 44개 보류의 개별 원본 요구는 첫 결과 JSON에 보존돼 있다.
+
+### 재현 명령
+
+마지막 자체 검토에서 다른 source ID로 복제된 동일 원문도 예약하면 안 된다는 경로를 보완했다. DB의 과거 source revision hash를 대조해 거절하며, 보완 후 관련 **38개 검사 통과**, Ruff lint/format 통과를 확인했다. 위 전체 347개 결과는 이 마지막 작은 보완 직전 결과이고 이후에는 관련 검사를 다시 수행했다. Markdown 로컬 링크358개도 확인했다.
+
+검증: 전체 Ruff lint/95파일 format 및 **347 passed, 2 skipped (103.39초)**. 정상 에이전트 검토와 기존 검토 보존, 예약 전 기록·개발 출처·검증 작업 거절, 파생/동일 도구 그룹 충돌, 예약 시점/hash/후보 변경 거절, 예측 비노출, 검토 입력 변경 거절, 고정 자료 hash·분할 선택·덮어쓰기 차단을 검사했다. 격리 테스트는 실제 학습 자료에 넣지 않았다. 원격 CI·유료 자원·후보 모델 학습은 실행하지 않았다.
+
+```powershell
+# 아래 실제 감사는 DB를 읽기 전용으로 열고, 검토와 개발 노출 표시를 이어받는다.
+.venv/Scripts/python.exe -X utf8 scripts/prepare_laya_training_data.py audit --db .local/state/projects/project-89095613680449da8ab8c438dfcf826a/state.sqlite --previous-review .local/laya-finetuning/execution-20260929/latest/reviewed.jsonl --output .local/laya-finetuning/next-audit
+.venv/Scripts/python.exe -X utf8 scripts/prepare_laya_training_data.py prepare --reviewed .local/laya-finetuning/execution-20260929/latest/reviewed.jsonl --output .local/laya-finetuning/next-readiness
+# 두 번째 명령은 현재 자료에서 exit1/not_ready가 정상적인 차단 결과다.
+```
+
+향후 예약 사양은 JSON 배열 `[ {"id":"…", "work_id":"실제 새 작업 ID", "source_ids":["새 출처 ID"]} ]`이다. 도구 적합성은 `capability_sources`에 `id/version/sha256`(실제 inventory 후보 객체의 canonical JSON SHA256)을 명시한다. `reserve --db <DB> --reservation-spec <사양.json> --reservation-history <예약 당시 감사.jsonl> --output <새 경로>`로 생성한 예약 파일과 같은 감사 파일을 후속 `audit`에 전달한다. `blind --reviewed <전체 원기록.jsonl> --output <검토 경로>`의 `blind-review.jsonl`을 검토하고 `prepare --reviewed <전체 원기록.jsonl> --review-decisions <검토 결과.jsonl> --reservations <예약.json> --questions <목적별 질문.json> --output <새 경로>`로 병합·검사한다. 기존 원문/모델/설정은 보존하며 개인 원문은 Git에 올리지 않는다.
+
 ## 재현 도구와 결과
 
 - [자료 조사·검토·분리](../scripts/prepare_laya_training_data.py), [검토 화면 템플릿](../scripts/laya_training_review.html)

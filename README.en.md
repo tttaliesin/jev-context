@@ -126,6 +126,8 @@ New model judgments retain the original input, questions, profile fingerprint, a
 
 Codex can verify reference labels against source text and execution evidence. Preparation accepts `agent_verified` reviews bound to the reviewed inputs, labels, and evidence; these are not recorded as human reviews. Data readiness and independent test separation remain required.
 
+Of 108 recorded cases and requests, 64 have Codex-verified reference labels and 44 are deferred; none qualify as independent test data. Preparation now supports advance source reservation, review without model predictions, source-group separation, and frozen data/question hashes. Training and performance comparison on actual data remain unexecuted because readiness requirements are unmet.
+
 Real stdio requests for all three purposes passed storage and server restart checks. An existing Codex MCP process may still need restarting; confirm its code matches disk through `workspace_status`. Verification requests are excluded from training data. Leaving the app open only polls status and does not generate training examples.
 
 | Tool | Purpose |
