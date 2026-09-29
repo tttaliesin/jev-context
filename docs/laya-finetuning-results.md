@@ -548,3 +548,162 @@ $env:PYTHONPATH='src'
 최종 로컬 검사: **367 passed, 2 skipped**(121.37초), Ruff 및 형식 검사162파일, 문서 로컬링크16개, 공개probe40개 출처/해시/개인 경로 제외 확인. UTF-8 환경과 짧은 pytest 임시 경로를 사용했다. 학습 보류 후 모델 재실행은 하지 않았다.
 
 마지막 검토에서 후보 모델뿐 아니라 원본 Laya·제품 SemIf의 최종 시험도 후보 고정 전에는 차단하도록 보완했다. 이후 관련 검사 **58 passed**(1.73초), Ruff/형식 재검사 통과. 앞의367개 전체 검사는 이 마지막 보완 전 결과이며 전체를 다시 실행한 것으로 표현하지 않는다.
+
+## 2026-09-29 WSL 상한 변경 후 완료 진단과 후보 비교
+
+사용자가 학습 재개를 요청했고 호스트 가용 약9.1GiB를 확인한 뒤 새 경로 `.local/laya-finetuning/resume5-20260929/`에서 실행했다. 이전 메모리 실패·사용자 중단은 보존한다. 최종 코드의40probe는 다시40/40 선택일치·최대확률차0으로 통과했다. 본 실험은 Windows CPU 실행이며 WSL5GB 설정은 다른 작업의 호스트 메모리 사용을 제한하기 위한 환경 변경이다.
+
+### 세 학습률 진단 완료
+
+| 설정 | 0회 정답 | 100회 정답 | 300회 정답 | 300회 NLL | 실행 시간 | 진단 통과 |
+|---|---:|---:|---:|---:|---:|---|
+| D1 / 1e-5 | 4/15 | 4/15 | 4/15 | 1.670520 | 326.12초 | 미통과 |
+| D2 / 1e-4 | 4/15 | 4/15 | 15/15 | 0.101841 | 322.48초 | 통과 |
+| D3 / 6e-4 | 4/15 | 6/15 | 8/15 | 1.147247 | 290.22초 | 통과 |
+
+세 실행의 원본 모델·코드·자료 hash와300단계 사례 순서가 모두 일치한다. 각 실행은 정상 완료됐고 encoder는 변경되지 않았다. D1 checkpoint는 이전 완료 진단과 동일한 `2e8771bbb091fa974e364bb21b60d37e140c9e3be7eff9dca119a8c896c735c1`이다. D2는 `7b67abdc7260ad204eb8a7cd114fccfbd7c0b07bd6d82779a0c91039961c3e35`, D3는 `0ecb3c67b84708a7a25c3d53afdc7be2d35bce714b9200ac1f81e56eb51d2402`다.
+
+**원인 범위가 좁혀졌다:** 고정된15개를 배우는 데 기존1e-5/300회 조건이 지나치게 보수적이었다는 직접 비교 근거가 생겼다. 동일 조건의1e-4는15/15를 학습했으므로 이 경로 전체가 학습 불가능하다는 가설은 지지되지 않는다. 하지만6e-4가 더 나빴으므로 학습률 증가 자체를 일반적인 해결책으로 삼지 않는다. 이는 학습한 문제의 진단이며 새 문제나 실제 업무의 성능 개선 증거는 아니다.
+
+D2/D3만 각 원본부터 train90/300의 C2/C3 후보를 만들었다. 원본을 development45에서 먼저 측정하고 후보 선택까지 이 분할만 사용했다. 진단checkpoint를 이어 학습하거나 배포하지 않았다.
+
+### 후보 학습·개발 선택·보정 완료
+
+D2/D3 진단 통과 뒤 각 원본에서 train90/300회로 새로 학습했다. C2(1e-4)는255.69초, C3(6e-4)는289.60초에 완료됐다. 두 실행 모두 encoder를 유지하고 head/type embedding/scorer의31개 tensor만 변경했다. 작은15개를 외운 진단checkpoint는 후보에 사용하지 않았다.
+
+| development45 | 목적별 정확도 평균 | 정답 | 중요 오판 | NLL | 적격 |
+|---|---:|---:|---:|---:|---|
+| 원본 Laya | 33.33% | 15/45 | 22 | 1.736490 | 기준 |
+| C2 / 1e-4 | 33.33% | 15/45 | 22 | 1.231125 | 예 |
+| C3 / 6e-4 | 33.33% | 15/45 | 20 | 1.263617 | 예, 선택 |
+
+정확도가 같으므로 사전에 정한 두 번째 기준인 중요 오판 수로 **C3를 선택**했다. C2의 낮은 NLL이나 진단15/15를 근거로 선택 순서를 바꾸지 않았다. 개발 자료는 frozen development45에서 입력·질문·라벨 순서를 대조해 만든 Python probe로 평가했다. 원시 probe와 분할/hash를 연결한 development 보고서를 보존했다.
+
+C3 저장 후 재로드15개와 격리 Ollaya 반입15개 모두 선택 일치15/15, 최대 확률차0으로 통과했다. calibration45만으로 원본 온도3, 후보 온도1.5를 선택했다. 온도는 비교 보고서의 확률 지표에 적용했으며 제품 설정은 바꾸지 않았다. 후보 checkpoint·보정·코드·자료·토크나이저·실행 조건과 runtime hash를 고정한 뒤 SemIf→원본→후보 순으로 시험을 실행했다.
+
+### 새 합성 시험90개 결과
+
+**결론: 개선 미확인.** 원본35/90(38.89%), 후보33/90(36.67%)이다. 중요 오판 합계는45→43개지만 관련성과 도구 적합성에서는 각각1개 늘었다. 전체8개는 정답으로 개선됐고10개는 오답으로 퇴보했다. 다른 오답으로 바뀐 경우는 이8/10에 포함하지 않는다. 선택이 실제로 바뀌었으므로 이전의 무변화 문제는 벗어났지만, 새로운 상황에서 정답을 더 잘 고르는 효과는 입증하지 못했다.
+
+| 목적 | 원본 정답 | 후보 정답 | 정확도 차이 | 그룹 bootstrap95% 구간 | 중요 오판 원본→후보 | 개선/퇴보 사례 수 | 기준 통과 |
+|---|---:|---:|---:|---|---:|---:|---|
+| 관련성 | 16/30 | 14/30 | -6.67%p | [-20.00, 6.67]%p | 10→11 | 1/3 | 미통과 |
+| 근거 관계 | 8/30 | 9/30 | +3.33%p | [-16.67, 23.33]%p | 22→18 | 5/4 | 미통과 |
+| 도구 적합성 | 11/30 | 10/30 | -3.33%p | [-16.67, 10.00]%p | 13→14 | 2/3 | 미통과 |
+
+목적별10개 상황 그룹을 단위로 paired bootstrap10,000회(seed20260928)를 적용했다. 세 구간 모두0을 포함한다. 세 번 반복한 관측은 시간 측정에 쓰며 정확도 표본을270개로 부풀리지 않는다. 총90개, 목적별30개인 합성 시험이고 같은 Codex가 문제 작성·검토를 맡았으므로 외부 독립 평가나 실제 업무 평가가 아니다.
+
+제품 비교는 별도다. 제품 SemIf는 GPU, Laya는 CPU이며 설정을 보존했다.
+
+| 제품 비교 | 관련성 | 근거 관계 | 도구 적합성 | 합계 | 중요 오판 합계 |
+|---|---:|---:|---:|---:|---:|
+| SemIf / GPU | 23/30 | 15/30 | 24/30 | 62/90 (68.89%) | 17 |
+| 원본 Laya / CPU | 16/30 | 8/30 | 11/30 | 35/90 (38.89%) | 45 |
+| 후보 C3 / CPU | 14/30 | 9/30 | 10/30 | 33/90 (36.67%) | 43 |
+
+SemIf도 이 시험에서 지지 정답6개를 모두 모순으로 분류했고 부분 근거6개 중1개만 맞혔다. 제품 비교 우위가 모든 라벨의 신뢰성을 뜻하지 않는다. 이전55/90과 이번62/90은 서로 다른 시험이므로 SemIf 자체가 개선됐다는 비교로 사용하지 않는다.
+
+라벨별 오답 수(반복0, 분모는 해당 정답 라벨 수):
+
+| 목적 / 정답 라벨 | 사례 수 | SemIf 오답 | 원본 Laya 오답 | 후보 C3 오답 |
+|---|---:|---:|---:|---:|
+| 관련성 / `insufficient_evidence` | 10 | 5 | 10 | 10 |
+| 관련성 / `irrelevant` | 10 | 0 | 0 | 1 |
+| 관련성 / `relevant` | 10 | 2 | 4 | 5 |
+| 근거 관계 / `contradicts` | 6 | 0 | 4 | 5 |
+| 근거 관계 / `insufficient_evidence` | 6 | 4 | 6 | 6 |
+| 근거 관계 / `partial` | 6 | 5 | 6 | 6 |
+| 근거 관계 / `supports` | 6 | 6 | 0 | 3 |
+| 근거 관계 / `unrelated` | 6 | 0 | 6 | 1 |
+| 도구 적합성 / `fit` | 10 | 3 | 6 | 6 |
+| 도구 적합성 / `insufficient_evidence` | 10 | 2 | 7 | 9 |
+| 도구 적합성 / `unfit` | 10 | 1 | 6 | 5 |
+
+주요 변화의 원문 대조:
+
+- `retry-sandbox-link-3`: “업로드 링크의 최종 대상은 허용 폴더 안이다”라는 주장에 “모니터 화면 밝기가70”이라는 근거를 주었다. 무관한 내용의 정답 `unrelated`를 후보가 새로 맞혔다.
+- `retry-migration-null-4`: “NULL이 유지됐다”는 주장에 “이전 후 NULL이 아닌 빈 문자열”이라는 관측을 주었다. 정답은 `contradicts`지만 후보는 원본이 맞힌 문제를 틀렸다.
+- `retry-migration-null-0`: NULL/빈 문자열 보존 조사에 실제 전후 값이 적힌 가상 기록을 주었다. 관련 자료를 후보가 무관으로 오판했다.
+- `retry-unicode-offset-1`: 문자 위치 변환 조사에 바탕 색상만 적힌 후보를 주었다. 무관한 자료를 후보가 관련으로 오판했다.
+
+모든 예시는 합성 기록이다. 입력·추천 정답·근거는 기존 `synthetic-retry-20260929.json`, 전체 사례별 선택·확률·변경 목록은 로컬 `*/test.json`과 `comparison/comparison.json`에 남아 있다. 정보 부족과 무관, 부분 근거 구별은 여전히 약하다. 라벨 빈도나 문장 패턴에 치우쳤는지, encoder 표현력이 부족한지는 이번 실험만으로 확정하지 않았다. 이를 확인하려고 소진된 시험으로 다시 후보를 조정하지 않는다.
+
+### 실행 비용과 실패 보존
+
+각 모델90개×3회, 총810회가 모두 관측됐고 실패0·미실행0·반복 간 선택 변화0이었다. 아래 추론 시간은 준비 시간을 제외한270개 요청 전체다. 메모리는5초 간격으로 관측한 프로세스 트리 working set 최대값이며 순간 peak나 GPU 메모리를 포함한 총량이 아니다.
+
+| 실행 | 준비 시간 | 추론 p50 | 추론 p95 | 관측 메모리 최대 |
+|---|---:|---:|---:|---:|
+| SemIf GPU | 119.55초 | 1116.33ms | 1723.76ms | 6.776GiB (7275565056bytes) |
+| 원본 Laya CPU | 5.03초 | 497.16ms | 772.91ms | 1.399GiB (1501790208bytes) |
+| C3 CPU | 5.50초 | 422.56ms | 640.02ms | 1.397GiB (1500446720bytes) |
+
+| 목적 | 원본 p50/p95 | 후보 p50/p95 |
+|---|---:|---:|
+| 관련성 | 298.87/453.07ms | 269.18/362.47ms |
+| 근거 관계 | 580.27/790.94ms | 498.64/663.36ms |
+| 도구 적합성 | 582.04/813.02ms | 492.31/684.48ms |
+
+이번 순차 측정에서 후보의 p95·메모리는10% 악화 기준에 걸리지 않았다. 하지만 정확도 구간과 중요 오판 기준을 통과하지 못했으므로 적용하지 않는다. 같은 구조의 모델이며 실행 순서와 시스템 부하의 영향도 있어, 측정 시간 감소를 학습으로 인한 일반적인 속도 개선이라고 단정하지 않는다. SemIf 준비119.55초도 별도 기록했고 추론 시간에 숨기지 않았다.
+
+보정 후 시험 전체 NLL은 원본1.298459→후보1.263104, Brier는0.714671→0.707509다. 확률 지표의 작은 감소를 정답률 개선으로 대체하지 않는다.
+
+### 고정 식별값·재현 기록
+
+이번 실행 코드는 `ee4d83e3999ab9bb63426b94d681e1c0caabc548`이며 코드 수정 없이 완료했다. 설치 버전은 Laya0.3.5, torch2.8.0+cpu, transformers4.56.2, Ollaya0.7.3이다. 학습 공통 조건은 seed20260928·batch1·CPU4 threads·AdamW weight_decay0.01·clip1·300updates다. encoder 고정, head/type embedding/scorer만 갱신했고5개 실행 모두300회·20분/step30초 제한 안에 완료했다.
+
+| 대상 | SHA256 |
+|---|---|
+| 원본 checkpoint | `9d628fd971b700382ac6f65920a86f149777b2e748e0c955fb3b19695aa8f204` |
+| C2 checkpoint | `a2bd76ab0393514839201fe361647d189053f65c9865e0c111ef3353be3a3279` |
+| 선택 C3 checkpoint | `ce006280dd2ec6dbe1d6b1cfbeb1750782adf8cf914b1e2575bae7272279e2a3` |
+| 고정 자료 | `b4e5f0957f54e05f72fddca7e7af083106cd92e2fa460cf86f06e56c8cf3b4c0` |
+| 분할 manifest | `2603447e3c5f563740ca5f8f79f4768380422cc73fc87a5d8f0e610b66f5c8bf` |
+| tokenizer.json | `609d8f4c067cd3950f88594c5a802616cea245823836ef5848ee4fc40aab5b6f` |
+| tokenizer_config.json | `6c6b2d8e3c84ce0e671c129cd6b374b235d6f9863042a5836358d00a89bbb5a1` |
+| trainer | `25cd85b4d6469ff21375c1391f66384f547878fda0911c2ac021ddf6d9ec777f` |
+| evaluator | `c3609b11167e43df060263a305d29e170a6ea72802f01e2a98ccf9f78992914f` |
+| C3 Ollaya manifest | `cf2508538095096564f458ab0c9220a7677bf7ffab7f20a0b61fd6194a21851b` |
+| 후보·조건 잠금 | `875f07c57f6569747296376811c51a893f1b4affe0d652ccc299c7fafaefbeab` |
+| 최종 comparison.json | `d7ea1ab8aa04aa229677c7a3a1ec30d0f021b39c7a35b007d854018a2a2dc989` |
+
+질문별 hash와 입력 순서는 frozen/실행 행, 모델 store 전체 파일 hash는 candidate-lock, GPU profile 식별값은 product/test.json에 보존한다. calibration·원본 runtime·execution-conditions.json도 시험 전에 잠금에 추가했다. 최종 검증에서 잠긴 모든 파일 hash,810개 입력·정답·순서, 모델별 시작/종료 시점의 비중첩, 시험 소진 표식을 다시 대조했다.
+
+다음은 이번에 실행한 CLI의 인자 구성이다. 자료 준비·15개ID 작성은 위 재현 절을 사용했다. 아래 경로의 실행 기록은 이미 완료됐으므로 **덮어쓰기/재실행하지 않는다**. 과거 재현 검토에 쓰고, 시험 결과를 보고 모델을 수정하려면 새 상황 시험을 준비해야 한다. 소진 표식을 지우거나 자료를 복사해 독립성을 되돌리지 않는다.
+
+```powershell
+$env:PYTHONUTF8='1'
+$env:PYTHONPATH='src'
+$run='.local/laya-finetuning/resume5-20260929'
+$frozen='.local/laya-finetuning/retry-20260929/frozen'
+$ids='.local/laya-finetuning/lr-20260929/diagnostic-ids.json'
+$dataArgs=@('--data-profile','synthetic-experiment','--dataset',"$frozen/frozen.jsonl",'--manifest',"$frozen/prepare.json")
+# D1/D2/D3: rate=1e-5/1e-4/6e-4, name=D1/D2/D3; 매 실행은 원본부터 시작.
+.local/laya-venv/Scripts/python.exe -X utf8 -m scripts.train_laya_pilot train @dataArgs --split train --steps 300 --learning-rate 1e-4 --diagnostic-ids $ids --output "$run/D2"
+# 진단 통과 후 별도 후보.C2=1e-4, C3=6e-4.
+.local/laya-venv/Scripts/python.exe -X utf8 -m scripts.train_laya_pilot train @dataArgs --split train --steps 300 --learning-rate 6e-4 --parity-ids $ids --output "$run/C3"
+.local/laya-venv/Scripts/python.exe -X utf8 -m scripts.train_laya_pilot reload @dataArgs --split train --steps 300 --learning-rate 6e-4 --parity-ids $ids --output "$run/C3"
+.local/laya-package-venv/Scripts/python.exe -X utf8 -m scripts.package_laya_pilot --pilot "$run/C3" --output "$run/candidate-store"
+```
+
+개발 평가에는 `load_frozen(..., 'development', 'synthetic-experiment')`의45개만 `development-probes.json`으로 연결했다. 기존 `probe --backend python --python-model <checkpoint>`로 원본/C2/C3를 순차 평가하고 `select_development_candidate`에 분할·입력 hash와 원시 보고서 hash를 연결해 전달했다. 로컬 `run_candidates.py`에 이 변환과 입력·질문·라벨 순서 대조를 보존했다. 새 수집 서비스나 공개 MCP 계약은 추가하지 않았다.
+
+최종 실행은 모델을 동시에 적재하지 않는 격리 CPU daemon 두 개(원본11444, 후보11445), `OLLAYA_MAX_LOADED_MODELS=1`, `OMP_NUM_THREADS=4`를 사용했다. `--server-pid`에는 당시 실제 PID를 전달했다. 실행을 재현할 때 PID는 새로 확인해야 한다.
+
+```powershell
+# 원본은 endpoint11444/model laya:multilingual/store .local/ollaya-evaluation/models.
+# 후보는 endpoint11445/model jev-laya:pilot/store $run/candidate-store.
+.venv/Scripts/python.exe -X utf8 -m scripts.evaluate_ollaya frozen @dataArgs --split calibration --backend ollaya --model jev-laya:pilot --endpoint http://127.0.0.1:11445 --server-pid 578488 --model-store "$run/candidate-store" --output "$run/candidate"
+.venv/Scripts/python.exe -X utf8 -m scripts.evaluate_ollaya freeze-candidate @dataArgs --checkpoint "$run/C3/checkpoint/model.safetensors" --model-store "$run/candidate-store" --calibration-report "$run/candidate/calibration.json" --candidate-lock "$run/candidate-lock.json"
+# 후보/원본 보정과 추가 실행조건 hash 잠금 뒤 SemIf→원본→후보 각각 test(자동3회).
+.venv/Scripts/python.exe -X utf8 -m scripts.evaluate_ollaya frozen @dataArgs --split test --backend ollaya --model jev-laya:pilot --endpoint http://127.0.0.1:11445 --server-pid 578488 --model-store "$run/candidate-store" --candidate-lock "$run/candidate-lock.json" --output "$run/candidate"
+.venv/Scripts/python.exe -X utf8 -m scripts.evaluate_ollaya compare @dataArgs --candidate-lock "$run/candidate-lock.json" --baseline-report "$run/baseline/test.json" --candidate-report "$run/candidate/test.json" --product-report "$run/product/test.json" --output "$run/comparison"
+```
+
+실제 전체 순서는 로컬 `run.py`→`run_candidates.py`→`finish_selected.py`와 단계별 로그에 보존했다. 이 보조 실행 파일과 모델 store는 로컬 실행 산출물이며 원격 저장소에는 올리지 않는다. 공개 fixture·기존 CLI·이 문서가 재현 방법의 공개 부분이고, 원본 모델·로컬 환경·고정 자료의 준비가 별도로 필요하다.
+
+### 완료 범위와 남은 한계
+
+최종 로컬 회귀 검사68개 통과(3.07초), 관련 trainer/evaluator/package/test의 Ruff 통과. 잠금 파일·전체 관측·질문/입력/정답·순서·학습 대상·자원 종료 조건을 결과 파일과 재대조했다. 소유 Ollaya 서버11444/11445는 적재 모델0개 확인 후 종료됐고 SemIf 평가 worker도 종료됐다. 원격CI·유료 자원·제품 기본 모델 교체는 사용하지 않았다.
+
+이번 승인 범위인 공개 재현·세 학습률 진단·두 후보 학습·개발 선택·보정·반입·새 시험 비교는 완료됐다. **학습 경로는 작동하지만 품질 개선은 미확인**이다. 자료/입력 표현의 일반화와 encoder 적응은 미해결 원인 후보이며 이번 범위를 넘는 추가 학습을 자동 실행하지 않는다. 새 시험90개는 이제 소진됐다. 실제 업무66개 확정·42개 보류,600개 기준과 독립 시험 부족은 그대로이며 이 합성 결과를 실제 개선으로 합산하지 않는다. 사용자에게 필요한 즉시 조치는 없다.
