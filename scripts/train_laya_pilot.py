@@ -23,13 +23,16 @@ sys.path.insert(0, str(ROOT / "src"))
 def validate_run(args, cases):
     steps = getattr(args, "steps", 100)
     rate = getattr(args, "learning_rate", 1e-5)
-    if (steps, rate) not in {(100, 1e-5), (300, 1e-5), (300, 3e-5)}:
+    extra = args.data_profile == "synthetic-experiment" and steps == 300 and rate in {1e-4, 6e-4}
+    if not extra and (steps, rate) not in {(100, 1e-5), (300, 1e-5), (300, 3e-5)}:
         raise ValueError("Only approved A/B/C training settings are allowed")
     selection = getattr(args, "diagnostic_ids", None)
     if not selection:
         return cases
-    if args.data_profile == "public-pilot" or rate != 1e-5 or steps != 300:
-        raise ValueError("Diagnostic requires frozen train, 300 steps and learning rate 1e-5")
+    if args.data_profile == "public-pilot" or rate not in {1e-5, 1e-4, 6e-4} or steps != 300:
+        raise ValueError(
+            "Diagnostic requires frozen train, 300 steps and an approved diagnostic rate"
+        )
     ids = read(selection)
     if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids):
         raise ValueError("Diagnostic IDs must be a JSON string list")
@@ -46,6 +49,20 @@ def validate_run(args, cases):
         if len(group) != 5 or {c["expected"] for c in group} != set(labels):
             raise ValueError("Diagnostic must cover five cases and all labels per purpose")
     return selected
+
+
+def select_parity(cases, ids, profile):
+    by_id = {c["id"]: c for c in cases}
+    if (
+        profile == "public-pilot"
+        or not isinstance(ids, list)
+        or not all(isinstance(i, str) for i in ids)
+        or len(ids) != 15
+        or len(set(ids)) != 15
+        or set(ids) - by_id.keys()
+    ):
+        raise ValueError("Parity IDs require 15 unique frozen train IDs")
+    return [by_id[i] for i in ids]
 
 
 def diagnostic_passed(snapshots, changed_tensors):
@@ -194,6 +211,7 @@ def main():
     parser.add_argument("--steps", type=int, default=100)
     parser.add_argument("--learning-rate", type=float, default=1e-5)
     parser.add_argument("--diagnostic-ids", type=Path)
+    parser.add_argument("--parity-ids", type=Path)
     parser.add_argument(
         "--split", choices=["train", "development", "calibration", "test"], required=True
     )
@@ -276,6 +294,9 @@ def main():
         base_weights = args.base / "model.safetensors"
         original_hash = sha(base_weights)
         parity = [c for p in questions for c in [x for x in cases if x["purpose"] == p][:4]]
+        if args.parity_ids:
+            parity = select_parity(cases, read(args.parity_ids), args.data_profile)
+            report["parity_ids_sha256"] = sha(args.parity_ids)
         if args.stage == "train":
             model_path = output / "reference-base"
             shutil.copytree(args.base, model_path)
@@ -358,7 +379,7 @@ def main():
             trainable = [p for p in agent.model.parameters() if p.requires_grad]
             report["trainable_parameters"] = sum(p.numel() for p in trainable)
             report["total_parameters"] = sum(p.numel() for p in agent.model.parameters())
-            optimizer = torch.optim.AdamW(trainable, lr=args.learning_rate)
+            optimizer = torch.optim.AdamW(trainable, lr=args.learning_rate, weight_decay=0.01)
             prepared = []
             for case in cases:
                 q = agent._to_internal(questions[case["purpose"]])

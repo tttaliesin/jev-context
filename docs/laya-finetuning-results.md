@@ -498,3 +498,53 @@ $env:PYTHONUTF8='1'
 ```
 
 원본 대조용으로 실행한 소유 Ollaya daemon11442는 모델 해제 후 종료했다. native Jev는 `matches_disk`/idle, 기존 profile fingerprint 및 promotion=false를 유지한다. 재시작은 필요하지 않다. 개인 원문·진단 가중치·로컬 실행 로그는 업로드하지 않고 검증한 코드·문서·합성 자료만 기존 원격에 반영한다.
+
+## 2026-09-29 외부 재현·학습률 비교 실행
+
+승인된 계획과 자체검토를 실행 전에 고정했다. 실행 경로는 `.local/laya-finetuning/lr-20260929/`이며 기존 실행을 덮어쓰지 않는다. 현재 상태: 코드·40개 실행 경로 대조 완료, 추가 학습은 사용자 요청으로 보류. 실행 결과는 아래와 같다.
+
+### 40개 공개 재현·선택지 순서 대조
+
+`evaluations/laya-finetuning/lr-probes-20260929.json`의 40개 입력을 예측 전에 고정했다. payload hash는 `ebe31fb1ffb9544d88a1036eaed6237b706e92e4db45d1ed12d808586eb8b575`다. 기존 train15와 역순15, 공식 #377 원문5와 역순5이며, 같은 의미의 원본·역순을 독립40개로 세지 않는다. 질문·라벨 순서를 그대로 전달했고 입력별 원출처·정답 이유·hash를 보존했다. 사람 검토가 아닌 Codex 검토다.
+
+Python과 Ollaya는 **40/40 선택 일치, 최대 확률차0**, 실패0이었다. 원본15개 정답4개, 공개 원문5개 정답3개이며 역순에서도 각각 같았다. 20쌍 중 선택 변화0개다. 공개 부정문 중 앞서 취소를 언급한 뒤 취소하지 말라고 명시한 두 사례는 양쪽 실행기에서 모두 틀렸다. 이 설치 버전에서도 공개 증상을 재현했지만 부정문 전체의 실패율로 확대할 수 없다. 이번 입력의 오답을 Ollaya 전달 오류로 설명할 근거는 없고, 순서 민감성도 이20쌍에서는 관측되지 않았다.
+
+원시 입력별 결과는 로컬 `probe-python/probe.json`, `probe-ollaya/probe.json`, `probe-parity.json`에 보존한다. 기존 multilingual checkpoint와 Ollaya0.7.3/CPU 설정을 사용했으며 패키지 업데이트는 없었다.
+
+### 학습 실행과 사용자 요청에 따른 보류
+
+| 실행 | 실제 진행 | 동일15개 평가 | 종료 이유 |
+|---|---|---|---|
+| D1 / 1e-5 | 252 updates | 0회4/15·NLL2.054917, 100회4/15·NLL1.898715 | 실행 중 자원 하한 위반; 조사 시 가용메모리 약1.6GiB |
+| D2 / 1e-4 | 0 updates | 미측정 | 적재 전 가용4GiB 조건 미달 |
+| D3 / 6e-4 | 0 updates | 미측정 | 적재 전 가용4GiB 조건 미달 |
+| D1 재시도 | 123 updates | 0회·100회 결과는 위와 동일 | 사용자가 학습 보류 요청, 실행기와 자식 학습 프로세스 종료 |
+
+어느 설정도300회 진단을 완료하지 못했다. **높은 학습률의 효과는 아직 측정되지 않았고 후보 학습·보정·반입·새 최종 시험은 미실행**이다. 자원 실패나 사용자 중단을 모델의 학습 실패로 계산하지 않는다. 기존 결론인 개선 미확인은 유지한다.
+
+호스트 조사에서 WSL의 높은 메모리 사용을 확인했다. Linux 파일 캐시를 회수했으나 다른 프로젝트의 Docker 서비스는 종료하지 않았다. Windows 가용메모리가4GiB를 회복한 뒤 새 출력 경로로 D1을 재개했고, 이후 사용자가 “이번에는 코드·검사까지 마무리하고 학습은 보류해”라고 지시해 중단했다. 재시도 원시 train.json은 강제 종료 당시의 부분 기록으로 보존하고 `user-stop.json`으로 종료 이유를 별도 연결한다. 부분 기록을 완료된 학습 보고서로 수정하지 않는다.
+
+실패 뒤 다른 설정을 즉시 적재하려던 첫 실행기의 절차는 부족했다. 재개 시에는 모델 해제와4GiB 회복을 먼저 확인하고 새로운 실행 디렉터리를 예약해야 한다. 사용자 보류 이후 자동 재시도·예약 작업은 남기지 않는다. 소유 Ollaya daemon11443도 모델0개 확인 후 종료했다. 제품 설정·원자료·미사용test90은 보존했다.
+
+### 코드 변경과 재현 방법
+
+평가 CLI에 `probe --probe-dataset`과 Python backend를 추가했다. frozen 입력과 혼용을 거절하고 사례별 질문을 그대로 사용하며, 순서 포함 hash·역순 쌍 의미 라벨을 검사한다. 오류·미실행 행을 보존하고 기존 실행을 덮어쓰지 않는다. 학습기의 높은 학습률은 synthetic-experiment/300회만 허용하며 진단과 최종 후보는 계속 분리한다. 별도 후보의 재로드 검사에 같은15개를 지정할 `--parity-ids`를 추가했다. 후보 고정은 학습기·평가기 코드 파일도 hash로 잠근다.
+
+다음은 보류 해제 후 사용할 명령이며 이번에 완료된 실행으로 해석하지 않는다. 출력 디렉터리는 매번 새 이름을 사용한다.
+
+```powershell
+$env:PYTHONUTF8='1'
+$env:PYTHONPATH='src'
+# 격리 Ollaya 서버: CPU, MAX_LOADED_MODELS=1, OMP_NUM_THREADS=4, 루프백11443.
+# Python 대조는 기존 호환 reference-base를 사용하며 원본 가중치는 변경하지 않는다.
+.local/laya-venv/Scripts/python.exe -X utf8 -m scripts.evaluate_ollaya probe --data-profile synthetic-experiment --probe-dataset evaluations/laya-finetuning/lr-probes-20260929.json --backend python --python-model .local/laya-finetuning/retry-20260929/diagnostic/reference-base --endpoint http://127.0.0.1:11443 --output .local/laya-finetuning/lr-resume/probe-python
+.venv/Scripts/python.exe -X utf8 -m scripts.evaluate_ollaya probe --data-profile synthetic-experiment --probe-dataset evaluations/laya-finetuning/lr-probes-20260929.json --backend ollaya --endpoint http://127.0.0.1:11443 --output .local/laya-finetuning/lr-resume/probe-ollaya
+# 실제 학습은 사용자의 보류 해제 후, 자원과 대조 통과 확인 뒤 실행한다.
+.local/laya-venv/Scripts/python.exe -X utf8 -m scripts.train_laya_pilot train --data-profile synthetic-experiment --dataset .local/laya-finetuning/retry-20260929/frozen/frozen.jsonl --manifest .local/laya-finetuning/retry-20260929/frozen/prepare.json --split train --steps 300 --learning-rate 1e-4 --diagnostic-ids .local/laya-finetuning/lr-20260929/diagnostic-ids.json --output .local/laya-finetuning/lr-resume/D2
+```
+
+코드의 출력 보존·오류 처리 보완은 모델 대조 이후에도 이루어졌다. 40개 모델 출력은 대조 시점의 코드 hash와 연결된 결과이며 최종 코드의 새 모델 실행을 했다고 표현하지 않는다. 사용자 보류 이후에는 모델을 다시 실행하지 않고 로컬 회귀 검사만 수행한다.
+
+최종 로컬 검사: **367 passed, 2 skipped**(121.37초), Ruff 및 형식 검사162파일, 문서 로컬링크16개, 공개probe40개 출처/해시/개인 경로 제외 확인. UTF-8 환경과 짧은 pytest 임시 경로를 사용했다. 학습 보류 후 모델 재실행은 하지 않았다.
+
+마지막 검토에서 후보 모델뿐 아니라 원본 Laya·제품 SemIf의 최종 시험도 후보 고정 전에는 차단하도록 보완했다. 이후 관련 검사 **58 passed**(1.73초), Ruff/형식 재검사 통과. 앞의367개 전체 검사는 이 마지막 보완 전 결과이며 전체를 다시 실행한 것으로 표현하지 않는다.

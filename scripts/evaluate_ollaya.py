@@ -69,7 +69,12 @@ def select_development_candidate(baseline, candidates):
         try:
             if training.get("diagnostic") or training.get("status") != "completed":
                 raise ValueError("Diagnostic or incomplete training is ineligible")
-            if (training["max_steps"], training["learning_rate"]) not in {
+            extra = (
+                training.get("data_profile") == "synthetic-experiment"
+                and training["max_steps"] == 300
+                and training["learning_rate"] in {1e-4, 6e-4}
+            )
+            if not extra and (training["max_steps"], training["learning_rate"]) not in {
                 (100, 1e-5),
                 (300, 1e-5),
                 (300, 3e-5),
@@ -163,7 +168,14 @@ def freeze_candidate(args):
     if len(manifests) != 1 or calibration.get("model_manifest_sha256") != sha(manifests[0]):
         raise ValueError("Calibration candidate manifest mismatch")
     temperature = choose_temperature(calibration)
-    files = [args.checkpoint, args.calibration_report, args.manifest, training_report]
+    files = [
+        args.checkpoint,
+        args.calibration_report,
+        args.manifest,
+        training_report,
+        Path(__file__),
+        ROOT / "scripts/train_laya_pilot.py",
+    ]
     files.extend(p for p in args.model_store.rglob("*") if p.is_file())
     lock = {
         "dataset_sha256": sha(args.dataset),
@@ -190,10 +202,14 @@ def frozen_evaluation(args):
     ):
         raise ValueError("Frozen evaluation needs explicit dataset/manifest/profile/split")
     cases = load_frozen(args.dataset, args.manifest, args.split, args.data_profile)
-    if args.model != BASE_MODEL and args.backend == "ollaya" and args.split == "test":
+    if args.split == "test":
         if not args.candidate_lock:
-            raise ValueError("Candidate test requires a frozen candidate")
-        check_candidate_lock(args.candidate_lock, args.dataset, args.model_store)
+            raise ValueError("Every final test requires a frozen candidate")
+        check_candidate_lock(
+            args.candidate_lock,
+            args.dataset,
+            args.model_store if args.backend == "ollaya" and args.model != BASE_MODEL else None,
+        )
     args.output.mkdir(parents=True, exist_ok=True)
     target = args.output / (args.split + ".json")
     with target.open("x", encoding="utf-8") as stream:
@@ -963,11 +979,243 @@ def identity(model_store):
     return {"hashes": hashes, "calibration": calibration}
 
 
+def probe_digest(value):
+    # Dictionary insertion order is part of the choice presentation contract.
+    return hashlib.sha256(
+        json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode()
+    ).hexdigest()
+
+
+def load_probes(path):
+    payload = read(path)
+    cases = payload["cases"]
+    if payload.get("usage") != "development_probe" or payload.get("sha256") != probe_digest(cases):
+        raise ValueError("Probe usage or content hash changed")
+    if not cases or len({c["id"] for c in cases}) != len(cases):
+        raise ValueError("Probe IDs must be unique")
+    for c in cases:
+        if c["split"] != "development" or c["usage"] not in {
+            "development_probe",
+            "external_reproduction",
+        }:
+            raise ValueError("Probes are development only")
+        if c["question"].get("type") != "choice" or c["expected"] not in c["question"]["criteria"]:
+            raise ValueError("Probe label/question mismatch")
+        if c["state_sha256"] != probe_digest(c["state"]) or c["question_sha256"] != probe_digest(
+            c["question"]
+        ):
+            raise ValueError("Probe input/question hash changed")
+        if not c.get("source") or not c.get("rationale"):
+            raise ValueError("Probe source and review required")
+    by_id = {c["id"]: c for c in cases}
+    for c in cases:
+        if c.get("reversed_from"):
+            original = by_id[c["reversed_from"]]
+            expected_q = copy.deepcopy(original["question"])
+            expected_q["criteria"] = dict(reversed(list(expected_q["criteria"].items())))
+            if (
+                c["question"] != expected_q
+                or list(c["question"]["criteria"]) != list(expected_q["criteria"])
+                or c["state"] != original["state"]
+                or c["expected"] != original["expected"]
+            ):
+                raise ValueError("Reverse probe changed meaning or label order")
+    return cases
+
+
+def compare_probes(reference, actual):
+    fields = ("id", "purpose", "expected", "state_sha256", "question_sha256", "labels")
+    if reference["dataset_sha256"] != actual["dataset_sha256"] or len(reference["rows"]) != len(
+        actual["rows"]
+    ):
+        raise ValueError("Probe dataset or row count mismatch")
+    rows = []
+    for left, right in zip(reference["rows"], actual["rows"], strict=True):
+        if any(left[k] != right[k] for k in fields):
+            raise ValueError("Probe input/order mismatch")
+        row = {"id": left["id"], "choice_match": False, "max_probability_error": None}
+        if left.get("status") == right.get("status") == "observed":
+            row["choice_match"] = left["choice"] == right["choice"]
+            row["max_probability_error"] = max(
+                abs(left["probabilities"][k] - right["probabilities"][k]) for k in left["labels"]
+            )
+        rows.append(row)
+    return {
+        "rows": rows,
+        "count": len(rows),
+        "passed": bool(rows)
+        and all(r["choice_match"] and r["max_probability_error"] <= 0.005 for r in rows),
+    }
+
+
+def complete_probe_failures(report, cases, reason):
+    by_id = {r["id"]: r for r in report["rows"]}
+    for c in cases:
+        if c["id"] not in by_id:
+            row = {
+                k: c[k] for k in ("id", "purpose", "expected", "state_sha256", "question_sha256")
+            }
+            row.update(labels=list(c["question"]["criteria"]), status="not_run", reason=reason)
+            report["rows"].append(row)
+        elif "status" not in by_id[c["id"]]:
+            by_id[c["id"]].update(status="error", reason=reason)
+
+
+def probe_evaluation(args):
+    import os
+
+    from jev_context.storage import FileLock
+    from scripts.train_laya_pilot import memory_gib
+
+    if not args.probe_dataset or any(
+        (args.dataset, args.manifest, args.split, args.candidate_lock)
+    ):
+        raise ValueError("Probe input cannot be combined with frozen inputs")
+    if args.data_profile != "synthetic-experiment" or args.backend not in {"python", "ollaya"}:
+        raise ValueError("Probe needs synthetic-experiment and Python/Ollaya")
+    cases = load_probes(args.probe_dataset)
+    args.output.mkdir(parents=True, exist_ok=False)
+    report = {
+        "usage": "development_probe",
+        "quality_evaluation": False,
+        "dataset_sha256": sha(args.probe_dataset),
+        "code_sha256": sha(Path(__file__)),
+        "backend": args.backend,
+        "model": args.model,
+        "rows": [],
+    }
+    initial = copy.deepcopy(report)
+    initial["status"] = "started"
+    complete_probe_failures(initial, cases, "not_started")
+    save(args.output / "probe.json", initial)
+    stopped = threading.Event()
+    began = time.perf_counter()
+    deadline = {"case": None}
+
+    def watchdog():
+        while not stopped.wait(0.5):
+            if (
+                time.perf_counter() - began > 1200
+                or memory_gib() < 1.5
+                or (deadline["case"] and time.perf_counter() > deadline["case"])
+            ):
+                report.update(status="failed", reason="time_or_memory_limit")
+                complete_probe_failures(report, cases, "time_or_memory_limit")
+                save(args.output / "probe.json", report)
+                os._exit(124)
+
+    client = Client(args.endpoint)
+    with (
+        FileLock(ROOT / ".local/laya-finetuning/experiment-model.lock"),
+        FileLock(Path(read(args.profile)["lock_root"]) / "resident.lock"),
+    ):
+        if client.call("/api/ps")["models"]:
+            raise ValueError("Another model is resident")
+        if memory_gib() < 4:
+            raise MemoryError("Require 4 GiB before loading")
+        threading.Thread(target=watchdog, daemon=True).start()
+        try:
+            if args.backend == "python":
+                os.environ["HF_HUB_OFFLINE"] = "1"
+                os.environ["TRANSFORMERS_OFFLINE"] = "1"
+                import torch
+                from laya import Agent
+                from laya.common import render_options, serialize_state
+
+                torch.set_num_threads(4)
+                agent = Agent(str(args.python_model), device="cpu")
+                agent.model.eval()
+                report["checkpoint_sha256"] = sha(args.python_model / "model.safetensors")
+            else:
+                report["identity"] = identity(args.model_store)
+                report["version"] = client.call("/api/version")
+                client.call("/api/decide", {"model": args.model, "keep_alive": -1}, timeout=300)
+            report["preparation_seconds"] = time.perf_counter() - began
+            for c in cases:
+                row = {
+                    k: c[k]
+                    for k in ("id", "purpose", "expected", "state_sha256", "question_sha256")
+                }
+                row["labels"] = list(c["question"]["criteria"])
+                report["rows"].append(row)
+                started = time.perf_counter()
+                deadline["case"] = started + 30
+                try:
+                    if args.backend == "python":
+                        q = agent._to_internal(c["question"])
+                        state = serialize_state(c["state"])
+                        options = render_options(q)
+                        lengths = [
+                            len(agent.tok(" " + o, add_special_tokens=False)["input_ids"])
+                            for o in options
+                        ]
+                        head = len(
+                            agent.tok(f"{q['t']} question: {q['ins']}", add_special_tokens=False)[
+                                "input_ids"
+                            ]
+                        )
+                        state_len = len(agent.tok(state, add_special_tokens=False)["input_ids"])
+                        if (
+                            any(agent.tok.mask_token in t for t in [state, q["ins"], *options])
+                            or any(n > 48 for n in lengths)
+                            or max(head, 16) + sum(lengths) + len(lengths) > 256
+                            or head + sum(lengths) + len(lengths) + state_len + 4 > 1024
+                        ):
+                            raise ValueError("Input would be truncated or rewritten")
+                        raw = agent.system_one(c["state"], {c["purpose"]: c["question"]})
+                    else:
+                        raw = client.call(
+                            "/v1/systemone",
+                            {
+                                "model": args.model,
+                                "state": c["state"],
+                                "questions": {c["purpose"]: c["question"]},
+                            },
+                            timeout=30,
+                        )
+                        if raw.get("model") != args.model:
+                            raise ValueError("Unexpected model")
+                    if raw.get("state_truncated"):
+                        raise ValueError("Input was truncated")
+                    answer = raw["answers"][c["purpose"]]
+                    probs = answer["probabilities"]
+                    if (
+                        set(probs) != set(row["labels"])
+                        or answer["choice"] not in probs
+                        or not all(math.isfinite(p) and 0 <= p <= 1 for p in probs.values())
+                    ):
+                        raise ValueError("Invalid probabilities or labels")
+                    row.update(status="observed", choice=answer["choice"], probabilities=probs)
+                except Exception as exc:
+                    row.update(status="error", reason=str(exc))
+                finally:
+                    deadline["case"] = None
+                    row["latency_ms"] = (time.perf_counter() - started) * 1000
+                    save(args.output / "probe.json", report)
+                print(c["id"], row["status"], flush=True)
+            report["status"] = (
+                "completed" if all(r["status"] == "observed" for r in report["rows"]) else "failed"
+            )
+        except Exception as exc:
+            report.update(status="failed", reason=str(exc))
+            raise
+        finally:
+            stopped.set()
+            complete_probe_failures(report, cases, report.get("reason", "interrupted"))
+            try:
+                if args.backend == "ollaya":
+                    client.unload(args.model)
+                    report["after_unload"] = client.call("/api/ps")
+            finally:
+                save(args.output / "probe.json", report)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "stage",
         choices=[
+            "probe",
             "develop",
             "validate",
             "semif",
@@ -978,13 +1226,17 @@ def main():
             "compare",
         ],
     )
+    parser.add_argument("--probe-dataset", type=Path)
+    parser.add_argument(
+        "--python-model", type=Path, default=ROOT / ".local/models/laya-multilingual"
+    )
     parser.add_argument("--dataset", type=Path)
     parser.add_argument("--manifest", type=Path)
     parser.add_argument("--split", choices=["train", "development", "calibration", "test"])
     parser.add_argument(
         "--data-profile", choices=["actual", "synthetic-experiment", "public-pilot"], required=True
     )
-    parser.add_argument("--backend", choices=["ollaya", "semif"], default="ollaya")
+    parser.add_argument("--backend", choices=["ollaya", "semif", "python"], default="ollaya")
     parser.add_argument("--model", default=BASE_MODEL)
     parser.add_argument("--candidate-lock", type=Path)
     parser.add_argument("--checkpoint", type=Path)
@@ -1000,6 +1252,21 @@ def main():
     )
     parser.add_argument("--profile", type=Path, default=ROOT / ".local/semif-ov-profile.json")
     args = parser.parse_args()
+    if args.stage == "probe":
+        existed = args.output.exists()
+        try:
+            probe_evaluation(args)
+        except Exception as exc:
+            target = args.output / "probe.json"
+            if not existed and target.exists():
+                report = read(target)
+                report.update(status="failed", reason=str(exc))
+                complete_probe_failures(report, load_probes(args.probe_dataset), str(exc))
+                save(target, report)
+            raise
+        return
+    if args.probe_dataset or args.backend == "python":
+        parser.error("Probe dataset and Python backend require probe stage")
     if args.stage == "compare":
         compare_frozen(args)
         return

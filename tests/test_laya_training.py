@@ -548,6 +548,9 @@ def test_frozen_evaluator_busy_does_not_unload_other_model(tmp_path, monkeypatch
 
     monkeypatch.setattr(evaluate, "Client", Client)
     monkeypatch.setattr(evaluate, "ROOT", tmp_path)
+    candidate_lock = tmp_path / "candidate-lock.json"
+    candidate_lock.write_text("{}")
+    monkeypatch.setattr(evaluate, "check_candidate_lock", lambda *args: {})
     args = argparse.Namespace(
         dataset=tmp_path / "frozen.jsonl",
         manifest=manifest,
@@ -555,7 +558,7 @@ def test_frozen_evaluator_busy_does_not_unload_other_model(tmp_path, monkeypatch
         data_profile="synthetic-experiment",
         model="laya:multilingual",
         backend="ollaya",
-        candidate_lock=None,
+        candidate_lock=candidate_lock,
         endpoint="unused",
         profile=profile,
         output=tmp_path / "results",
@@ -567,6 +570,7 @@ def test_frozen_evaluator_busy_does_not_unload_other_model(tmp_path, monkeypatch
     assert all(r["status"] == "not_run" for r in saved["rows"])
     assert calls == ["/api/ps"]
     args.model = "jev-laya:pilot"
+    args.candidate_lock = None
     with pytest.raises(ValueError, match="frozen candidate"):
         evaluate.frozen_evaluation(args)
 
@@ -786,6 +790,10 @@ def test_retry_diagnostic_ids_and_settings(tmp_path):
         steps=300, learning_rate=1e-5, diagnostic_ids=path, data_profile="synthetic-experiment"
     )
     assert len(validate_run(args, rows)) == 15
+    for rate in (1e-4, 6e-4):
+        args.learning_rate = rate
+        assert len(validate_run(args, rows)) == 15
+    args.learning_rate = 1e-5
     for bad in [ids[:-1], ids[:-1] + [ids[0]], ids[:-1] + ["not-train"]]:
         path.write_text(json.dumps(bad), "utf-8")
         with pytest.raises(ValueError):
@@ -899,3 +907,135 @@ def test_diagnostic_checkpoint_cannot_freeze(tmp_path, monkeypatch):
     )
     with pytest.raises(ValueError, match="Diagnostic"):
         evaluate.freeze_candidate(args)
+
+
+def test_lr_probe_order_and_hash_guards(tmp_path):
+    import copy
+    import json
+    from pathlib import Path
+
+    from scripts.evaluate_ollaya import load_probes, probe_digest
+
+    fixture = Path("evaluations/laya-finetuning/lr-probes-20260929.json")
+    assert len(load_probes(fixture)) == 40
+    original = json.loads(fixture.read_text(encoding="utf-8"))
+    for kind in ("hash", "split", "label", "order"):
+        payload = copy.deepcopy(original)
+        row = payload["cases"][-1]
+        if kind == "hash":
+            row["state"]["text"] += "changed"
+        elif kind == "split":
+            row["split"] = "test"
+        elif kind == "label":
+            row["expected"] = "cancel_account"
+        else:
+            row["question"]["criteria"] = dict(reversed(list(row["question"]["criteria"].items())))
+            row["question_sha256"] = probe_digest(row["question"])
+        payload["sha256"] = probe_digest(payload["cases"])
+        path = tmp_path / "probe.json"
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        with pytest.raises(ValueError):
+            load_probes(path)
+
+
+def test_high_learning_rates_only_bounded_synthetic():
+    from argparse import Namespace
+
+    from scripts.train_laya_pilot import validate_run
+
+    for rate in (1e-4, 6e-4):
+        args = Namespace(
+            steps=300, learning_rate=rate, diagnostic_ids=None, data_profile="synthetic-experiment"
+        )
+        assert validate_run(args, []) == []
+        for profile, steps in (
+            ("actual", 300),
+            ("public-pilot", 300),
+            ("synthetic-experiment", 100),
+        ):
+            args.data_profile, args.steps = profile, steps
+            with pytest.raises(ValueError):
+                validate_run(args, [])
+
+
+def test_probe_failures_are_retained_and_parity_rejects_mismatch():
+    import copy
+    from pathlib import Path
+
+    from scripts.evaluate_ollaya import compare_probes, complete_probe_failures, load_probes
+
+    cases = load_probes(Path("evaluations/laya-finetuning/lr-probes-20260929.json"))
+    report = {"dataset_sha256": "same", "rows": []}
+    complete_probe_failures(report, cases, "load failed")
+    assert len(report["rows"]) == 40
+    assert all(r["status"] == "not_run" for r in report["rows"])
+    assert not compare_probes(report, report)["passed"]
+    changed = copy.deepcopy(report)
+    changed["rows"][0]["question_sha256"] = "changed"
+    with pytest.raises(ValueError, match="mismatch"):
+        compare_probes(report, changed)
+
+
+def test_parity_ids_are_frozen_train_only():
+    from scripts.train_laya_pilot import select_parity
+
+    cases = [{"id": str(i)} for i in range(15)]
+    ids = [c["id"] for c in cases]
+    assert select_parity(cases, ids, "synthetic-experiment") == cases
+    for bad in (ids[:-1], ids[:-1] + [ids[0]], ids[:-1] + ["test-case"], [{"id": "bad"}] * 15):
+        with pytest.raises(ValueError):
+            select_parity(cases, bad, "synthetic-experiment")
+    with pytest.raises(ValueError):
+        select_parity(cases, ids, "public-pilot")
+
+
+def test_probe_cli_never_overwrites_an_existing_run(tmp_path, monkeypatch):
+    import sys
+
+    from scripts.evaluate_ollaya import main
+
+    target = tmp_path / "probe.json"
+    original = '{"status":"completed","rows":[]}'
+    target.write_text(original)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "evaluate_ollaya",
+            "probe",
+            "--data-profile",
+            "synthetic-experiment",
+            "--probe-dataset",
+            "evaluations/laya-finetuning/lr-probes-20260929.json",
+            "--output",
+            str(tmp_path),
+        ],
+    )
+    with pytest.raises(FileExistsError):
+        main()
+    assert target.read_text() == original
+
+
+def test_all_final_test_backends_require_candidate_lock(monkeypatch):
+    from argparse import Namespace
+    from pathlib import Path
+
+    from scripts.evaluate_ollaya import frozen_evaluation
+
+    monkeypatch.setattr(data, "load_frozen", lambda *args: [])
+    for backend, model in (
+        ("ollaya", "laya:multilingual"),
+        ("ollaya", "jev-laya:pilot"),
+        ("semif", "product"),
+    ):
+        args = Namespace(
+            dataset=Path("frozen.jsonl"),
+            manifest=Path("prepare.json"),
+            data_profile="synthetic-experiment",
+            split="test",
+            backend=backend,
+            model=model,
+            candidate_lock=None,
+        )
+        with pytest.raises(ValueError, match="Every final test"):
+            frozen_evaluation(args)
