@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import re
 import sqlite3
 from collections import Counter
 from datetime import UTC, datetime
@@ -592,16 +593,27 @@ def freeze_dataset(rows, report, questions, output):
     }
 
 
-def load_frozen(dataset, manifest, split):
+def load_frozen(dataset, manifest, split, data_profile=None):
     """Fail closed; consumers choose one split, with no public-data fallback."""
     if split not in {"train", "development", "calibration", "test"}:
         raise ValueError("Explicit valid split required")
     report = json.loads(Path(manifest).read_text("utf-8"))
+    profile = report.get("data_profile", "actual")
+    if data_profile is not None and data_profile != profile:
+        raise ValueError("Data profile mismatch")
     if report.get("status") != "ready" or hashlib.sha256(
         Path(dataset).read_bytes()
     ).hexdigest() != report.get("file_sha256"):
         raise ValueError("Dataset not ready or file hash changed")
     rows = read_jsonl(dataset)
+    if profile == "synthetic-experiment":
+        checked, _ = prepare_synthetic(rows, report.get("reservation", {}))
+        if checked["status"] != "ready":
+            raise ValueError("Synthetic readiness changed: " + str(checked["errors"]))
+    elif profile != "actual" or any(
+        r.get("provenance") == "agent_authored_synthetic" for r in rows
+    ):
+        raise ValueError("Synthetic data cannot masquerade as actual records")
     questions = {}
     for row in rows:
         purpose = row["purpose"]
@@ -625,6 +637,93 @@ def load_frozen(dataset, manifest, split):
     if not selected:
         raise ValueError("Requested split is empty")
     return selected
+
+
+def prepare_synthetic(rows, reservation, exposed_rows=()):
+    """Separate bounded experiment policy; never lowers the actual-record gate."""
+    errors = []
+    sizes = {"train": 30, "development": 15, "calibration": 15, "test": 30}
+    families = reservation.get("families", {})
+    if len(rows) != 270 or len({r["id"] for r in rows}) != 270:
+        errors.append("Need exactly 270 unique synthetic cases")
+    counts = Counter((r.get("split"), r.get("purpose"), r.get("expected")) for r in rows)
+    for split, size in sizes.items():
+        for purpose, labels in LABELS.items():
+            for label in labels:
+                if counts[split, purpose, label] != size // len(labels):
+                    errors.append(f"Unbalanced {split}/{purpose}/{label}")
+    for row in rows:
+        review = row.get("review", {})
+        source = row.get("source_record", {})
+        state = row.get("state", {})
+        if row.get("purpose") == "capability_fit" and isinstance(state.get("candidate"), dict):
+            identifier = str(state["candidate"].get("id", ""))
+            if any(
+                label in re.split(r"[^a-z_]+", identifier.lower())
+                or label in identifier.lower().split("-")
+                for label in LABELS["capability_fit"]
+            ):
+                errors.append(f"Gold label leaks through candidate ID: {row['id']}")
+        if (
+            row.get("provenance") != "agent_authored_synthetic"
+            or row.get("usage") != "synthetic_experiment"
+            or not state.get("context", "").startswith("합성 실험:")
+            or row.get("reservation_sha256") != digest(reservation)
+            or families.get(row.get("family_id")) != row.get("split")
+            or row.get("pair_group_id") != row.get("family_id")
+            or source.get("id") != row.get("family_id")
+            or row.get("state_sha256") != digest(state)
+            or row.get("source_record_sha256") != digest(source)
+            or not row.get("source_refs")
+            or any(ref.get("sha256") != digest(source) for ref in row["source_refs"])
+            or not row.get("evidence_text")
+            or row["evidence_text"] not in canonical(state.get("candidate"))
+            or review.get("status") != "agent_verified"
+            or review.get("reviewer_type") != "agent"
+            or not review.get("reviewer")
+            or not review.get("reason")
+            or review.get("checked_state_sha256") != digest(state)
+            or review.get("checked_record_sha256") != digest(source)
+            or review.get("checked_label") != row.get("expected")
+            or not isinstance(row.get("critical"), bool)
+            or review.get("checked_critical") is not row.get("critical")
+            or review.get("target_model_output_used_as_label") is not False
+            or review.get("human_reviewed") is not False
+        ):
+            errors.append(f"Invalid synthetic provenance/review: {row['id']}")
+        try:
+            if utc_time(review["reviewed_at"]) <= utc_time(reservation["reserved_at"]):
+                raise ValueError("Review predates reservation")
+        except (KeyError, ValueError, TypeError):
+            errors.append(f"Invalid reservation/review time: {row['id']}")
+    combined = [*rows, *exposed_rows]
+    groups = assign_groups(combined)
+    blocked = set(groups[len(rows) :])
+    prepared = [{**r, "group_id": g} for r, g in zip(rows, groups[: len(rows)], strict=True)]
+    for group in set(groups[: len(rows)]):
+        members = [r for r in prepared if r["group_id"] == group]
+        if len({r["split"] for r in members}) != 1:
+            errors.append("Connected synthetic family crosses splits")
+        if group in blocked:
+            errors.append("Synthetic case derives from exposed records")
+    for purpose, labels in LABELS.items():
+        test = [r for r in prepared if r["purpose"] == purpose and r["split"] == "test"]
+        if len({r["group_id"] for r in test}) < 10:
+            errors.append(f"Need ten test families: {purpose}")
+        for label in labels:
+            if len({r["group_id"] for r in test if r["expected"] == label}) < 2:
+                errors.append(f"Need two test families: {purpose}/{label}")
+    return {
+        "status": "not_ready" if errors else "ready",
+        "errors": errors,
+        "data_profile": "synthetic-experiment",
+        "reservation": reservation,
+        "rows": len(rows),
+        "groups": len(set(groups[: len(rows)])),
+        "split_purpose_label_counts": {"/".join(k): v for k, v in sorted(counts.items())},
+        "promotion_eligible": False,
+        "independent_human_evaluation": False,
+    }, [] if errors else prepared
 
 
 def prepare_reviewed(rows, minimum=600, reservations=None):
@@ -769,6 +868,9 @@ def main():
     parser.add_argument("stage", choices=["inventory", "audit", "prepare", "reserve", "blind"])
     parser.add_argument("--db", type=Path)
     parser.add_argument("--reviewed", type=Path)
+    parser.add_argument(
+        "--data-profile", choices=["actual", "synthetic-experiment"], default="actual"
+    )
     parser.add_argument("--reservation-spec", type=Path, help="New work/source IDs, before use")
     parser.add_argument("--reservations", type=Path)
     parser.add_argument("--reservation-history", type=Path)
@@ -836,14 +938,39 @@ def main():
     else:
         if not args.reviewed:
             parser.error("prepare needs --reviewed")
-        rows = [json.loads(line) for line in args.reviewed.read_text("utf-8").splitlines() if line]
+        if args.data_profile == "synthetic-experiment":
+            fixture = json.loads(args.reviewed.read_text("utf-8"))
+            rows = fixture["cases"]
+        else:
+            rows = read_jsonl(args.reviewed)
         if args.review_decisions:
             merge_decisions(rows, read_jsonl(args.review_decisions))
-        stats, prepared = prepare_reviewed(rows, reservations=reservations)
+        if args.data_profile == "synthetic-experiment":
+            exposed = read_jsonl(args.previous_review) if args.previous_review else []
+            for filename in ("development", "validation"):
+                exposed.extend(
+                    json.loads(
+                        (ROOT / f"evaluations/ollaya-tuning/{filename}.json").read_text("utf-8")
+                    )["cases"]
+                )
+            exposed.extend(
+                json.loads(
+                    (ROOT / "evaluations/laya-finetuning/review-draft-20260928.json").read_text(
+                        "utf-8"
+                    )
+                )["cases"]
+            )
+            stats, prepared = prepare_synthetic(rows, fixture["reservation"], exposed)
+        else:
+            stats, prepared = prepare_reviewed(rows, reservations=reservations)
+            stats["data_profile"] = "actual"
         if prepared:
-            if not args.questions:
+            if args.data_profile == "synthetic-experiment":
+                questions = fixture["questions"]
+            elif not args.questions:
                 parser.error("Freezing ready data requires --questions")
-            questions = json.loads(args.questions.read_text("utf-8"))
+            else:
+                questions = json.loads(args.questions.read_text("utf-8"))
             stats = freeze_dataset(prepared, stats, questions, args.output)
     (args.output / (args.stage + ".json")).write_text(
         json.dumps(stats, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"

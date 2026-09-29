@@ -1,16 +1,20 @@
 """Explicit, isolated diagnostic. Never changes the production profile or promotion policy."""
 
 import argparse
+import contextlib
 import copy
+import ctypes
 import hashlib
 import http.client
 import ipaddress
 import json
 import math
+import random
 import statistics
-import subprocess
+import threading
 import time
 from collections import Counter
+from ctypes import wintypes
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -21,6 +25,491 @@ FIXTURES = ROOT / "evaluations/ollaya"
 TEMPERATURES = [0.5, 0.75, 1, 1.5, 2, 3, 4]
 THRESHOLDS = [0, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95]
 BASE_MODEL = "laya:multilingual"
+
+
+def choose_temperature(report):
+    if report.get("split") != "calibration" or any(
+        r["split"] != "calibration" or r["status"] != "observed" for r in report["rows"]
+    ):
+        raise ValueError("Temperature selection requires complete calibration-only results")
+    scores = []
+    for temperature in (0.5, 0.75, 1, 1.5, 2, 3):
+        nll = statistics.mean(
+            -math.log(max(scale(r["probabilities"], temperature)[r["expected"]], 1e-8))
+            for r in report["rows"]
+        )
+        scores.append((nll, abs(temperature - 1), temperature))
+    return min(scores)[2]
+
+
+def check_candidate_lock(path, dataset, model_store=None):
+    lock = read(path)
+    if lock["dataset_sha256"] != sha(dataset):
+        raise ValueError("Candidate lock dataset mismatch")
+    for entry in lock["files"]:
+        if sha(Path(entry["path"])) != entry["sha256"]:
+            raise ValueError("Locked candidate or calibration changed")
+    if model_store and str(model_store.resolve()) != lock["model_store"]:
+        raise ValueError("Candidate model store differs from lock")
+    return lock
+
+
+def freeze_candidate(args):
+    from scripts.prepare_laya_training_data import load_frozen
+
+    load_frozen(args.dataset, args.manifest, "test", args.data_profile)
+    calibration = read(args.calibration_report)
+    if calibration["dataset_sha256"] != sha(args.dataset):
+        raise ValueError("Calibration dataset mismatch")
+    manifests = list((args.model_store / "manifests").rglob("pilot"))
+    if len(manifests) != 1 or calibration.get("model_manifest_sha256") != sha(manifests[0]):
+        raise ValueError("Calibration candidate manifest mismatch")
+    temperature = choose_temperature(calibration)
+    files = [args.checkpoint, args.calibration_report, args.manifest]
+    files.extend(p for p in args.model_store.rglob("*") if p.is_file())
+    lock = {
+        "dataset_sha256": sha(args.dataset),
+        "model_store": str(args.model_store.resolve()),
+        "temperature": temperature,
+        "frozen_at_unix": time.time(),
+        "files": [{"path": str(p.resolve()), "sha256": sha(p)} for p in files],
+        "promotion_eligible": False,
+    }
+    with args.candidate_lock.open("x", encoding="utf-8") as stream:
+        json.dump(lock, stream, indent=2)
+    print(json.dumps({"candidate_frozen": True, "temperature": temperature}))
+
+
+def frozen_evaluation(args):
+    from jev_context.storage import FileLock
+    from scripts.prepare_laya_training_data import digest, load_frozen
+
+    if (
+        not args.dataset
+        or not args.manifest
+        or args.data_profile == "public-pilot"
+        or not args.split
+    ):
+        raise ValueError("Frozen evaluation needs explicit dataset/manifest/profile/split")
+    cases = load_frozen(args.dataset, args.manifest, args.split, args.data_profile)
+    if args.model != BASE_MODEL and args.backend == "ollaya" and args.split == "test":
+        if not args.candidate_lock:
+            raise ValueError("Candidate test requires a frozen candidate")
+        check_candidate_lock(args.candidate_lock, args.dataset, args.model_store)
+    args.output.mkdir(parents=True, exist_ok=True)
+    target = args.output / (args.split + ".json")
+    with target.open("x", encoding="utf-8") as stream:
+        json.dump({"status": "started", "split": args.split}, stream)
+    report = {
+        "status": "running",
+        "split": args.split,
+        "data_profile": args.data_profile,
+        "dataset_sha256": sha(args.dataset),
+        "manifest_sha256": sha(args.manifest),
+        "backend": args.backend,
+        "model": args.model if args.backend == "ollaya" else "product-semif",
+        "rows": [],
+        "memory_samples": [],
+        "promotion_eligible": False,
+        "test_results_sealed": args.split == "test",
+        "candidate_lock_sha256": sha(args.candidate_lock) if args.candidate_lock else None,
+        "started_at_unix": time.time(),
+        "conditions": {
+            "repeats": 3 if args.split == "test" else 1,
+            "case_order": [c["id"] for c in cases],
+            "memory_sample_interval_seconds": 5,
+            "memory_kind": "observed process-tree working set; not GPU memory",
+            "latency": "all repeated requests; model load separately recorded",
+            "input_limit": 1024,
+        },
+    }
+    client = Client(args.endpoint)
+    engine = None
+    owned_ollaya_load = False
+    stopped = threading.Event()
+    monitor = None
+    profile = read(args.profile)
+    leases = contextlib.ExitStack()
+    try:
+        leases.enter_context(FileLock(ROOT / ".local/laya-finetuning/experiment-model.lock"))
+        if args.backend == "ollaya":
+            leases.enter_context(FileLock(Path(profile["lock_root"]) / "resident.lock"))
+        if client.call("/api/ps")["models"]:
+            raise RuntimeError("Other Ollaya model is resident")
+        began = time.perf_counter()
+        if args.backend == "semif":
+            engine = SemifOpenVINO(profile)
+            engine.prepare()
+            report.update(profile=profile, fingerprint=engine.fingerprint, startup=engine.startup)
+            pid = engine.process.pid
+        else:
+            if not args.server_pid:
+                raise ValueError("Ollaya needs owned server PID")
+            manifest = (
+                args.model_store / "manifests/ollaya.dev/library" / args.model.replace(":", "/")
+            )
+            report["model_manifest_sha256"] = sha(manifest)
+            manifest_data = read(manifest)
+            for layer in [manifest_data["config"], *manifest_data["layers"]]:
+                blob = args.model_store / "blobs" / layer["digest"].replace(":", "-")
+                if sha(blob) != layer["digest"].split(":")[1]:
+                    raise ValueError("Model blob integrity failed")
+            report["model_config"] = read(
+                args.model_store / "blobs" / manifest_data["config"]["digest"].replace(":", "-")
+            )
+            report["runtime_version"] = client.call("/api/version")
+            owned_ollaya_load = True
+            report["load"] = client.call(
+                "/api/decide", {"model": args.model, "keep_alive": -1}, timeout=300
+            )
+            pid = args.server_pid
+        report["preparation_seconds"] = time.perf_counter() - began
+
+        def sample():
+            while not stopped.is_set():
+                try:
+                    report["memory_samples"].append(process_snapshot(pid))
+                except Exception as exc:
+                    report["memory_samples"].append({"error": str(exc)})
+                stopped.wait(5)
+
+        monitor = threading.Thread(target=sample, daemon=True)
+        monitor.start()
+        failures = 0
+        for repeat in range(report["conditions"]["repeats"]):
+            for case in cases:
+                row = {
+                    k: case[k]
+                    for k in (
+                        "id",
+                        "split",
+                        "purpose",
+                        "expected",
+                        "critical",
+                        "group_id",
+                        "state_sha256",
+                    )
+                }
+                row.update(repeat=repeat, question_sha256=digest(case["question"]))
+                start = time.perf_counter()
+                if failures >= 3:
+                    row.update(status="not_run", reason="three_consecutive_errors")
+                else:
+                    try:
+                        q = question_contract(case["purpose"], case["question"])
+                        if engine:
+                            answer = engine.evaluate(
+                                {
+                                    "evaluation_id": f"{case['id']}-{repeat}",
+                                    "profile_fingerprint": engine.fingerprint,
+                                    "deadline_ms": 30000,
+                                    "state": case["state"],
+                                    "questions": [q],
+                                }
+                            )["answers"][0]
+                        else:
+                            raw = client.call(
+                                "/v1/systemone",
+                                {
+                                    "model": args.model,
+                                    "state": case["state"],
+                                    "questions": {case["purpose"]: case["question"]},
+                                },
+                                timeout=30,
+                            )
+                            if raw.get("state_truncated") or raw.get("model") != args.model:
+                                raise ValueError("Truncation or model identity mismatch")
+                            answer = convert(raw, [q], "Ollaya probability")[0]
+                        probabilities = answer["raw_distribution"]
+                        if set(probabilities) != set(case["question"]["criteria"]) or any(
+                            not math.isfinite(v) for v in probabilities.values()
+                        ):
+                            raise ValueError("Incomplete or nonfinite distribution")
+                        row.update(
+                            status="observed",
+                            choice=answer["choice"],
+                            probabilities=probabilities,
+                        )
+                        failures = 0
+                    except Exception as exc:
+                        row.update(status="error", reason=str(exc))
+                        failures += 1
+                    row["latency_ms"] = (time.perf_counter() - start) * 1000
+                report["rows"].append(row)
+                save(target, report)
+            print(
+                f"{args.backend} {args.split} repeat {repeat + 1} recorded (predictions hidden)",
+                flush=True,
+            )
+        report["status"] = (
+            "completed" if all(r["status"] == "observed" for r in report["rows"]) else "incomplete"
+        )
+    except Exception as exc:
+        report.update(status="failed", error=str(exc))
+        # Preserve every not-run case, even when preparation failed.
+        done = {(r["repeat"], r["id"]) for r in report["rows"]}
+        for repeat in range(report["conditions"]["repeats"]):
+            for case in cases:
+                if (repeat, case["id"]) not in done:
+                    report["rows"].append(
+                        {
+                            **{
+                                k: case[k]
+                                for k in (
+                                    "id",
+                                    "split",
+                                    "purpose",
+                                    "expected",
+                                    "critical",
+                                    "group_id",
+                                    "state_sha256",
+                                )
+                            },
+                            "repeat": repeat,
+                            "question_sha256": digest(case["question"]),
+                            "status": "not_run",
+                            "reason": "preparation_or_run_failed",
+                        }
+                    )
+    finally:
+        stopped.set()
+        if monitor:
+            monitor.join(timeout=35)
+        if engine:
+            engine.close()
+        if owned_ollaya_load:
+            try:
+                client.unload(args.model)
+            except Exception as exc:
+                report.update(status="failed", unload_error=str(exc))
+        leases.close()
+        report["finished_at_unix"] = time.time()
+        save(target, report)
+    print(
+        json.dumps(
+            {
+                "status": report["status"],
+                "recorded": len(report["rows"]),
+                "sealed": args.split == "test",
+            }
+        )
+    )
+    if report["status"] != "completed":
+        raise SystemExit(1)
+
+
+def paired_comparison(baseline, candidate):
+    if (
+        baseline["dataset_sha256"] != candidate["dataset_sha256"]
+        or baseline["conditions"]["case_order"] != candidate["conditions"]["case_order"]
+    ):
+        raise ValueError("Cannot compare different datasets or case orders")
+    left = {(r["repeat"], r["id"]): r for r in baseline["rows"]}
+    right = {(r["repeat"], r["id"]): r for r in candidate["rows"]}
+    if (
+        set(left) != set(right)
+        or len(left) != len(baseline["rows"])
+        or len(right) != len(candidate["rows"])
+    ):
+        raise ValueError("Missing or duplicate evaluation rows")
+    for key in left:
+        if any(
+            left[key][k] != right[key][k]
+            for k in (
+                "state_sha256",
+                "question_sha256",
+                "expected",
+                "group_id",
+                "split",
+                "purpose",
+                "critical",
+            )
+        ):
+            raise ValueError("Comparison input, label, question or group mismatch")
+    result = {}
+    for purpose in ("relevance", "evidence_relation", "capability_fit"):
+        a = [r for r in left.values() if r["purpose"] == purpose and r["repeat"] == 0]
+        b = [right[0, r["id"]] for r in a]
+        groups = sorted({r["group_id"] for r in a})
+        changes = [
+            {
+                "id": x["id"],
+                "group_id": x["group_id"],
+                "before_correct": x.get("choice") == x["expected"],
+                "after_correct": y.get("choice") == y["expected"],
+            }
+            for x, y in zip(a, b, strict=True)
+        ]
+
+        def delta(c):
+            return sum(int(x["after_correct"]) - int(x["before_correct"]) for x in c) / len(c)
+
+        rng = random.Random(20260928)
+        samples = sorted(
+            delta(
+                [
+                    x
+                    for g in rng.choices(groups, k=len(groups))
+                    for x in changes
+                    if x["group_id"] == g
+                ]
+            )
+            for _ in range(10000)
+        )
+        ma, mb = metrics(a), metrics(b)
+        repeated_a = metrics([r for r in left.values() if r["purpose"] == purpose])
+        repeated_b = metrics([r for r in right.values() if r["purpose"] == purpose])
+
+        def memory(report):
+            values = [
+                s["working_set_sum_bytes"]
+                for s in report["memory_samples"]
+                if s.get("working_set_sum_bytes", 0) > 0
+            ]
+            return max(values) if values else None
+
+        ram_a, ram_b = memory(baseline), memory(candidate)
+        latency_ok = bool(
+            repeated_a["p95_ms"]
+            and repeated_b["p95_ms"]
+            and repeated_b["p95_ms"] < repeated_a["p95_ms"] * 1.1
+        )
+        passed = bool(
+            samples[250] > 0
+            and mb["critical_errors"] <= ma["critical_errors"]
+            and latency_ok
+            and ram_a
+            and ram_b
+            and ram_b < ram_a * 1.1
+            and baseline["status"] == candidate["status"] == "completed"
+        )
+        result[purpose] = {
+            "baseline": ma,
+            "candidate": mb,
+            "difference": delta(changes),
+            "bootstrap_95": [samples[250], samples[9749]],
+            "groups": len(groups),
+            "repeated_baseline": repeated_a,
+            "repeated_candidate": repeated_b,
+            "memory_bytes": [ram_a, ram_b],
+            "changes": [c for c in changes if c["before_correct"] != c["after_correct"]],
+            "improvement_gate_passed": passed,
+        }
+    return result
+
+
+def compare_frozen(args):
+    from scripts.prepare_laya_training_data import load_frozen
+
+    cases = load_frozen(args.dataset, args.manifest, "test", args.data_profile)
+    lock = check_candidate_lock(args.candidate_lock, args.dataset)
+    baseline, candidate, product = (
+        read(p) for p in (args.baseline_report, args.candidate_report, args.product_report)
+    )
+    for report in (baseline, candidate, product):
+        if (
+            report["split"] != "test"
+            or report["dataset_sha256"] != sha(args.dataset)
+            or report["manifest_sha256"] != sha(args.manifest)
+        ):
+            raise ValueError("Comparison requires the same frozen test")
+        if (
+            report["conditions"]["case_order"] != [c["id"] for c in cases]
+            or len(report["rows"]) != len(cases) * 3
+        ):
+            raise ValueError("Comparison requires all cases and three repeats")
+    if candidate["started_at_unix"] < lock["frozen_at_unix"] or candidate.get(
+        "candidate_lock_sha256"
+    ) != sha(args.candidate_lock):
+        raise ValueError("Candidate test must follow the exact candidate lock")
+    # Mark consumed before reading/analyzing predictions; an interrupted analysis cannot reset it.
+    ledger = args.dataset.parent / "test-consumed.json"
+    with ledger.open("x", encoding="utf-8") as stream:
+        json.dump(
+            {
+                "dataset_sha256": sha(args.dataset),
+                "candidate_lock_sha256": sha(args.candidate_lock),
+                "consumed_at_unix": time.time(),
+                "reason": "Final predictions opened; any candidate revision requires a new test",
+            },
+            stream,
+            indent=2,
+        )
+    paired = paired_comparison(baseline, candidate)
+    product_paired = paired_comparison(product, candidate)
+    baseline_cal = read(args.baseline_report.with_name("calibration.json"))
+    if (
+        baseline_cal["dataset_sha256"] != sha(args.dataset)
+        or baseline_cal["model_manifest_sha256"] != baseline["model_manifest_sha256"]
+    ):
+        raise ValueError("Baseline calibration mismatch")
+    temperatures = {"baseline": choose_temperature(baseline_cal), "candidate": lock["temperature"]}
+    calibrated = {}
+    for name, report in (("baseline", baseline), ("candidate", candidate)):
+        rows = copy.deepcopy([r for r in report["rows"] if r["repeat"] == 0])
+        for row in rows:
+            if row.get("probabilities"):
+                row["probabilities"] = scale(row["probabilities"], temperatures[name])
+        calibrated[name] = metrics(rows)
+    result = {
+        "data_profile": args.data_profile,
+        "dataset_sha256": sha(args.dataset),
+        "candidate_lock_sha256": sha(args.candidate_lock),
+        "paired_laya": paired,
+        "product_comparison": product_paired,
+        "temperatures": temperatures,
+        "calibrated_probability_metrics": calibrated,
+        "conclusion": "synthetic_improvement_observed"
+        if all(p["improvement_gate_passed"] for p in paired.values())
+        else "improvement_unconfirmed",
+        "actual_business_improvement": "unverified",
+        "promotion_eligible": False,
+        "reports": {
+            name: {
+                "sha256": sha(path),
+                "preparation_seconds": r.get("preparation_seconds"),
+                "conditions": r["conditions"],
+            }
+            for name, path, r in (
+                ("baseline", args.baseline_report, baseline),
+                ("candidate", args.candidate_report, candidate),
+                ("product", args.product_report, product),
+            )
+        },
+        "limitations": [
+            "Same agent authored and reviewed labels; synthetic scenarios only",
+            "Ten test scenario groups; correlated repeats are not independent samples",
+            "Product GPU versus Laya CPU; process working set excludes GPU allocation",
+        ],
+    }
+    result["unstable_cases"] = {
+        name: sum(
+            len({r.get("choice", r["status"]) for r in report["rows"] if r["id"] == case["id"]}) > 1
+            for case in cases
+        )
+        for name, report in (("baseline", baseline), ("candidate", candidate), ("product", product))
+    }
+    args.output.mkdir(parents=True, exist_ok=True)
+    with (args.output / "comparison.json").open("x", encoding="utf-8") as stream:
+        json.dump(result, stream, ensure_ascii=False, indent=2)
+    print(
+        json.dumps(
+            {
+                "conclusion": result["conclusion"],
+                "laya": {
+                    p: {
+                        "before": r["baseline"]["correct"],
+                        "after": r["candidate"]["correct"],
+                        "count": r["candidate"]["count"],
+                        "interval": r["bootstrap_95"],
+                        "passed": r["improvement_gate_passed"],
+                    }
+                    for p, r in paired.items()
+                },
+            },
+            ensure_ascii=False,
+        )
+    )
 
 
 def read(path):
@@ -40,25 +529,108 @@ def save(path, value):
 def process_snapshot(root_pid):
     """Windows working-set sample of this owned process tree, not a peak or GPU measurement."""
     root_pid = int(root_pid)
-    command = (
-        f"$taskIds = [System.Collections.Generic.HashSet[int]]::new(); $null=$taskIds.Add({root_pid}); "
-        "$taskAll = @(Get-CimInstance Win32_Process); "
-        "do { $taskChanged=$false; foreach($taskP in $taskAll) { "
-        "if($taskIds.Contains([int]$taskP.ParentProcessId)) { "
-        "if($taskIds.Add([int]$taskP.ProcessId)) { $taskChanged=$true } } } } while($taskChanged); "
-        "@($taskAll | Where-Object { $taskIds.Contains([int]$_.ProcessId) } | "
-        "Select-Object ProcessId,ParentProcessId,Name,WorkingSetSize) | ConvertTo-Json -Compress"
-    )
-    result = subprocess.run(
-        ["powershell", "-NoProfile", "-Command", command],
-        check=True,
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-    rows = json.loads(result.stdout) if result.stdout.strip() else []
-    rows = rows if isinstance(rows, list) else [rows]
-    return {"processes": rows, "working_set_sum_bytes": sum(r["WorkingSetSize"] for r in rows)}
+
+    # WMI can return an empty array with exit code zero in restricted sessions.
+    # Toolhelp/PSAPI reads only PID ancestry and memory, with no command-line or file reads.
+    class Entry(ctypes.Structure):
+        _fields_ = [
+            ("size", wintypes.DWORD),
+            ("usage", wintypes.DWORD),
+            ("pid", wintypes.DWORD),
+            ("heap", ctypes.c_size_t),
+            ("module", wintypes.DWORD),
+            ("threads", wintypes.DWORD),
+            ("parent", wintypes.DWORD),
+            ("priority", wintypes.LONG),
+            ("flags", wintypes.DWORD),
+            ("name", wintypes.WCHAR * 260),
+        ]
+
+    class Counters(ctypes.Structure):
+        _fields_ = [("size", wintypes.DWORD), ("faults", wintypes.DWORD)] + [
+            (name, ctypes.c_size_t)
+            for name in (
+                "peak_ws",
+                "working_set",
+                "peak_paged",
+                "paged",
+                "peak_nonpaged",
+                "nonpaged",
+                "pagefile",
+                "peak_pagefile",
+            )
+        ]
+
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    psapi = ctypes.WinDLL("psapi", use_last_error=True)
+    kernel.CreateToolhelp32Snapshot.argtypes = [wintypes.DWORD, wintypes.DWORD]
+    kernel.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+    kernel.Process32FirstW.argtypes = kernel.Process32NextW.argtypes = [
+        wintypes.HANDLE,
+        ctypes.POINTER(Entry),
+    ]
+    kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel.OpenProcess.restype = wintypes.HANDLE
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    psapi.GetProcessMemoryInfo.argtypes = [
+        wintypes.HANDLE,
+        ctypes.POINTER(Counters),
+        wintypes.DWORD,
+    ]
+    snapshot = kernel.CreateToolhelp32Snapshot(2, 0)
+    if snapshot == ctypes.c_void_p(-1).value:
+        raise ctypes.WinError(ctypes.get_last_error())
+    entries = []
+    entry = Entry()
+    entry.size = ctypes.sizeof(entry)
+    try:
+        found = kernel.Process32FirstW(snapshot, ctypes.byref(entry))
+        while found:
+            entries.append((entry.pid, entry.parent, entry.name))
+            found = kernel.Process32NextW(snapshot, ctypes.byref(entry))
+    finally:
+        kernel.CloseHandle(snapshot)
+    ids = {root_pid}
+    while True:
+        next_ids = ids | {pid for pid, parent, _ in entries if parent in ids}
+        if next_ids == ids:
+            break
+        ids = next_ids
+    rows = []
+    for pid, parent, name in entries:
+        if pid not in ids:
+            continue
+        handle = kernel.OpenProcess(0x1000 | 0x10, False, pid)
+        if not handle:
+            raise ctypes.WinError(ctypes.get_last_error())
+        counters = Counters()
+        counters.size = ctypes.sizeof(counters)
+        try:
+            if not psapi.GetProcessMemoryInfo(
+                handle, ctypes.byref(counters), ctypes.sizeof(counters)
+            ):
+                raise ctypes.WinError(ctypes.get_last_error())
+        finally:
+            kernel.CloseHandle(handle)
+        rows.append(
+            {
+                "ProcessId": pid,
+                "ParentProcessId": parent,
+                "Name": name,
+                "WorkingSetSize": counters.working_set,
+            }
+        )
+    if (
+        not rows
+        or root_pid not in {r["ProcessId"] for r in rows}
+        or any(r["WorkingSetSize"] <= 0 for r in rows)
+    ):
+        raise RuntimeError("Owned process memory unavailable; must not report zero")
+    return {
+        "method": "Windows Toolhelp32 + PSAPI",
+        "processes": rows,
+        "working_set_sum_bytes": sum(r["WorkingSetSize"] for r in rows),
+    }
 
 
 def fixtures():
@@ -295,7 +867,33 @@ def identity(model_store):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("stage", choices=["develop", "validate", "semif", "contracts", "resources"])
+    parser.add_argument(
+        "stage",
+        choices=[
+            "develop",
+            "validate",
+            "semif",
+            "contracts",
+            "resources",
+            "frozen",
+            "freeze-candidate",
+            "compare",
+        ],
+    )
+    parser.add_argument("--dataset", type=Path)
+    parser.add_argument("--manifest", type=Path)
+    parser.add_argument("--split", choices=["train", "development", "calibration", "test"])
+    parser.add_argument(
+        "--data-profile", choices=["actual", "synthetic-experiment", "public-pilot"], required=True
+    )
+    parser.add_argument("--backend", choices=["ollaya", "semif"], default="ollaya")
+    parser.add_argument("--model", default=BASE_MODEL)
+    parser.add_argument("--candidate-lock", type=Path)
+    parser.add_argument("--checkpoint", type=Path)
+    parser.add_argument("--calibration-report", type=Path)
+    parser.add_argument("--baseline-report", type=Path)
+    parser.add_argument("--candidate-report", type=Path)
+    parser.add_argument("--product-report", type=Path)
     parser.add_argument("--server-pid", type=int)
     parser.add_argument("--endpoint", default="http://127.0.0.1:11437")
     parser.add_argument("--output", type=Path, default=ROOT / ".local/ollaya-evaluation/results")
@@ -304,6 +902,19 @@ def main():
     )
     parser.add_argument("--profile", type=Path, default=ROOT / ".local/semif-ov-profile.json")
     args = parser.parse_args()
+    if args.stage == "compare":
+        compare_frozen(args)
+        return
+    if args.stage == "frozen":
+        frozen_evaluation(args)
+        return
+    if args.stage == "freeze-candidate":
+        freeze_candidate(args)
+        return
+    if args.data_profile != "public-pilot" or args.dataset or args.manifest:
+        parser.error(
+            "Legacy public diagnostics require --data-profile public-pilot without dataset/manifest"
+        )
     cases, questions, frozen = fixtures()
     client = Client(args.endpoint)
     output = args.output
@@ -483,7 +1094,11 @@ def main():
             worker_pid = engine.process.pid
         finally:
             engine.close()
-        report["semif_after_close"] = process_snapshot(worker_pid)
+        report["semif_after_close"] = {
+            "worker_pid": worker_pid,
+            "owned_worker_reaped": engine.process is None,
+            "working_set_sum_bytes": None,
+        }
     else:
         purpose = "relevance"
         report["initial_ps"] = client.call("/api/ps")

@@ -1,10 +1,12 @@
 """Compare reloaded PyTorch checkpoint with isolated Ollaya; never evaluates accuracy."""
 
 import argparse
+import contextlib
 import json
 import time
 from pathlib import Path
 
+from jev_context.storage import FileLock
 from scripts.evaluate_ollaya import Client, process_snapshot, read, save, sha
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -34,6 +36,17 @@ def main():
         "quality_evaluation": False,
         "promotion_eligible": False,
     }
+    leases = contextlib.ExitStack()
+    leases.enter_context(FileLock(ROOT / ".local/laya-finetuning/experiment-model.lock"))
+    try:
+        leases.enter_context(
+            FileLock(
+                Path(read(ROOT / ".local/semif-ov-profile.json")["lock_root"]) / "resident.lock"
+            )
+        )
+    except BaseException:
+        leases.close()
+        raise
     try:
         started = time.perf_counter()
         client.call("/api/decide", {"model": packaged["model"], "keep_alive": -1}, timeout=300)
@@ -77,9 +90,12 @@ def main():
         report.update(passed=False, error=f"{type(exc).__name__}: {exc}")
         raise
     finally:
-        client.unload(packaged["model"])
-        report["after_unload"] = client.call("/api/ps")
-        save(output, report)
+        try:
+            client.unload(packaged["model"])
+            report["after_unload"] = client.call("/api/ps")
+            save(output, report)
+        finally:
+            leases.close()
     print(
         json.dumps(
             {

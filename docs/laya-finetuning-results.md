@@ -1,5 +1,7 @@
 # 실제 가중치 학습·Ollaya 반입 예비 실행
 
+**최신 결과(2026-09-29):** 합성 270개를 분리해 후보를 100 step 학습하고 90문제로 비교했다. 미학습 Laya와 후보 모두 33/90, 제품 SemIf는 55/90이었다. 결론은 **개선 미확인**, 제품 기본 모델 유지다. 아래 과거 기술 예비 실행과 최신 합성 실험을 구분한다.
+
 2026-09-28. [실행 계획과 사전 자체 검토](laya-finetuning-plan.md)에 따른 기록. **기술 예비 실행은 성공, 실제 정답 데이터에 의한 본 학습·독립 성능 검증은 미완료**다.
 
 ## 여기서 말하는 ‘정답’
@@ -282,3 +284,106 @@ Ollaya v0.7.3의 동일 구조 fp32 ONNX graph를 재사용하는 제한된 패�
 첫 전체 검사는 Laya 모의 worker에 실제 encoder 설정 파일이 없어서 1개 실패했다(319 passed / 2 skipped). fixture에 설정 파일과 해당 설정을 읽은 모델 객체를 넣어 실제 준비 계약을 반영했고, 관련 11개 검사가 통과했다. 최종 Ruff lint·format과 전체 pytest는 **320 passed / 2 skipped**였다.
 
 추가 검사에는 출처 그룹의 전이적 연결, 동일 원문 중복, 모델 예측을 정답으로 사용하지 않는 계약, 공개 진단의 재사용 차단, 읽기 전용 기록 추출, HTML 스크립트 주입 방지, rotary 설정 변환과 runtime 거절이 포함된다. 생성한 검토 화면의 JavaScript 문법과 원시 결과 hash·checkpoint 연결·상대 문서 링크도 확인했다. 브라우저에서 사람의 실제 검토 작업까지 수행한 것은 아니다.
+
+
+## 2026-09-29 승인된 합성 실험: 자료 준비와 원문 재검토
+
+실제 자료 부족과 별개로 합성 자료를 학습·시험 양쪽에 쓰도록 사용자가 승인했다. 실제 600개 기준은 그대로이며 합성 자료를 그 수에 합산하지 않는다.
+
+- 합성 자료: `evaluations/laya-finetuning/synthetic-20260929.json`에270개.30개 구체적 업무 상황을 먼저train10/development5/calibration5/test10으로 배정했다. 각 상황의 관련성3/근거관계3/도구적합성3개는 한 분할에만 존재한다. 분할별90/45/45/90개, 목적별 동일 수량과 라벨 균등, 시험 목적별10개 상황 묶음·30개 및 라벨별2개 이상 묶음 검사를 통과했다.
+- 검토: 각 항목에 가상 입력·정답·근거 문장·판정 이유·Codex 검토·hash를 기록했다. Jev 예측을 정답에 쓰지 않았다. 같은 작성자의 규칙·문체 편향이 있으며, 사람 독립 평가나 실제 업무 향상을 뜻하지 않는다.
+- 수정 후 고정 데이터 SHA256: `0ae4281dfe88ca1905c52eb25fe1d9f50ae9af0deee74be8304dab7d2fd7bde9`. 질문hash `fdc5984c609ffd1cd13078e7499bae8d42e5e8e75eaa4c62abcb9593c48b204a`. 분할hash `c9796fb9cdad1395fe821b9a62f84ae6d1615bb7a74a3acb51d1b6926ef33843`.
+- 실제 보류44개 재검토: 아이콘 적용과 초기 packaged GUI 검증2개를 원시 파일에 대조해추가 확정. 실제108개 중66개 agent_verified/42개deferred/human0/test0. 나머지는 프로젝트 원본목록에서 필수 원문을 찾지 못한33개와 일부 파일은 있으나 종합 주장 대조가 불완전한9개다. 이를 정답 insufficient_evidence로 바꾸지 않았다. 원본108개와 이전검토 파일을 보존했다.
+- 원시 대조의 범위: v3비교의756관측과 관리자 예외 오판3회, startup30개 선택일치/확률차0, 온보딩·언어왕복 보고 등을 확인했으나 당시 미적용 설정·전체회귀·원격반영까지 확인되지 않은 주장은 보류했다. 새 실행으로 과거 사실을 대체하지 않았다. 원격CI는 조회·실행하지 않았다.
+
+개인 기록과 상세 보류 이유는 `.local/laya-finetuning/synthetic-20260929/actual-recheck.json`, 새 검토는 `actual-reviewed.jsonl`에 저장한다. 이후 `--previous-review`에는 이 새 파일을 사용한다. 준비 결과와 모델 실행은 같은 디렉터리에 별도 보존한다. 아래 모델 비교 결과가 추가되기 전까지 이 절은 자료 준비 완료만 뜻한다.
+
+
+### 최종 점수 공개 전 발견한 입력 결함과 정정
+
+첫 합성 파일의 도구 후보 ID에 `fit`/`unfit`/`insufficient_evidence`가 포함돼 있었다. 정답이 입력에 노출되는 결함이므로 최초 실행(가중치 `da71a292…`)은 성능 근거에서 제외했다. 시험 예측·점수는 열람하지 않았으며, 이 수정은 모델 오답을 보고 한 조정이 아니다. 각 상황의 세 도구 후보를 동일한 중립 ID `<family>-tool`로 바꾸고 상태/검토 hash를 갱신했다. 기존 상황 분할·질문·정답·근거는 보존했으며 새 입력hash로 원본 모델부터 전 과정을 재실행한다. 정답 단어가 후보 ID에 들어가면 준비 검사가 거절하는 회귀 검사를 추가했다. 최초 자료·모델·실행 보고는 삭제하지 않고 `invalidated-run.json`과 함께 로컬에 보존한다.
+
+이 정정 뒤의 정식 실험 산출물은 `.local/laya-finetuning/synthetic-20260929/corrected/`에만 둔다. 이전 디렉터리의 시험 수치나 시간은 최종 결과와 섞지 않는다. 전체검사354통과/2제외 후 소비된 시험 재학습 차단·정답ID 유출 방지 등 관련45검사를 통과했다. 최종 코드 검사는 아래 결과에 기록한다.
+
+### 재현 순서
+
+저장소 루트의 PowerShell에서 실행한다. 모델·가상환경은 기존 로컬 설치를 사용하며 자동 다운로드나 유료 실행을 하지 않는다. 출력 디렉터리는 새 경로를 지정한다. 원자료 준비의 `--previous-review`는 로컬 실제자료 충돌 검사를 추가하며 공유 저장소에는 해당 개인자료를 넣지 않는다.
+
+```powershell
+$experiment='.local/laya-finetuning/synthetic-20260929/corrected'
+.venv/Scripts/python.exe -X utf8 -m scripts.prepare_laya_training_data prepare --data-profile synthetic-experiment --reviewed evaluations/laya-finetuning/synthetic-20260929.json --previous-review .local/laya-finetuning/synthetic-20260929/actual-reviewed.jsonl --output "$experiment/frozen"
+```
+
+기존 Ollaya0.7.3 daemon을 루프백 전용 포트로 실행한다. `OLLAYA_DEVICE=cpu`, `OLLAYA_MAX_LOADED_MODELS=1`, `OMP_NUM_THREADS=4`와 원본 모델 저장소를 사용한다. OMP 설정은 기록한 환경값이며 ONNX 내부 스레드 수를 별도 실측했다고 주장하지 않는다. 학습의 torch4threads는 코드에서 고정한다. 원본 Laya와 후보의 실행기·환경·질문·입력은 동일하며 제품 SemIf는 기존 GPU 프로필을 그대로 사용한다.
+
+```powershell
+# SemIf test와 원본 Laya development/calibration/test를 순차 실행한다.
+.venv/Scripts/python.exe -X utf8 -m scripts.evaluate_ollaya frozen --data-profile synthetic-experiment --dataset "$experiment/frozen/frozen.jsonl" --manifest "$experiment/frozen/prepare.json" --split test --backend semif --endpoint http://127.0.0.1:11439 --output "$experiment/semif"
+# 원본 Laya는 backend ollaya, model laya:multilingual, 기존 model-store,
+# 소유 daemon의 --server-pid를 전달하고 각 split을 별도로 실행한다.
+.local/laya-venv/Scripts/python.exe -X utf8 -m scripts.train_laya_pilot train --data-profile synthetic-experiment --dataset "$experiment/frozen/frozen.jsonl" --manifest "$experiment/frozen/prepare.json" --split train --output "$experiment/pilot"
+# 같은 인수로 train 대신 reload를 실행한다.
+.local/laya-package-venv/Scripts/python.exe -X utf8 -m scripts.package_laya_pilot --pilot "$experiment/pilot" --output "$experiment/ollaya-store"
+# 새 저장소를 사용하는 소유 daemon을 다른 루프백 포트에서 준비한다.
+# scripts.verify_laya_pilot에 --pilot/--endpoint/--server-pid를 전달한다.
+# 후보의 development/calibration을 frozen 명령으로 실행한다.
+.venv/Scripts/python.exe -X utf8 -m scripts.evaluate_ollaya freeze-candidate --data-profile synthetic-experiment --dataset "$experiment/frozen/frozen.jsonl" --manifest "$experiment/frozen/prepare.json" --model-store "$experiment/ollaya-store" --checkpoint "$experiment/pilot/checkpoint/model.safetensors" --calibration-report "$experiment/candidate/calibration.json" --candidate-lock "$experiment/candidate-lock.json"
+# 후보 test에는 --model jev-laya:pilot, --model-store, --candidate-lock을 전달한다.
+.venv/Scripts/python.exe -X utf8 -m scripts.evaluate_ollaya compare --data-profile synthetic-experiment --dataset "$experiment/frozen/frozen.jsonl" --manifest "$experiment/frozen/prepare.json" --candidate-lock "$experiment/candidate-lock.json" --baseline-report "$experiment/baseline/test.json" --candidate-report "$experiment/candidate/test.json" --product-report "$experiment/semif/test.json" --output "$experiment"
+```
+
+`frozen` 시험 실행은 점수·선택을 표준출력에 내보내지 않는다. `compare`가 결과를 열기 전에 고정자료 옆 `test-consumed.json`을 만들며 그 자료로 새 후보를 학습하면 거절한다. 이 표시는 협업 절차 보호이며 파일 복사·변조까지 막는 보안 봉인은 아니다. 시험 결과로 후보를 수정하려면 새 상황 묶음과 새로운 고정 시험이 필요하다. 공개 예비 진단은 명시적으로 `--data-profile public-pilot`을 사용한다.
+
+
+### 수정된 자료의 학습·최종 품질 결과
+
+최종 후보는 원본에서 다시 시작한100step 학습이다. 83.18초, 최대step0.952초, 학습 가능한14,770,945개 파라미터 중31개 텐서가 변경됐으며 encoder는 그대로다. 후보 가중치SHA256은 `cc396e3c7e05ff522e3863bf9e4481daa0c80b1b28b3b5ce2bef7d2457bdd7e5`다. 재로드12/12 및 Ollaya12/12 선택 일치, 최대 확률 오차는 각각 약0.0001로 반입 기준0.005 이하다.
+
+| 목적 | 제품 SemIf | 미학습 Laya | 학습 후보 | Laya 대비 정확도 차이95% 구간 |
+|---|---:|---:|---:|---:|
+| 관련성 | 21/30 | 11/30 | 11/30 | 0~0%p |
+| 근거 관계 | 13/30 | 9/30 | 9/30 | 0~0%p |
+| 도구 적합성 | 21/30 | 13/30 | 13/30 | 0~0%p |
+
+합계는 제품55/90(61.1%), 미학습/후보 각각33/90(36.7%)다. 3회 반복에서 세 모델 모두 판정 변동이 없었고, 실행 실패와 미실행은0이다. 반복270개를 독립270문제로 계산하지 않았으며 정확도 분모는90개다. Laya 학습 전후에는 **개선한 문항0개, 퇴보한 문항0개**, 중요 오류44개로 동일했다. 목적별 중요 오류는 관련성11/근거관계21/도구적합성12개다. 이 실험의 critical은 사전 표시된 비긍정 라벨 문항의 오판을 보수적으로 센 것이며 제품 사고율이 아니다.
+
+10개 상황 묶음을 재표집한10,000회 paired bootstrap 구간은 세 목적 모두0~0%p다. 동일한 판정을 반복한 고정 문제집의 구간이며 실제 업무 효과의 구간으로 확대하지 않는다. 보정 온도는 원본/후보 모두calibration에서3으로 선택됐고, 시험NLL은1.26718→1.26168, Brier는0.70324→0.70032였다. 확률은 조금 달라졌지만 정답 선택은 바뀌지 않았다. 이 작은 확률 지표 차이를 정확도 개선으로 주장하지 않는다.
+
+주요 오류도 그대로다. 관련성에서 내용이 읽히지 않는10개를 모두 무관으로 판정했고, 도구 기능이 명시되지 않은10개를 모두 부적합으로 판정했다. 근거 관계에서는 근거 부족6개와 무관6개를 모두 supports로 판정했고, partial6개 중5개를 supports로 판정했다. 이는 보류·부분 근거 처리가 여전히 부족하다는 이번 문제집의 관찰이다. 시험 공개 후 이를 보고 학습이나 질문을 수정하지 않았다.
+
+**결론: 개선 미확인.** 정확도 차이 구간의 하한>0 기준을 통과하지 못했다. 제품 기본 SemIf와 설정은 유지한다. 제한된 head 학습이 실행됐다는 사실과 유용한 판단 성능이 좋아졌다는 주장을 구분한다. 시험은소진 표시됐으며 새로운 후보를 조정하려면 새 시험이 필요하다.
+
+### 실제 자료의 별도 개발 진단
+
+확정66개를 같은 원본·후보로 각각 실행했다. 저장된 원요청26개는 당시 질문을 사용했고, 재구성한 실행 보고40개는 명시된 공통 판정 질문을 사용했다. 원입력을 변경하지 않았다.
+
+| 목적 | 자료 수 | 정상 실행 | 정답(전체 자료 기준) | 입력 한도 초과 |
+|---|---:|---:|---:|---:|
+| 관련성 | 16 | 9 | 8 | 7 |
+| 근거 관계 | 48 | 43 | 9 | 5 |
+| 도구 적합성 | 2 | 2 | 1 | 0 |
+
+원본과 후보의 결과는 위 표와 동일하다. 합계18/66이며12개입력은 `STATE_TRUNCATED` 거절을 실패로 보존했다. 성공한54개만 분모로 삼아 점수를 높이지 않았다. 이 자료는 개발에 노출돼 있고 관련성16개가 모두relevant이며 도구적합성은2개뿐이다. 독립 시험이나 실제 업무 개선 증거가 아니다. 개인 원문/예측은 로컬에만 보존한다.
+
+### 메모리 수집 결함과 자원 재측정
+
+첫 측정기의 WMI 조회는 제한된 환경에서 프로세스 목록을 받지 못하고도 종료코드0을 반환했다. 그때 기록된 working-set0은 **미측정**으로 무효 처리한다. Windows Toolhelp32와PSAPI로 소유 프로세스와 자식의 실제 working set을 읽도록 수정하고, 없는PID나0값은 실패로 처리한다. GPU 메모리를 측정한 것으로 표현하지 않는다.
+
+품질 시험 결과·가중치·질문·보정은 고정하고, 동일 입력·순서·3회 반복으로 자원을 다시 측정한다. 이는 측정 오류를 바로잡는 반복이며 새로운 독립 품질 시험으로 세지 않는다. 이전품질 결과와 원시0값은 삭제하지 않고 미측정 이유를 기록했다. 유효 자원 결과는 `corrected/performance/`와 아래 표에 둔다.
+
+| 모델 | 준비 시간 | 추론 p50 | 추론 p95 | 관측 최대 프로세스 메모리 |
+|---|---:|---:|---:|---:|
+| 제품 SemIf (GPU) | 28.33초 | 1055.8ms | 1220.0ms | 6.776GiB |
+| 미학습 Laya (CPU) | 3.47초 | 292.5ms | 515.0ms | 1.400GiB |
+| 후보 Laya (CPU) | 3.01초 | 294.0ms | 495.5ms | 1.399GiB |
+
+모델별90문제×3회 순차 실행, 샘플 주기5초(조회 시간 추가), Windows Toolhelp32+PSAPI의 소유 프로세스 트리 working set이다. 실제 순간 최대치나 GPU 할당량을 뜻하지 않는다. 준비 시간에는 모델 무결성 검사·적재가 포함되며 추론 시간은 따로 측정했다. 후보의 전체p95 변화는-3.8%, 관측 메모리 변화는-0.0%다. 이전 품질 실행과 모든270개 판정이 모델별로 일치했다. 목적별p95·라벨별오류·개선/퇴보 목록은 로컬 `resource-comparison.json`과 `comparison.json`에 보존한다. 자원 측정 반복으로 시험을 새 독립 평가로 재분류하지 않았다.
+
+실제 자료는66개 확정으로600개 하한까지534개 부족하다. 실제 독립 시험은 세 목적 각각30개씩 모두 부족하다. 관련성의 irrelevant/insufficient_evidence, 근거 관계의 contradicts/unrelated, 도구 적합성의 insufficient_evidence 확정 사례가 없다. 기존15개 연결 그룹은 개발에 노출돼 최종 시험으로 전환하지 않는다. 필요한 원문33개와 대조 미완료9개의 목록은 `actual-recheck.json`에 있으며, 사용자에게 일괄 라벨 작성을 요구하지 않는다. 이번 합성 실험에는 추가 사용자 입력이 필요하지 않았다.
+
+
+### 최종 검증과 반영 범위
+
+최종 코드에서 Ruff/형식 검사와 **357 passed, 2 skipped**(113.25초)를 확인했다. 변경 문서의 로컬 링크161개가 유효했고 합성270개에 개인 경로·실제 기록 식별값이 없음을 검사했다. 실제66개 원문·모델 가중치·실행 원시 결과는 로컬에 보존하며 Git에 추가하지 않는다. source/질문/hash/분할변경, 정답ID 유출, 시험 소진 후 학습, 시험 전 후보미고정, 다른모델 실행 중 해제, 존재하지않는PID를0메모리로 기록하는 경로를 회귀 검사한다.
+
+실험 daemon11439/11440/11441의 모델 해제를 확인하고 소유PID를 종료했다. 현재 native Jev는 `matches_disk`, 제품엔진 `idle`, worker/broker 없음, 기존 profile fingerprint 유지, 모든 promotion=false다. 원격CI와 유료 자원은 사용하지 않았다. 검증한 준비·학습·평가·반입검사 코드와 합성자료, 기존 계획/결과/한영README를 기존 원격master에 반영한다. 이 결과는 합성 실험 완료이며 실제 독립 업무 평가 완료를 뜻하지 않는다.

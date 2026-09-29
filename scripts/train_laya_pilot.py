@@ -1,4 +1,4 @@
-"""Bounded CPU head-training smoke test; exposed development data, never a quality gate."""
+"""Bounded CPU head training from frozen train data or an explicitly selected public pilot."""
 
 import argparse
 import ctypes
@@ -9,10 +9,39 @@ import random
 import shutil
 import statistics
 import struct
+import sys
+import threading
 import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "src"))
+
+
+def training_inputs(args):
+    from scripts.prepare_laya_training_data import load_frozen
+
+    if args.split != "train":
+        raise ValueError("Training/reload parity must use train only")
+    if args.data_profile == "public-pilot":
+        if args.dataset or args.manifest:
+            raise ValueError("Public pilot cannot accept a frozen dataset")
+        questions = read(ROOT / "evaluations/ollaya-tuning/candidates.json")["a_original"][
+            "questions"
+        ]
+        return read(ROOT / "evaluations/ollaya-tuning/development.json")["cases"], questions
+    if not args.dataset or not args.manifest or not args.data_profile:
+        raise ValueError("Explicit --dataset, --manifest, --data-profile required")
+    if (
+        getattr(args, "stage", "train") == "train"
+        and (args.dataset.parent / "test-consumed.json").exists()
+    ):
+        raise ValueError(
+            "Final test consumed: candidate revision requires a new test and frozen dataset"
+        )
+    cases = load_frozen(args.dataset, args.manifest, args.split, args.data_profile)
+    return cases, {c["purpose"]: c["question"] for c in cases}
 
 
 def read(path):
@@ -114,12 +143,23 @@ def main():
     parser.add_argument("stage", choices=["train", "reload"])
     parser.add_argument("--base", type=Path, default=ROOT / ".local/models/laya-multilingual")
     parser.add_argument("--output", type=Path, default=ROOT / ".local/laya-finetuning/pilot")
+    parser.add_argument("--dataset", type=Path)
+    parser.add_argument("--manifest", type=Path)
+    parser.add_argument(
+        "--split", choices=["train", "development", "calibration", "test"], required=True
+    )
+    parser.add_argument(
+        "--data-profile", choices=["actual", "synthetic-experiment", "public-pilot"], required=True
+    )
     args = parser.parse_args()
+    cases, questions = training_inputs(args)
     os.environ["HF_HUB_OFFLINE"] = "1"
     os.environ["TRANSFORMERS_OFFLINE"] = "1"
     import torch
     from laya import Agent
-    from laya.common import build_sequence, collate_items, render_options
+    from laya.common import build_sequence, collate_items, render_options, serialize_state
+
+    from jev_context.storage import FileLock
 
     torch.set_num_threads(4)
     torch.manual_seed(20260928)
@@ -128,17 +168,58 @@ def main():
     output.mkdir(parents=True, exist_ok=True)
     with (output / (args.stage + ".started")).open("x") as marker:
         marker.write(str(time.time()))
-    report = {"stage": args.stage, "quality_evaluation": False, "promotion_eligible": False}
+    report = {
+        "stage": args.stage,
+        "quality_evaluation": False,
+        "promotion_eligible": False,
+        "data_profile": args.data_profile,
+        "split": args.split,
+        "training_ids": [c["id"] for c in cases],
+        "dataset_sha256": sha(args.dataset) if args.dataset else None,
+        "manifest_sha256": sha(args.manifest) if args.manifest else None,
+        "seed": 20260928,
+        "batch_size": 1,
+        "threads": 4,
+        "learning_rate": 1e-5,
+    }
     started = time.perf_counter()
+    stopped = threading.Event()
+    deadline = {"step": None}
+
+    def watchdog():
+        while not stopped.wait(0.5):
+            now = time.perf_counter()
+            if (
+                now - started > 1200
+                or (deadline["step"] and now > deadline["step"])
+                or memory_gib() < 1.5
+            ):
+                save(
+                    output / "watchdog-abort.json",
+                    {
+                        "status": "failed",
+                        "reason": "time_or_memory_limit",
+                        "elapsed_seconds": now - started,
+                    },
+                )
+                os._exit(124)
+
+    guard = FileLock(ROOT / ".local/laya-finetuning/experiment-model.lock")
+    resident = FileLock(
+        Path(read(ROOT / ".local/semif-ov-profile.json")["lock_root"]) / "resident.lock"
+    )
+    guard.__enter__()
+    try:
+        resident.__enter__()
+    except BaseException:
+        guard.__exit__(None, None, None)
+        raise
+    threading.Thread(target=watchdog, daemon=True).start()
     try:
         if memory_gib() < 4:
             raise MemoryError("Require 4 GiB available before load")
         base_weights = args.base / "model.safetensors"
         original_hash = sha(base_weights)
-        questions = read(ROOT / "evaluations/ollaya-tuning/candidates.json")["a_original"][
-            "questions"
-        ]
-        cases = read(ROOT / "evaluations/ollaya-tuning/development.json")["cases"]
         parity = [c for p in questions for c in [x for x in cases if x["purpose"] == p][:4]]
         if args.stage == "train":
             model_path = output / "reference-base"
@@ -149,6 +230,27 @@ def main():
         else:
             model_path = output / "checkpoint"
         agent = Agent(str(model_path), device="cpu")
+        for case in cases:
+            q = agent._to_internal(questions[case["purpose"]])
+            state_text = serialize_state(case["state"])
+            options = render_options(q)
+            if any(agent.tok.mask_token in value for value in [state_text, q["ins"], *options]):
+                raise ValueError("Input contains mask token that the runtime would replace")
+            lengths = [
+                len(agent.tok(" " + option, add_special_tokens=False)["input_ids"])
+                for option in options
+            ]
+            head = len(
+                agent.tok(f"{q['t']} question: {q['ins']}", add_special_tokens=False)["input_ids"]
+            )
+            state_length = len(agent.tok(state_text, add_special_tokens=False)["input_ids"])
+            option_total = sum(1 + length for length in lengths)
+            if (
+                any(length > 48 for length in lengths)
+                or max(head, 16) + option_total > 256
+                or head + option_total + state_length + 4 > 1024
+            ):
+                raise ValueError("Question/options/state would be truncated")
         report.update(
             base_sha256=original_hash,
             device=str(agent.device),
@@ -212,6 +314,7 @@ def main():
                 agent.model.encoder.eval()
                 optimizer.zero_grad(set_to_none=True)
                 began = time.perf_counter()
+                deadline["step"] = began + 30
                 logits, _ = agent.model(
                     **{
                         k: batch[k]
@@ -232,6 +335,7 @@ def main():
                 torch.nn.utils.clip_grad_norm_(trainable, 1.0, error_if_nonfinite=True)
                 optimizer.step()
                 elapsed = time.perf_counter() - began
+                deadline["step"] = None
                 report["steps"].append({"step": step + 1, "loss": loss.item(), "seconds": elapsed})
                 save(output / "train.json", report)
                 print(
@@ -263,6 +367,10 @@ def main():
         report.update(status="failed", error=f"{type(exc).__name__}: {exc}")
         save(output / (args.stage + ".json"), report)
         raise
+    finally:
+        stopped.set()
+        resident.__exit__(None, None, None)
+        guard.__exit__(None, None, None)
     save(output / (args.stage + ".json"), report)
     print(json.dumps({k: report[k] for k in ["stage", "status", "elapsed_seconds"]}), flush=True)
 

@@ -503,3 +503,261 @@ def test_runtime_rejects_silently_ignored_checkpoint_rotary_parameters():
     validate_rotary_config(
         checkpoint, SimpleNamespace(rope_parameters=checkpoint["rope_parameters"])
     )
+
+
+def synthetic_fixture():
+    import json
+    from pathlib import Path
+
+    return json.loads(
+        (
+            Path(__file__).resolve().parents[1]
+            / "evaluations/laya-finetuning/synthetic-20260929.json"
+        ).read_text("utf-8")
+    )
+
+
+def test_frozen_evaluator_busy_does_not_unload_other_model(tmp_path, monkeypatch):
+    import argparse
+    import json
+
+    import pytest
+
+    from scripts import evaluate_ollaya as evaluate
+    from scripts.prepare_laya_training_data import freeze_dataset, prepare_synthetic
+
+    fixture = synthetic_fixture()
+    report, rows = prepare_synthetic(fixture["cases"], fixture["reservation"])
+    report = freeze_dataset(rows, report, fixture["questions"], tmp_path)
+    manifest = tmp_path / "prepare.json"
+    manifest.write_text(json.dumps(report), "utf-8")
+    profile = tmp_path / "profile.json"
+    profile.write_text(json.dumps({"lock_root": str(tmp_path / "resident")}), "utf-8")
+    calls = []
+
+    class Client:
+        def __init__(self, endpoint):
+            pass
+
+        def call(self, path):
+            calls.append(path)
+            return {"models": ["someone-elses-model"]}
+
+        def unload(self, model):
+            pytest.fail("Must not unload another model on a busy result")
+
+    monkeypatch.setattr(evaluate, "Client", Client)
+    monkeypatch.setattr(evaluate, "ROOT", tmp_path)
+    args = argparse.Namespace(
+        dataset=tmp_path / "frozen.jsonl",
+        manifest=manifest,
+        split="test",
+        data_profile="synthetic-experiment",
+        model="laya:multilingual",
+        backend="ollaya",
+        candidate_lock=None,
+        endpoint="unused",
+        profile=profile,
+        output=tmp_path / "results",
+    )
+    with pytest.raises(SystemExit):
+        evaluate.frozen_evaluation(args)
+    saved = json.loads((args.output / "test.json").read_text("utf-8"))
+    assert len(saved["rows"]) == 270
+    assert all(r["status"] == "not_run" for r in saved["rows"])
+    assert calls == ["/api/ps"]
+    args.model = "jev-laya:pilot"
+    with pytest.raises(ValueError, match="frozen candidate"):
+        evaluate.frozen_evaluation(args)
+
+
+def test_candidate_lock_rejects_changed_checkpoint(tmp_path):
+    import json
+
+    import pytest
+
+    from scripts.evaluate_ollaya import check_candidate_lock, sha
+
+    dataset = tmp_path / "frozen.jsonl"
+    checkpoint = tmp_path / "model.safetensors"
+    dataset.write_text("frozen", "utf-8")
+    checkpoint.write_text("before", "utf-8")
+    lock = tmp_path / "candidate-lock.json"
+    lock.write_text(
+        json.dumps(
+            {
+                "dataset_sha256": sha(dataset),
+                "files": [{"path": str(checkpoint), "sha256": sha(checkpoint)}],
+            }
+        ),
+        "utf-8",
+    )
+    assert check_candidate_lock(lock, dataset)
+    checkpoint.write_text("after", "utf-8")
+    with pytest.raises(ValueError, match="changed"):
+        check_candidate_lock(lock, dataset)
+
+
+def test_process_memory_is_positive_and_missing_pid_is_not_zero():
+    import os
+
+    import pytest
+
+    from scripts.evaluate_ollaya import process_snapshot
+
+    if os.name != "nt":
+        pytest.skip("Windows process memory sampler")
+    observed = process_snapshot(os.getpid())
+    assert observed["working_set_sum_bytes"] > 0
+    assert os.getpid() in {p["ProcessId"] for p in observed["processes"]}
+    with pytest.raises(RuntimeError, match="unavailable"):
+        process_snapshot(0xFFFFFFFE)
+
+
+def test_synthetic_profile_balanced_and_actual_gate_unchanged():
+    from scripts.prepare_laya_training_data import prepare_reviewed, prepare_synthetic
+
+    fixture = synthetic_fixture()
+    report, rows = prepare_synthetic(fixture["cases"], fixture["reservation"])
+    assert report["status"] == "ready"
+    assert report["groups"] == 30 and len(rows) == 270
+    actual, _ = prepare_reviewed(rows)
+    assert actual["status"] == "not_ready"
+    assert any("Need 600" in error for error in actual["errors"])
+
+
+def test_synthetic_review_tampering_and_family_leak_rejected():
+    import copy
+
+    from scripts.prepare_laya_training_data import prepare_synthetic
+
+    fixture = synthetic_fixture()
+    changes = [
+        lambda r: r[0].update(expected="irrelevant"),
+        lambda r: r[0]["state"].update(candidate="changed"),
+        lambda r: r[0]["review"].update(target_model_output_used_as_label=True),
+        lambda r: r[0].update(provenance="captured_model_request"),
+        lambda r: r[0].update(usage="verification_only"),
+        lambda r: r[-1].update(pair_group_id=r[0]["pair_group_id"]),
+        lambda r: r[0]["review"].update(human_reviewed=True),
+    ]
+    for change in changes:
+        rows = copy.deepcopy(fixture["cases"])
+        change(rows)
+        assert prepare_synthetic(rows, fixture["reservation"])[0]["status"] == "not_ready"
+    assert (
+        prepare_synthetic(fixture["cases"], fixture["reservation"], [fixture["cases"][0]])[0][
+            "status"
+        ]
+        == "not_ready"
+    )
+
+
+def test_synthetic_freeze_profile_and_train_only(tmp_path):
+    import argparse
+    import json
+
+    import pytest
+
+    from scripts.prepare_laya_training_data import freeze_dataset, load_frozen, prepare_synthetic
+    from scripts.train_laya_pilot import training_inputs
+
+    fixture = synthetic_fixture()
+    report, rows = prepare_synthetic(fixture["cases"], fixture["reservation"])
+    report = freeze_dataset(rows, report, fixture["questions"], tmp_path)
+    manifest = tmp_path / "prepare.json"
+    manifest.write_text(json.dumps(report), "utf-8")
+    dataset = tmp_path / "frozen.jsonl"
+    args = argparse.Namespace(
+        dataset=dataset, manifest=manifest, data_profile="synthetic-experiment", split="train"
+    )
+    cases, _ = training_inputs(args)
+    assert len(cases) == 90 and all(c["split"] == "train" for c in cases)
+    with pytest.raises(ValueError, match="profile"):
+        load_frozen(dataset, manifest, "train", "actual")
+    args.split = "test"
+    with pytest.raises(ValueError, match="train only"):
+        training_inputs(args)
+    args.split = "train"
+    ledger = tmp_path / "test-consumed.json"
+    ledger.write_text("{}", "utf-8")
+    with pytest.raises(ValueError, match="consumed"):
+        training_inputs(args)
+    ledger.unlink()
+    dataset.write_text(dataset.read_text("utf-8") + " ", "utf-8")
+    with pytest.raises(ValueError, match="hash"):
+        load_frozen(dataset, manifest, "train", "synthetic-experiment")
+
+
+def test_temperature_cannot_use_development_or_failed_rows():
+    import pytest
+
+    from scripts.evaluate_ollaya import choose_temperature
+
+    row = {
+        "split": "calibration",
+        "status": "observed",
+        "expected": "a",
+        "probabilities": {"a": 0.5, "b": 0.5},
+    }
+    assert choose_temperature({"split": "calibration", "rows": [row]}) == 1
+    with pytest.raises(ValueError, match="calibration"):
+        choose_temperature({"split": "development", "rows": [row]})
+    row["status"] = "error"
+    with pytest.raises(ValueError, match="calibration"):
+        choose_temperature({"split": "calibration", "rows": [row]})
+
+
+def test_synthetic_candidate_id_label_leak_rejected_even_with_rebound_hash():
+    from scripts.prepare_laya_training_data import digest, prepare_synthetic
+
+    fixture = synthetic_fixture()
+    row = next(r for r in fixture["cases"] if r["purpose"] == "capability_fit")
+    row["state"]["candidate"]["id"] = "plausible-tool-fit"
+    row["state_sha256"] = digest(row["state"])
+    row["review"]["checked_state_sha256"] = row["state_sha256"]
+    report, _ = prepare_synthetic(fixture["cases"], fixture["reservation"])
+    assert any("Gold label leaks" in e for e in report["errors"])
+
+
+def test_paired_comparison_keeps_failures_and_rejects_mismatch():
+    import copy
+
+    import pytest
+
+    from scripts.evaluate_ollaya import paired_comparison
+
+    rows = [
+        {
+            "repeat": 0,
+            "id": p,
+            "purpose": p,
+            "split": "test",
+            "state_sha256": "s",
+            "question_sha256": "q",
+            "group_id": "g",
+            "expected": "a",
+            "critical": True,
+            "status": "error",
+            "latency_ms": 1,
+        }
+        for p in ("relevance", "evidence_relation", "capability_fit")
+    ]
+    baseline = {
+        "dataset_sha256": "d",
+        "conditions": {"case_order": [r["id"] for r in rows]},
+        "rows": rows,
+        "memory_samples": [],
+        "status": "incomplete",
+    }
+    result = paired_comparison(baseline, copy.deepcopy(baseline))
+    assert all(
+        r["baseline"]["count"] == 1
+        and r["baseline"]["errors"] == 1
+        and not r["improvement_gate_passed"]
+        for r in result.values()
+    )
+    candidate = copy.deepcopy(baseline)
+    candidate["rows"][0]["question_sha256"] = "different"
+    with pytest.raises(ValueError, match="mismatch"):
+        paired_comparison(baseline, candidate)
