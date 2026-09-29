@@ -387,6 +387,52 @@ $experiment='.local/laya-finetuning/synthetic-20260929/corrected'
 최종 코드에서 Ruff/형식 검사와 **357 passed, 2 skipped**(113.25초)를 확인했다. 변경 문서의 로컬 링크161개가 유효했고 합성270개에 개인 경로·실제 기록 식별값이 없음을 검사했다. 실제66개 원문·모델 가중치·실행 원시 결과는 로컬에 보존하며 Git에 추가하지 않는다. source/질문/hash/분할변경, 정답ID 유출, 시험 소진 후 학습, 시험 전 후보미고정, 다른모델 실행 중 해제, 존재하지않는PID를0메모리로 기록하는 경로를 회귀 검사한다.
 
 실험 daemon11439/11440/11441의 모델 해제를 확인하고 소유PID를 종료했다. 현재 native Jev는 `matches_disk`, 제품엔진 `idle`, worker/broker 없음, 기존 profile fingerprint 유지, 모든 promotion=false다. 원격CI와 유료 자원은 사용하지 않았다. 검증한 준비·학습·평가·반입검사 코드와 합성자료, 기존 계획/결과/한영README를 기존 원격master에 반영한다. 이 결과는 합성 실험 완료이며 실제 독립 업무 평가 완료를 뜻하지 않는다.
+## 2026-09-29 외부 사용법·학습 사례 조사
+
+사용자의 외부 조사 요청에 따라 공식 문서·실제 학습 코드·재현 이슈를 확인하고 현재 구현과 대조했다. 아래는 **외부 보고와 코드 조사**이며 우리 환경에서 해당 방법을 재실행한 결과가 아니다. 기존 진단의 정답 4/15 불변, 손실 감소, encoder 불변, 실행 경로 일치는 그대로 유효하다. 원인은 아직 확정하지 못했지만 조사 없이 같은 제한 설정의 실패에서 멈추는 것은 불충분했다.
+
+### ‘튜닝이 쉽다’의 서로 다른 의미
+
+- [Ollaya Modelfile](https://ollaya.dev/docs/modelfile)은 질문·선택지, 확률 보정, 정밀도 등을 지정해 파생 모델을 구성한다. 질문 변경과 가중치 학습은 다른 작업이다. 하나의 양수 온도로 logits를 나누는 보정은 확률의 과신을 조절하지만 가장 높은 선택지를 바꾸지 않는다.
+- [공식 Laya](https://github.com/NandhaKishorM/laya)는 업무별 추가 학습을 전제로 한 기본 모델의 한계를 직접 설명한다. 공개 벤치마크의 학습 후 점수를 우리 관련성·근거 관계·도구 적합성 성능으로 옮겨 해석할 수 없다.
+- [Laya Studio](https://github.com/Hantlowt/laya-studio)는 동결된 표현에서 중심점·방향·변환 등을 만드는 별도 접근이다. 가중치 추가 학습과 다르며 현재 Ollaya에 설정 파일만 넣으면 동작하는지 검증되지 않았다. 이번에 설치하거나 외부 생성 API를 사용하지 않았다.
+
+### 실제 학습 코드와의 차이
+
+조사일은 2026-09-29다. 공식 코드 참조는 `9d955671415fc19f069b9cc998928075c1f255ec`, 커뮤니티 layaMOE 코드는 `866456198d29cca836c83e66f32fb556857c4292`로 고정했다. 읽은 원본과 SHA-256은 로컬 `.local/laya-finetuning/upstream-research-20260929/sources.json`에 남겼다. 다운로드한 코드는 실행하지 않았다.
+
+| 항목 | 우리 실행 | 공식 학습 노트북 | 공개 CPU head 학습 사례 |
+|---|---|---|---|
+| 학습 대상 | encoder 고정, head/type embedding/scorer | encoder와 나머지 모듈 | encoder 고정, 복제한 head |
+| 학습률 | 실제 실행 1e-5 | encoder 2.5e-5, head 1e-4 | head 6e-4 |
+| 반복·자원 | CPU 4 threads, batch 1, 100/300 updates | 2 T4, 4 epochs, 누적 batch 64 | CPU, 6 epochs, 수천 학습 항목 |
+| 목적 함수 | 정답 인덱스 cross entropy | soft cross entropy + RLCD | choice는 cross entropy |
+| 추가 조건 | 고정 질문·선택지 순서 | cosine 학습률 감소 | encoder 특징 캐시, warmup/감소, 선택지 순서 섞기 |
+| gradient clipping | 1 | 1 | 1 |
+
+공식 수치는 [학습 노트북](https://github.com/NandhaKishorM/laya/blob/9d955671415fc19f069b9cc998928075c1f255ec/notebooks/laya_finetune_typed_decisions_2xT4_kaggle.ipynb)의 실제 코드에서 확인했다. 이는 현재 CPU 20분 예비 실행과 다른 범위다. 공식 RLCD를 쓰지 않았다는 사실만으로 우리의 cross entropy를 결함으로 단정할 수는 없다.
+
+[layaMOE 작성자](https://github.com/vishalmysore/layaMOE)는 frozen head가 3e-5에서 거의 움직이지 않고 6e-4에서 학습됐다고 보고한다. [학습 코드](https://github.com/vishalmysore/layaMOE/blob/866456198d29cca836c83e66f32fb556857c4292/scripts/train_expert.py)에서도 6e-4 기본값을 확인했다. 다만 이 사례는 ModernBERT 기반 421M 모델이며 우리의 multilingual 322M과 다르다. 작성자가 시험을 보고 라우터를 한 번 수정했고 목적별 시험도 작다. 따라서 성공 보증이나 독립적인 품질 증거가 아닌 **head 학습률과 특징 캐시를 조사할 근거**로 사용한다. MoE 서비스나 라우터를 우리 프로젝트에 추가할 이유는 없다.
+
+### 알려진 문제와 우리 증상에 적용되는 범위
+
+| 원출처 | 공개 관찰 | 우리에게 주는 의미와 한계 |
+|---|---|---|
+| [선택지·검색 품질 이슈 #171](https://github.com/NandhaKishorM/laya/issues/171) | 제작자가 해당 검색 사례에서 개선이 없음을 인정하고 선택지 설명·순서 민감성을 설명 | 의미가 같은 선택지 순서 변경을 개발 진단에 포함할 근거. 해당 검색 작업의 실패율을 우리 작업에 적용하지 않음 |
+| [다국어 한쪽 답 쏠림 #99](https://github.com/NandhaKishorM/laya/issues/99) | 긴 잡음 입력의 여러 선택지가 일부 답으로 쏠린다는 보고 | 우리와 증상은 유사하지만 입력 길이와 과제가 달라 동일 원인이라고 확정할 수 없음 |
+| [부정문 실패 재현 #377](https://github.com/NandhaKishorM/laya/issues/377) | 0.3.20의 실제 다국어 모델에서 취소하지 말라는 일부 입력을 취소로 판정 | 금지·반례를 다루는 업무에서 중요한 재현 후보. 우리 설치 버전에서 아직 재실행하지 않음 |
+| [공식 브라우저 특화 사례](https://github.com/NandhaKishorM/laya/blob/9d955671415fc19f069b9cc998928075c1f255ec/docs/finetune_browser_agent.md) | 실행 결과 기반 학습, 입력·선택지 표현과 잘림 문제를 함께 수정 | 실제 실행 근거와 입력 일치가 중요함. 우리의 합성 입력 감사는 잘림 0이므로 그 사례의 입력 한도 확장을 바로 복사하지 않음 |
+
+현재 학습 환경은 Laya 0.3.5 / torch 2.8.0+cpu / transformers 4.56.2다. 조사한 최신 README는 0.3.21을 안내한다. [공식 학습 논의 #26](https://github.com/NandhaKishorM/laya/issues/26)에 후속 보정·적재 수정이 있으나, 현재 사용자 정의 학습기는 보정 자료를 별도 분리한다. 버전 차이만으로 정답 불변의 원인을 확정하거나 업데이트가 해결책이라고 주장하지 않는다. 패키지 교체는 별도 출력 동등성 확인이 필요하다.
+
+### 판단과 다음 진단 우선순위
+
+가장 직접적인 미검증 가설은 **업무에 비해 지나치게 보수적인 head 학습 조건**이다. 우리 1e-5는 공식 head 설정의 1/10이며 실제로 정답 확률과 손실은 움직였다. 그렇다고 더 높은 학습률이면 반드시 정답이 늘어나는 것은 아니다. 본체 표현의 한계, 선택지·부정문 민감성, 자료의 구분 가능성도 남아 있다. 모든 step의 gradient가 잘렸다는 관찰만으로 clipping을 원인으로 지목하지 않는다. 비교한 외부 구현도 같은 상한 1을 사용한다.
+
+다음은 train/development만 사용하는 원인 분리다. 공개 부정문과 선택지 순서의 대조 입력으로 민감도를 확인하고, Python/Ollaya 원시 선택·확률을 대조한다. 그다음 같은 원본·15개 학습 자료에서 head 학습률을 비교한다. 동결 encoder의 특징을 캐시할 경우에는 먼저 원래 logits와 일치를 확인한다. 새 최종 시험은 이 진단에 사용하지 않는다. 상세 절차와 미실행 상태는 [계획 보완](laya-finetuning-plan.md#2026-09-29-외부-조사에-따른-진단-보완)에 기록했다.
+
+이번에 완료한 것은 외부 조사와 코드 대조·계획 보완이다. 외부 예제 재현, 다른 학습률, encoder 학습, 새 시험 평가는 아직 실행하지 않았다. 결론은 계속 **개선 미확인**이며 Ollaya 전체 또는 Laya 전체가 학습 불가능하다는 결론은 아니다.
+
 ## 2026-09-29 후속 원인 진단 실행
 
 승인된 후속 계획에 따라 감사·새 자료 고정·15개 학습 진단을 완료했다. 앞선 실험은 보존하며 새 실행 경로는 `.local/laya-finetuning/retry-20260929/`다. 진단이 실패하면 후보 탐색을 중단한다는 사전 기준을 적용했다. 사용자에게 라벨을 요청하거나 기준을 낮추지 않았다.
