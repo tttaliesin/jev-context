@@ -1,6 +1,6 @@
 # 실제 가중치 학습·Ollaya 반입 예비 실행
 
-**최신 결과(2026-09-29):** 합성 270개를 분리해 후보를 100 step 학습하고 90문제로 비교했다. 미학습 Laya와 후보 모두 33/90, 제품 SemIf는 55/90이었다. 결론은 **개선 미확인**, 제품 기본 모델 유지다. 아래 과거 기술 예비 실행과 최신 합성 실험을 구분한다.
+**최신 결과(2026-09-29):** 후속 진단에서 같은 학습 자료 15개를 300 step 반복했지만 정답은 4/15로 유지됐다. 평균 손실은 2.055→1.671로 감소했으나 진단 기준 미달이므로 A/B/C 후보 학습과 새 최종 시험은 실행하지 않았다. 앞선 시험은 원본/후보33/90, 제품SemIf55/90이었다. 결론은 **개선 미확인**, 제품 기본 모델 유지다. 진단 자료의 점수를 시험 정확도로 표현하지 않는다.
 
 2026-09-28. [실행 계획과 사전 자체 검토](laya-finetuning-plan.md)에 따른 기록. **기술 예비 실행은 성공, 실제 정답 데이터에 의한 본 학습·독립 성능 검증은 미완료**다.
 
@@ -387,3 +387,68 @@ $experiment='.local/laya-finetuning/synthetic-20260929/corrected'
 최종 코드에서 Ruff/형식 검사와 **357 passed, 2 skipped**(113.25초)를 확인했다. 변경 문서의 로컬 링크161개가 유효했고 합성270개에 개인 경로·실제 기록 식별값이 없음을 검사했다. 실제66개 원문·모델 가중치·실행 원시 결과는 로컬에 보존하며 Git에 추가하지 않는다. source/질문/hash/분할변경, 정답ID 유출, 시험 소진 후 학습, 시험 전 후보미고정, 다른모델 실행 중 해제, 존재하지않는PID를0메모리로 기록하는 경로를 회귀 검사한다.
 
 실험 daemon11439/11440/11441의 모델 해제를 확인하고 소유PID를 종료했다. 현재 native Jev는 `matches_disk`, 제품엔진 `idle`, worker/broker 없음, 기존 profile fingerprint 유지, 모든 promotion=false다. 원격CI와 유료 자원은 사용하지 않았다. 검증한 준비·학습·평가·반입검사 코드와 합성자료, 기존 계획/결과/한영README를 기존 원격master에 반영한다. 이 결과는 합성 실험 완료이며 실제 독립 업무 평가 완료를 뜻하지 않는다.
+## 2026-09-29 후속 원인 진단 실행
+
+승인된 후속 계획에 따라 감사·새 자료 고정·15개 학습 진단을 완료했다. 앞선 실험은 보존하며 새 실행 경로는 `.local/laya-finetuning/retry-20260929/`다. 진단이 실패하면 후보 탐색을 중단한다는 사전 기준을 적용했다. 사용자에게 라벨을 요청하거나 기준을 낮추지 않았다.
+
+### 입력과 답안 감사
+
+기존270개의 원래 입력·정답·근거와 선택지 구성을 재검토했다. 답안 검토에 모델 예측을 사용하지 않았으며 사람 검토로 기록하지 않았다. 기존 train90/development45/calibration45의 입력·정답을 유지했다. 새 시험90개는 NULL 이전, 링크 경로, 원자적 저장 복구, 시간대 중복 시각, 조직별 캐시, WAL 스냅샷, 스트림 취소, 페이지 cursor, 승인 범위, 유니코드 인덱스라는10개 상황으로 작성했다. 기존 물리·행정 업무의 이름만 바꾼 복제는 아니다. 다만 학습 자료와 시험 분야가 달라지는 합성 실험이며 실제 코딩 업무 일반화를 보장하지 않는다.
+
+예약 뒤 작성·검토한 새 고정 자료는 train90/dev45/cal45/test90, 목적·라벨 균형 및 test 목적별10그룹·라벨별2그룹 조건을 통과했다. 기존 시험/실제 개발 노출 자료와 출처 그룹 및 입력 중복을 검사했다. 기존180개는 이전 검토를 보존하면서 예약과 검토 시점을 새 revision에 연결했다. 같은 Codex가 작성·검토하는 한계는 그대로다.
+
+기존270개와 새270개 모두 토큰·질문·선택지 순서·정답 인덱스·MASK 위치를 검사했다. 최대359토큰, 잘림0이며 choice형 qtype=0과 라벨 인덱스가 일치했다. 목적별 질문은 하나이며 서로 다른 질문을 덮어쓰지 않고 거절한다. 입력/정답/출처hash가 검토와 묶여 있고 후보 ID에 정답 라벨은 없다. 이 검사는 의미 판단의 외부 독립 검증이 아니다.
+
+실제 개발의 이전 실패12개는 원문을 그대로 토큰화했을 때1,091~1,633토큰으로 모두1,024한도를 넘었다. 관련성7개, 근거관계5개이며 직렬화 원문에서 첫 초과 문자 위치와 필드별 토큰 수를 로컬 `input-audit.json`에 기록했다. 요약·절단으로 성공 처리하지 않았다. 실제66확정/42보류, 실제 평가600기준은 변경하지 않았다.
+
+새 자료: [문제·답안·근거](../evaluations/laya-finetuning/synthetic-retry-20260929.json). 고정 JSONL SHA256은 `b4e5f0957f54e05f72fddca7e7af083106cd92e2fa460cf86f06e56c8cf3b4c0`이다. 새 시험은 **예측 미실행·미소진**이다. 이전 시험 소진 표식은 그대로다.
+
+### 같은15개 반복 학습 결과
+
+ID순 선택 규칙에 따라 library/meal 두 상황의 목적별5개를 사용했다. 근거관계5라벨 전체, 관련성 relevant2/irrelevant1/insufficient2, 도구 fit1/unfit2/insufficient2다. 두 상황을 반복 학습한 진단이며 독립 성능 평가가 아니다.
+
+| 시점 | 동일15개 정답 | 평가모드 평균 NLL |
+|---|---:|---:|
+| 학습 전 | 4/15 | 2.054917 |
+| 100 step | 4/15 | 1.898715 |
+| 300 step | 4/15 | 1.670520 |
+
+원본부터 seed20260928, AdamW1e-5, batch1, CPU4threads로 실행했다. 총260.08초, 최대step1.234초로 제한 안에 완료했다. head/type embedding/scorer31개 텐서가 변경되고 encoder는 그대로였다. 모든step에서 각 학습 모듈의 유한한 gradient와 update를 기록했다. 전체300step에서 clip 이전 gradient norm이1을 넘었으며 기존clip1을 그대로 적용했다. 이것만으로 clipping이 실패 원인이라고 단정하지 않는다.
+
+틀린11개 모두 정답 확률이 올라가고 정답과 최고 오답의 점수 차이가 줄었지만, 어느 것도 역전하지 못했다. 기존 정답4개의 정답 확률도 내려갔다. 이는 분포가 덜 확신하는 방향으로 움직였다는 관찰이며 올바른 의미 구별 능력이 개선됐다는 증거는 아니다. **평균 손실 감소 조건은 통과, 정답수 증가 또는14/15 조건은 실패**다.
+
+직접 logits와 Python 추론은 0/100/300step의 각15개에서 선택과 온도 적용 후 확률이 일치했다. 저장/재로드12개 선택도 모두 일치하고 최대확률차0.0001로 기준0.005 이하다. 원본 Python과 Ollaya 경로12개는 선택·확률 차이0으로 일치했다. 진단 가중치SHA256은 `2e8771bbb091fa974e364bb21b60d37e140c9e3be7eff9dca119a8c896c735c1`이다. 진단 모델 자체는 Ollaya로 포장하지 않았으며, 포장·후보 고정에서 명시적으로 거절한다.
+
+확인된 사실은 학습 갱신과 실행 경로 일치, 그리고 제한된 반복 학습에서 선택 불변이다. 학습률·횟수·encoder고정·입력 표현 중 무엇이 주된 원인인지는 분리해 입증하지 못했다. 전체 모델이 학습 불가능하다고 해석하지 않는다.
+
+### 미실행 단계와 재현
+
+A/B/C 후보 학습, 개발 후보 선택의 실제 모델 비교, 보정, 후보 반입, 새 최종 시험과 bootstrap은 **진단 기준 미달로 미실행**이다. 도구의 설정 검증·진단 자료 제한·개발 선택·후보 고정 차단은 구현하고 로컬 검사했다. 제품 설정과 원본 모델은 유지한다. 새 시험을 열지 않았으므로 새로운 성능 수치는 없다. 결론은 **개선 미확인**이다.
+
+원본 모델 및 가상환경이 설치된 저장소 루트에서 실행한다. 출력은 반드시 아직 없는 별도 디렉터리를 사용한다. 아래는 실제 실행과 같은 입력을 재현하는 명령이며 기존 결과를 덮어쓰지 않는다.
+
+```powershell
+$retry='.local/laya-finetuning/retry-reproduction'
+.venv/Scripts/python.exe -X utf8 -m scripts.prepare_laya_training_data prepare --data-profile synthetic-experiment --reviewed evaluations/laya-finetuning/synthetic-retry-20260929.json --output "$retry/frozen"
+$diagnosticIds=@('synth-library-0','synth-library-1','synth-library-2','synth-meal-0','synth-meal-2','synth-library-3','synth-library-4','synth-library-5','synth-meal-3','synth-meal-4','synth-library-6','synth-library-7','synth-library-8','synth-meal-7','synth-meal-8')
+[IO.File]::WriteAllText((Join-Path (Get-Location) "$retry/diagnostic-ids.json"), (ConvertTo-Json -InputObject $diagnosticIds), [Text.UTF8Encoding]::new($false))
+.local/laya-venv/Scripts/python.exe -X utf8 -m scripts.train_laya_pilot train --data-profile synthetic-experiment --dataset "$retry/frozen/frozen.jsonl" --manifest "$retry/frozen/prepare.json" --split train --steps 300 --learning-rate 1e-5 --diagnostic-ids "$retry/diagnostic-ids.json" --output "$retry/diagnostic"
+# 같은 인수에서 train을 reload로 바꾸면 저장 후 참조 추론을 기록한다.
+```
+
+원래 실행은 기존 비공개 actual-reviewed.jsonl 및 이전 시험을 노출 자료로 연결해 추가 충돌 검사를 수행했다. 위 공개 재현은 개인 자료를 요구하지 않으며 저장소의 시험 재사용 회귀 검사와 함께 검증한다. 결과는 train.json의 diagnostic_snapshots/steps/diagnostic_passed, reload.json, base-runtime-parity.json, review-audit.json, input-audit.json에 보존한다. 마지막 네 파일의 개인 정보가 포함될 수 있는 원시 기록은 Git에 올리지 않는다. 사용자가 추가로 작성할 문제나 답안은 없다.
+
+### 후속 코드 검증
+
+최종 전체 검사 **362 passed, 2 skipped**(119.35초), Ruff와형식검사162파일, 변경 문서 로컬링크162개를 확인했다. 진단 모델의 포장을 실제 명령으로 요청했을 때 `Diagnostic checkpoints cannot be packaged`로 거절됐고 저장소가 생성되지 않았다. 진단 ID의 중복/미등록/분할 혼입, 승인 외 학습 설정, 개발 선택의 입력 변경/실패/시험 혼용/정확도 퇴보, 진단 후보 고정과 기존 시험 상황 재사용을 거절하는 검사를 포함한다.
+
+첫 전체 검사는 긴 임시 디렉터리 경로에서 파일 생성 오류가 났고, 경로를 줄인 실행은 기본cp949 디코딩으로6개가 실패했다. 최종 검사는 기존 코드나 기준을 바꾸지 않고 짧은 경로와 UTF-8 환경으로 실행했다. 재현 조건은 다음과 같다. 실패 실행 로그도 로컬에 보존한다.
+
+```powershell
+$env:PYTHONUTF8='1'
+.venv/Scripts/python.exe -X utf8 -m pytest -q --tb=short --basetemp .local/qa-retry-utf8 -p no:cacheprovider
+.venv/Scripts/python.exe -m ruff check .
+.venv/Scripts/python.exe -m ruff format --check .
+```
+
+원본 대조용으로 실행한 소유 Ollaya daemon11442는 모델 해제 후 종료했다. native Jev는 `matches_disk`/idle, 기존 profile fingerprint 및 promotion=false를 유지한다. 재시작은 필요하지 않다. 개인 원문·진단 가중치·로컬 실행 로그는 업로드하지 않고 검증한 코드·문서·합성 자료만 기존 원격에 반영한다.

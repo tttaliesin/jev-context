@@ -27,6 +27,94 @@ THRESHOLDS = [0, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95]
 BASE_MODEL = "laya:multilingual"
 
 
+def select_development_candidate(baseline, candidates):
+    """Select with development only; candidates contain report and training metadata."""
+    identity_fields = ("id", "state_sha256", "question_sha256", "purpose", "expected", "critical")
+
+    def scores(report):
+        if report.get("split") != "development" or report.get("status") != "completed":
+            raise ValueError("Selection requires completed development reports")
+        rows = report["rows"]
+        if (
+            len(rows) != 45
+            or len({r["id"] for r in rows}) != 45
+            or any(
+                r["split"] != "development" or r["status"] != "observed" or r["repeat"] != 0
+                for r in rows
+            )
+        ):
+            raise ValueError("Selection requires 45 unique complete development rows")
+        per_purpose = []
+        for purpose in ("relevance", "evidence_relation", "capability_fit"):
+            group = [r for r in rows if r["purpose"] == purpose]
+            if len(group) != 15:
+                raise ValueError("Development purpose count mismatch")
+            per_purpose.append(sum(r["choice"] == r["expected"] for r in group) / 15)
+        probabilities = [r["probabilities"][r["expected"]] for r in rows]
+        if any(not math.isfinite(p) or not 0 <= p <= 1 for p in probabilities):
+            raise ValueError("Invalid development probability")
+        return {
+            "macro_accuracy": statistics.mean(per_purpose),
+            "critical_errors": sum(r["critical"] and r["choice"] != r["expected"] for r in rows),
+            "nll": statistics.mean(-math.log(max(p, 1e-8)) for p in probabilities),
+        }
+
+    base = scores(baseline)
+    identities = [[r[k] for k in identity_fields] for r in baseline["rows"]]
+    decisions = []
+    eligible = []
+    for name, candidate in candidates.items():
+        report, training = candidate["report"], candidate["training"]
+        reason = None
+        try:
+            if training.get("diagnostic") or training.get("status") != "completed":
+                raise ValueError("Diagnostic or incomplete training is ineligible")
+            if (training["max_steps"], training["learning_rate"]) not in {
+                (100, 1e-5),
+                (300, 1e-5),
+                (300, 3e-5),
+            }:
+                raise ValueError("Unapproved training settings")
+            if (
+                report["dataset_sha256"] != baseline["dataset_sha256"]
+                or training["dataset_sha256"] != report["dataset_sha256"]
+                or identities != [[r[k] for k in identity_fields] for r in report["rows"]]
+            ):
+                raise ValueError("Development inputs/order or training dataset mismatch")
+            value = scores(report)
+            if (
+                value["macro_accuracy"] < base["macro_accuracy"]
+                or value["critical_errors"] > base["critical_errors"]
+            ):
+                reason = "Development accuracy or critical errors regressed"
+            else:
+                eligible.append(
+                    (
+                        (
+                            -value["macro_accuracy"],
+                            value["critical_errors"],
+                            value["nll"],
+                            training["max_steps"],
+                            training["learning_rate"],
+                            name,
+                        ),
+                        name,
+                    )
+                )
+        except (ValueError, KeyError) as exc:
+            value = None
+            reason = str(exc)
+        decisions.append(
+            {"name": name, "scores": value, "eligible": reason is None, "reason": reason}
+        )
+    return {
+        "baseline": base,
+        "candidates": decisions,
+        "selected": min(eligible)[1] if eligible else None,
+        "selection_split": "development",
+    }
+
+
 def choose_temperature(report):
     if report.get("split") != "calibration" or any(
         r["split"] != "calibration" or r["status"] != "observed" for r in report["rows"]
@@ -58,6 +146,16 @@ def freeze_candidate(args):
     from scripts.prepare_laya_training_data import load_frozen
 
     load_frozen(args.dataset, args.manifest, "test", args.data_profile)
+    training_report = args.checkpoint.parent.parent / "train.json"
+    training = read(training_report)
+    if (args.checkpoint.parent / "diagnostic-only.json").exists() or training.get("diagnostic"):
+        raise ValueError("Diagnostic checkpoints cannot become final candidates")
+    if (
+        training.get("status") != "completed"
+        or training.get("checkpoint_sha256") != sha(args.checkpoint)
+        or training.get("dataset_sha256") != sha(args.dataset)
+    ):
+        raise ValueError("Candidate training did not complete against this frozen dataset")
     calibration = read(args.calibration_report)
     if calibration["dataset_sha256"] != sha(args.dataset):
         raise ValueError("Calibration dataset mismatch")
@@ -65,7 +163,7 @@ def freeze_candidate(args):
     if len(manifests) != 1 or calibration.get("model_manifest_sha256") != sha(manifests[0]):
         raise ValueError("Calibration candidate manifest mismatch")
     temperature = choose_temperature(calibration)
-    files = [args.checkpoint, args.calibration_report, args.manifest]
+    files = [args.checkpoint, args.calibration_report, args.manifest, training_report]
     files.extend(p for p in args.model_store.rglob("*") if p.is_file())
     lock = {
         "dataset_sha256": sha(args.dataset),

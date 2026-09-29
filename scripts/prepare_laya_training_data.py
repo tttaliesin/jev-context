@@ -644,6 +644,13 @@ def prepare_synthetic(rows, reservation, exposed_rows=()):
     errors = []
     sizes = {"train": 30, "development": 15, "calibration": 15, "test": 30}
     families = reservation.get("families", {})
+    previous = reservation.get("previous_reservation")
+    while previous:
+        if set(f for f, split in families.items() if split == "test") & set(
+            previous.get("families", {})
+        ):
+            errors.append("New test reuses a previously exposed family")
+        previous = previous.get("previous_reservation")
     if len(rows) != 270 or len({r["id"] for r in rows}) != 270:
         errors.append("Need exactly 270 unique synthetic cases")
     counts = Counter((r.get("split"), r.get("purpose"), r.get("expected")) for r in rows)

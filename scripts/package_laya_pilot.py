@@ -54,6 +54,8 @@ def main():
     manifest_path = source / "manifests/ollaya.dev/library/laya/multilingual"
     manifest = json.loads(manifest_path.read_text())
     report = json.loads((args.pilot / "train.json").read_text(encoding="utf-8"))
+    if report.get("diagnostic") or (args.pilot / "checkpoint/diagnostic-only.json").exists():
+        raise ValueError("Diagnostic checkpoints cannot be packaged")
     checkpoint = args.pilot / "checkpoint/model.safetensors"
     if report["status"] != "completed" or sha(checkpoint) != report["checkpoint_sha256"]:
         raise ValueError("Training did not complete or checkpoint changed")

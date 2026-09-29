@@ -130,6 +130,8 @@ Of 108 recorded cases and requests, 66 have Codex-verified reference labels and 
 
 A separate 270-case synthetic experiment completed 100 training steps and a 90-case test. Both untrained Laya and the candidate scored 33/90; production SemIf scored 55/90. **Improvement was not demonstrated**, and the production model remains unchanged. See the [results and limitations](docs/laya-finetuning-results.md).
 
+A follow-up diagnostic repeated 15 training examples for 300 steps. Loss decreased, but accuracy stayed at 4/15, failing the diagnostic gate. Further candidate training stopped, and the new 90-case test remains unexecuted.
+
 Real stdio requests for all three purposes passed storage and server restart checks. An existing Codex MCP process may still need restarting; confirm its code matches disk through `workspace_status`. Verification requests are excluded from training data. Leaving the app open only polls status and does not generate training examples.
 
 | Tool | Purpose |

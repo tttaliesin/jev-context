@@ -4,6 +4,7 @@ import argparse
 import ctypes
 import hashlib
 import json
+import math
 import os
 import random
 import shutil
@@ -17,6 +18,46 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
+
+
+def validate_run(args, cases):
+    steps = getattr(args, "steps", 100)
+    rate = getattr(args, "learning_rate", 1e-5)
+    if (steps, rate) not in {(100, 1e-5), (300, 1e-5), (300, 3e-5)}:
+        raise ValueError("Only approved A/B/C training settings are allowed")
+    selection = getattr(args, "diagnostic_ids", None)
+    if not selection:
+        return cases
+    if args.data_profile == "public-pilot" or rate != 1e-5 or steps != 300:
+        raise ValueError("Diagnostic requires frozen train, 300 steps and learning rate 1e-5")
+    ids = read(selection)
+    if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids):
+        raise ValueError("Diagnostic IDs must be a JSON string list")
+    if len(ids) != 15 or len(set(ids)) != len(ids):
+        raise ValueError("Diagnostic needs 15 unique train IDs")
+    by_id = {c["id"]: c for c in cases}
+    if set(ids) - by_id.keys():
+        raise ValueError("Diagnostic contains non-train or unknown IDs")
+    selected = [by_id[i] for i in ids]
+    from scripts.prepare_laya_training_data import LABELS
+
+    for purpose, labels in LABELS.items():
+        group = [c for c in selected if c["purpose"] == purpose]
+        if len(group) != 5 or {c["expected"] for c in group} != set(labels):
+            raise ValueError("Diagnostic must cover five cases and all labels per purpose")
+    return selected
+
+
+def diagnostic_passed(snapshots, changed_tensors):
+    before, after = snapshots[0], snapshots[-1]
+    return bool(
+        after["step"] == 300
+        and changed_tensors
+        and not any(n.startswith("encoder.") for n in changed_tensors)
+        and all(math.isfinite(s["mean_loss"]) for s in snapshots)
+        and after["mean_loss"] < before["mean_loss"]
+        and (after["correct"] > before["correct"] or after["correct"] >= 14)
+    )
 
 
 def training_inputs(args):
@@ -41,7 +82,12 @@ def training_inputs(args):
             "Final test consumed: candidate revision requires a new test and frozen dataset"
         )
     cases = load_frozen(args.dataset, args.manifest, args.split, args.data_profile)
-    return cases, {c["purpose"]: c["question"] for c in cases}
+    questions = {}
+    for case in cases:
+        if case["purpose"] in questions and questions[case["purpose"]] != case["question"]:
+            raise ValueError("Question changed within purpose")
+        questions[case["purpose"]] = case["question"]
+    return validate_run(args, cases), questions
 
 
 def read(path):
@@ -145,6 +191,9 @@ def main():
     parser.add_argument("--output", type=Path, default=ROOT / ".local/laya-finetuning/pilot")
     parser.add_argument("--dataset", type=Path)
     parser.add_argument("--manifest", type=Path)
+    parser.add_argument("--steps", type=int, default=100)
+    parser.add_argument("--learning-rate", type=float, default=1e-5)
+    parser.add_argument("--diagnostic-ids", type=Path)
     parser.add_argument(
         "--split", choices=["train", "development", "calibration", "test"], required=True
     )
@@ -153,6 +202,7 @@ def main():
     )
     args = parser.parse_args()
     cases, questions = training_inputs(args)
+    validate_run(args, cases)
     os.environ["HF_HUB_OFFLINE"] = "1"
     os.environ["TRANSFORMERS_OFFLINE"] = "1"
     import torch
@@ -180,7 +230,12 @@ def main():
         "seed": 20260928,
         "batch_size": 1,
         "threads": 4,
-        "learning_rate": 1e-5,
+        "learning_rate": args.learning_rate,
+        "max_steps": args.steps,
+        "diagnostic": bool(args.diagnostic_ids),
+        "diagnostic_ids_sha256": sha(args.diagnostic_ids) if args.diagnostic_ids else None,
+        "trainer_sha256": sha(Path(__file__)),
+        "questions": questions,
     }
     started = time.perf_counter()
     stopped = threading.Event()
@@ -230,6 +285,12 @@ def main():
         else:
             model_path = output / "checkpoint"
         agent = Agent(str(model_path), device="cpu")
+        report["tokenizer_files"] = {
+            str(p.relative_to(model_path)): sha(p)
+            for p in sorted((model_path / "tokenizer").rglob("*"))
+            if p.is_file()
+        }
+        report["input_audit"] = []
         for case in cases:
             q = agent._to_internal(questions[case["purpose"]])
             state_text = serialize_state(case["state"])
@@ -251,6 +312,19 @@ def main():
                 or head + option_total + state_length + 4 > 1024
             ):
                 raise ValueError("Question/options/state would be truncated")
+            seq, markers = build_sequence(agent.tok, case["state"], q, 1024, 256)
+            report["input_audit"].append(
+                {
+                    "id": case["id"],
+                    "labels": list(q["crit"]),
+                    "label_index": list(q["crit"]).index(case["expected"]),
+                    "state_tokens": state_length,
+                    "head_tokens": head,
+                    "option_tokens": lengths,
+                    "sequence_tokens": len(seq),
+                    "markers": markers,
+                }
+            )
         report.update(
             base_sha256=original_hash,
             device=str(agent.device),
@@ -284,7 +358,7 @@ def main():
             trainable = [p for p in agent.model.parameters() if p.requires_grad]
             report["trainable_parameters"] = sum(p.numel() for p in trainable)
             report["total_parameters"] = sum(p.numel() for p in agent.model.parameters())
-            optimizer = torch.optim.AdamW(trainable, lr=1e-5)
+            optimizer = torch.optim.AdamW(trainable, lr=args.learning_rate)
             prepared = []
             for case in cases:
                 q = agent._to_internal(questions[case["purpose"]])
@@ -301,8 +375,75 @@ def main():
                     }
                 )
             report["steps"] = []
+            report["diagnostic_snapshots"] = []
+
+            def snapshot(step):
+                rows = []
+                agent.model.eval()
+                with torch.inference_mode():
+                    for case, item in zip(cases, prepared, strict=True):
+                        batch = collate_items([[item]], agent.tok.pad_token_id)
+                        z, _ = agent.model(
+                            **{
+                                k: batch[k]
+                                for k in (
+                                    "input_ids",
+                                    "attention_mask",
+                                    "marker_pos",
+                                    "marker_mask",
+                                    "qtype",
+                                )
+                            },
+                            detach_encoder=True,
+                        )
+                        z = z[0, : len(item["markers"])]
+                        if not torch.isfinite(z).all():
+                            raise ValueError("Non-finite diagnostic logits")
+                        label = item["label"]
+                        probabilities = z.softmax(-1)
+                        labels = list(questions[case["purpose"]]["criteria"])
+                        api = agent.system_one(
+                            case["state"], {case["purpose"]: questions[case["purpose"]]}
+                        )["answers"][case["purpose"]]
+                        from laya.common import temp_bucket
+
+                        temperature = agent.temperature_by_options.get(
+                            temp_bucket(0, len(labels)), agent.temperature[0]
+                        )
+                        scaled = (z / temperature).softmax(-1)
+                        if api["choice"] != labels[int(z.argmax())] or any(
+                            abs(api["probabilities"][name] - float(scaled[i])) > 0.00011
+                            for i, name in enumerate(labels)
+                        ):
+                            raise ValueError("Direct logits and Python choice/probabilities differ")
+                        rows.append(
+                            {
+                                "id": case["id"],
+                                "expected": case["expected"],
+                                "choice": labels[int(z.argmax())],
+                                "loss": float(-z.log_softmax(-1)[label]),
+                                "correct_probability": float(probabilities[label]),
+                                "correct_margin": float(
+                                    z[label] - torch.cat((z[:label], z[label + 1 :])).max()
+                                ),
+                                "logits": z.tolist(),
+                                "labels": labels,
+                                "python_parity": True,
+                            }
+                        )
+                result = {
+                    "step": step,
+                    "rows": rows,
+                    "mean_loss": statistics.mean(r["loss"] for r in rows),
+                    "correct": sum(r["choice"] == r["expected"] for r in rows),
+                }
+                report["diagnostic_snapshots"].append(result)
+                save(output / "train.json", report)
+
+            if args.diagnostic_ids:
+                snapshot(0)
             order = list(range(len(prepared)))
-            for step in range(100):
+            for step in range(args.steps):
                 if step % len(order) == 0:
                     random.shuffle(order)
                 if memory_gib() < 1.5 or time.perf_counter() - started > 1200:
@@ -332,17 +473,59 @@ def main():
                 if not torch.isfinite(loss):
                     raise ValueError("Non-finite training loss")
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(trainable, 1.0, error_if_nonfinite=True)
+                modules = ("head.", "type_emb.", "scorer.")
+                gradient_norms = {}
+                previous = {}
+                for prefix in modules:
+                    params = [
+                        (n, p) for n, p in agent.model.named_parameters() if n.startswith(prefix)
+                    ]
+                    gradient_norms[prefix] = math.sqrt(
+                        sum(
+                            float(p.grad.detach().float().square().sum())
+                            for _, p in params
+                            if p.grad is not None
+                        )
+                    )
+                    previous.update({n: p.detach().clone() for n, p in params})
+                if not all(math.isfinite(v) for v in gradient_norms.values()):
+                    raise ValueError("Non-finite module gradients")
+                total_norm = torch.nn.utils.clip_grad_norm_(trainable, 1.0, error_if_nonfinite=True)
                 optimizer.step()
+                update_norms = {
+                    prefix: math.sqrt(
+                        sum(
+                            float((p.detach() - previous[n]).float().square().sum())
+                            for n, p in agent.model.named_parameters()
+                            if n.startswith(prefix)
+                        )
+                    )
+                    for prefix in modules
+                }
+                if not all(math.isfinite(v) for v in update_norms.values()):
+                    raise ValueError("Non-finite parameter update")
                 elapsed = time.perf_counter() - began
                 deadline["step"] = None
-                report["steps"].append({"step": step + 1, "loss": loss.item(), "seconds": elapsed})
+                report["steps"].append(
+                    {
+                        "step": step + 1,
+                        "loss": loss.item(),
+                        "seconds": elapsed,
+                        "case_id": cases[order[step % len(order)]]["id"],
+                        "gradient_norms": gradient_norms,
+                        "update_norms": update_norms,
+                        "total_gradient_norm_before_clip": float(total_norm),
+                    }
+                )
                 save(output / "train.json", report)
                 print(
-                    f"step {step + 1}/100 loss={loss.item():.4f} seconds={elapsed:.3f}", flush=True
+                    f"step {step + 1}/{args.steps} loss={loss.item():.4f} seconds={elapsed:.3f}",
+                    flush=True,
                 )
                 if elapsed > 30:
                     raise TimeoutError("Step exceeded 30 seconds")
+                if args.diagnostic_ids and step + 1 in (100, 300):
+                    snapshot(step + 1)
             checkpoint = output / "checkpoint"
             checkpoint.mkdir()
             for directory in ("encoder", "tokenizer"):
@@ -358,6 +541,17 @@ def main():
             ):
                 raise ValueError("Unexpected weight updates")
             report["checkpoint_sha256"] = sha(checkpoint / "model.safetensors")
+            if args.diagnostic_ids:
+                save(
+                    checkpoint / "diagnostic-only.json",
+                    {"diagnostic": True, "checkpoint_sha256": report["checkpoint_sha256"]},
+                )
+                report["diagnostic_passed"] = diagnostic_passed(
+                    report["diagnostic_snapshots"], report["changed_tensors"]
+                ) and all(
+                    any(s["update_norms"][p] > 0 for s in report["steps"])
+                    for p in ("head.", "type_emb.", "scorer.")
+                )
             report["after_fp32"] = predictions()
             report["step_median_seconds"] = statistics.median(s["seconds"] for s in report["steps"])
         if sha(base_weights) != original_hash:

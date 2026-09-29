@@ -761,3 +761,141 @@ def test_paired_comparison_keeps_failures_and_rejects_mismatch():
     candidate["rows"][0]["question_sha256"] = "different"
     with pytest.raises(ValueError, match="mismatch"):
         paired_comparison(baseline, candidate)
+
+
+def test_retry_diagnostic_ids_and_settings(tmp_path):
+    import argparse
+    import json
+
+    from scripts.train_laya_pilot import validate_run
+
+    rows = [r for r in synthetic_fixture()["cases"] if r["split"] == "train"]
+    ids = []
+    for purpose, labels in data.LABELS.items():
+        chosen = [
+            next(r["id"] for r in rows if r["purpose"] == purpose and r["expected"] == label)
+            for label in labels
+        ]
+        chosen += [r["id"] for r in rows if r["purpose"] == purpose and r["id"] not in chosen][
+            : 5 - len(chosen)
+        ]
+        ids.extend(chosen)
+    path = tmp_path / "ids.json"
+    path.write_text(json.dumps(ids), "utf-8")
+    args = argparse.Namespace(
+        steps=300, learning_rate=1e-5, diagnostic_ids=path, data_profile="synthetic-experiment"
+    )
+    assert len(validate_run(args, rows)) == 15
+    for bad in [ids[:-1], ids[:-1] + [ids[0]], ids[:-1] + ["not-train"]]:
+        path.write_text(json.dumps(bad), "utf-8")
+        with pytest.raises(ValueError):
+            validate_run(args, rows)
+    args.diagnostic_ids = None
+    for steps, rate in [(100, 3e-5), (301, 1e-5), (300, float("nan")), (300, 0)]:
+        args.steps, args.learning_rate = steps, rate
+        with pytest.raises(ValueError, match="approved"):
+            validate_run(args, rows)
+
+
+def test_retry_diagnostic_gate_needs_loss_and_decision_learning():
+    from scripts.train_laya_pilot import diagnostic_passed
+
+    before = {"step": 0, "mean_loss": 2.0, "correct": 5}
+    after = {"step": 300, "mean_loss": 1.0, "correct": 6}
+    assert diagnostic_passed([before, after], ["head.weight"])
+    assert not diagnostic_passed([before, {**after, "correct": 5}], ["head.weight"])
+    assert not diagnostic_passed([before, {**after, "mean_loss": 2.1}], ["head.weight"])
+    assert not diagnostic_passed([before, after], ["encoder.weight"])
+    assert not diagnostic_passed([before, {**after, "mean_loss": float("nan")}], ["head.weight"])
+
+
+def test_retry_test_is_new_and_old_development_is_preserved():
+    import json
+    from pathlib import Path
+
+    old = synthetic_fixture()
+    new = json.loads(
+        (
+            Path(__file__).resolve().parents[1]
+            / "evaluations/laya-finetuning/synthetic-retry-20260929.json"
+        ).read_text("utf-8")
+    )
+    exposed = [r for r in old["cases"] if r["split"] == "test"]
+    report, _ = data.prepare_synthetic(new["cases"], new["reservation"], exposed)
+    assert report["status"] == "ready"
+    reused = dict(new["reservation"])
+    reused["families"] = {**reused["families"], "waterlab": "test"}
+    rejected, _ = data.prepare_synthetic(new["cases"], reused)
+    assert "New test reuses a previously exposed family" in rejected["errors"]
+    old_states = {r["state_sha256"] for r in old["cases"]}
+    assert all(r["state_sha256"] not in old_states for r in new["cases"] if r["split"] == "test")
+    old_by_id = {r["id"]: r for r in old["cases"]}
+    for row in new["cases"]:
+        if row["split"] != "test":
+            assert row["state"] == old_by_id[row["id"]]["state"]
+            assert row["expected"] == old_by_id[row["id"]]["expected"]
+
+
+def test_retry_selection_excludes_test_failed_and_diagnostic_candidates():
+    import copy
+
+    from scripts.evaluate_ollaya import select_development_candidate
+
+    rows = []
+    for purpose in data.LABELS:
+        for i in range(15):
+            rows.append(
+                {
+                    "id": f"{purpose}-{i}",
+                    "purpose": purpose,
+                    "expected": "yes",
+                    "choice": "yes",
+                    "state_sha256": "s",
+                    "question_sha256": "q",
+                    "critical": False,
+                    "split": "development",
+                    "status": "observed",
+                    "repeat": 0,
+                    "probabilities": {"yes": 0.8, "no": 0.2},
+                }
+            )
+    baseline = {"split": "development", "status": "completed", "rows": rows, "dataset_sha256": "d"}
+    training = {
+        "status": "completed",
+        "diagnostic": False,
+        "max_steps": 100,
+        "learning_rate": 1e-5,
+        "dataset_sha256": "d",
+    }
+    candidates = {"A": {"report": copy.deepcopy(baseline), "training": training}}
+    assert select_development_candidate(baseline, candidates)["selected"] == "A"
+    for change in [
+        lambda c: c["training"].update(diagnostic=True),
+        lambda c: c["report"].update(split="test"),
+        lambda c: c["report"]["rows"][0].update(status="error"),
+        lambda c: c["report"]["rows"][0].update(state_sha256="changed"),
+        lambda c: c["report"]["rows"][0].update(choice="no"),
+    ]:
+        damaged = copy.deepcopy(candidates)
+        change(damaged["A"])
+        assert select_development_candidate(baseline, damaged)["selected"] is None
+
+
+def test_diagnostic_checkpoint_cannot_freeze(tmp_path, monkeypatch):
+    import argparse
+    import json
+
+    from scripts import evaluate_ollaya as evaluate
+
+    monkeypatch.setattr(data, "load_frozen", lambda *args: [])
+    checkpoint = tmp_path / "checkpoint/model.safetensors"
+    checkpoint.parent.mkdir()
+    (tmp_path / "train.json").write_text(json.dumps({"diagnostic": True}), "utf-8")
+    args = argparse.Namespace(
+        checkpoint=checkpoint,
+        dataset=tmp_path / "data",
+        manifest=tmp_path / "manifest",
+        data_profile="synthetic-experiment",
+    )
+    with pytest.raises(ValueError, match="Diagnostic"):
+        evaluate.freeze_candidate(args)
