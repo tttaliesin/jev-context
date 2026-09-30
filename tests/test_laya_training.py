@@ -2,6 +2,7 @@ import copy
 import json
 import sqlite3
 import struct
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -370,6 +371,7 @@ def test_model_prediction_is_not_a_human_gold_label():
     row.update(expected=None, model_prediction="relevant", review={"status": "pending"})
     report, prepared = data.prepare_reviewed([row], minimum=1)
     assert report["status"] == "not_ready"
+
     assert any("Verified review" in e for e in report["errors"])
     assert any("Gold label" in e for e in report["errors"])
     assert not prepared
@@ -1039,3 +1041,259 @@ def test_all_final_test_backends_require_candidate_lock(monkeypatch):
         )
         with pytest.raises(ValueError, match="Every final test"):
             frozen_evaluation(args)
+
+
+def test_curve_fixture_balanced_nested_and_honest_review():
+    fixture = json.loads(
+        Path("evaluations/laya-finetuning/learning-curve-20260930.json").read_text("utf-8")
+    )
+    report, rows = data.prepare_synthetic(
+        fixture["cases"], fixture["reservation"], profile="synthetic-learning-curve"
+    )
+    assert report["status"] == "ready", report["errors"]
+    assert report["causal_families"] == report["groups"] == 360
+    assert len(rows) == 5400
+    assert len({data.digest(r["state"]) for r in rows}) == 5400
+    assert all(
+        not r["review"]["human_reviewed"] and not r["review"]["individual_manual_read"]
+        for r in rows
+    )
+    reservation = copy.deepcopy(fixture["reservation"])
+    reservation["train_subsets"]["450"][0] = next(r["id"] for r in rows if r["split"] == "test")
+    _, errors = data.check_learning_curve(rows, reservation)
+    assert any("nested train" in e or "Partial family" in e for e in errors)
+    reservation = copy.deepcopy(fixture["reservation"])
+    reservation["family_specs"]["api-00"].update(reservation["family_specs"]["source-00"])
+    _, errors = data.check_learning_curve(rows, reservation)
+    assert any("Repeated causal family" in e for e in errors)
+    changed = copy.deepcopy(fixture["cases"])
+    changed[0]["review"]["target_model_output_used_as_label"] = True
+    report, _ = data.prepare_synthetic(
+        changed, fixture["reservation"], profile="synthetic-learning-curve"
+    )
+    assert report["status"] == "not_ready"
+
+    changed = copy.deepcopy(fixture["cases"])
+    row = next(r for r in changed if r["purpose"] == "capability_fit")
+    row["state"]["candidate"]["id"] += "-0"
+    row["state_sha256"] = row["review"]["checked_state_sha256"] = data.digest(row["state"])
+    report, _ = data.prepare_synthetic(
+        changed, fixture["reservation"], profile="synthetic-learning-curve"
+    )
+    assert any("ID must be identical" in e for e in report["errors"])
+
+
+def test_curve_cache_cannot_mix_input_split_or_encoder(tmp_path):
+    from scripts.train_laya_pilot import check_feature_cache, sha
+
+    case = dict(id="row", state="input", question="question")
+    target = tmp_path / "row.pt"
+    target.write_bytes(b"local features")
+    meta = dict(
+        status="completed",
+        base_sha256="base",
+        tokenizer_files={},
+        dataset_sha256="data",
+        split="train",
+        dtype="float32",
+        rows=[
+            dict(
+                id="row",
+                file="row.pt",
+                sha256=sha(target),
+                state_sha256=data.digest("input"),
+                question_sha256=data.digest("question"),
+            )
+        ],
+    )
+    (tmp_path / "cache.json").write_text(json.dumps(meta))
+    assert check_feature_cache(tmp_path, [case], "base", {}, "data", "train")
+    for model, split, state in (
+        ("other", "train", "input"),
+        ("base", "test", "input"),
+        ("base", "train", "changed"),
+    ):
+        with pytest.raises(ValueError):
+            check_feature_cache(tmp_path, [{**case, "state": state}], model, {}, "data", split)
+    target.write_bytes(b"changed features")
+    with pytest.raises(ValueError, match="feature file changed"):
+        check_feature_cache(tmp_path, [case], "base", {}, "data", "train")
+
+
+def test_curve_training_settings_cannot_reduce_exposure_or_leak_split(tmp_path):
+    from scripts.train_laya_pilot import validate_run
+
+    ids = [str(i) for i in range(450)]
+    selection = tmp_path / "ids.json"
+    selection.write_text(json.dumps(ids))
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(json.dumps({"train_subsets": {"450": ids}}))
+    args = SimpleNamespace(
+        data_profile="synthetic-learning-curve",
+        stage="train",
+        split="train",
+        max_run_seconds=5400,
+        train_ids=selection,
+        diagnostic_ids=None,
+        manifest=manifest,
+        epochs=6,
+        learning_rate=6e-4,
+        seed=20260928,
+        effective_batch=15,
+        feature_cache=tmp_path,
+    )
+    cases = [{"id": i} for i in ids]
+    assert len(validate_run(args, cases)) == 450
+    for field, value in (
+        ("epochs", 7),
+        ("seed", 0),
+        ("effective_batch", 1),
+        ("split", "test"),
+        ("max_run_seconds", 5401),
+    ):
+        bad = copy.copy(args)
+        setattr(bad, field, value)
+        with pytest.raises(ValueError):
+            validate_run(bad, cases)
+    selection.write_text(json.dumps(ids[:-1] + ["test-row"]))
+    with pytest.raises(ValueError, match="train subset"):
+        validate_run(args, cases)
+
+
+def test_curve_resamples_groups_not_seed_rows_and_blocks_missing_runs(tmp_path):
+    from scripts.evaluate_ollaya import summarize_learning_curve
+
+    rows = [
+        dict(
+            id=f"r{i}",
+            state_sha256=f"s{i}",
+            question_sha256="q",
+            purpose=p,
+            expected="yes",
+            critical=True,
+            group_id=f"g{i // 5}",
+            split="development",
+            status="observed",
+            repeat=0,
+            choice="no",
+            probabilities={"yes": 0.1, "no": 0.9},
+            latency_ms=1,
+        )
+        for p in data.LABELS
+        for i in range(150)
+    ]
+    # IDs identify each purpose too; groups are shared causal scenarios with five cases/purpose.
+    for row in rows:
+        row["id"] += row["purpose"]
+    baseline = dict(status="completed", split="development", dataset_sha256="frozen", rows=rows)
+    base_path = tmp_path / "features/development"
+    base_path.mkdir(parents=True)
+    (base_path / "baseline-development.json").write_text(json.dumps(baseline))
+    for size, epochs in ((450, 6), (1350, 6), (4050, 6), (450, 54), (1350, 18)):
+        for seed in (20260928, 20260929, 20260930):
+            path = tmp_path / f"n{size}-e{epochs}-s{seed}"
+            path.mkdir()
+            training = dict(
+                status="completed",
+                seed=seed,
+                training_ids=[str(i) for i in range(size)],
+                data_profile="synthetic-learning-curve",
+                batch_size=15,
+                learning_rate=6e-4,
+                dataset_sha256="frozen",
+                epochs=epochs,
+                max_steps=size // 15 * epochs,
+                exposures={str(i): epochs for i in range(size)},
+                elapsed_seconds=1,
+            )
+            (path / "train.json").write_text(json.dumps(training))
+            report = copy.deepcopy(baseline)
+            for row in report["rows"]:
+                row.update(choice="yes", probabilities={"yes": 0.9, "no": 0.1})
+            (path / "development.json").write_text(json.dumps(report))
+    result = summarize_learning_curve(tmp_path)
+    assert result["status"] == "complete"
+    assert result["selected_setting"] == "n450-e6"
+    assert result["selected_seed"] == 20260929
+    interval = result["settings"]["n450-e6"]["versus_original"]["relevance"]
+    assert interval["groups"] == 30 and interval["distinct_cases"] == 150
+    assert interval["bootstrap_95"] == [1, 1]
+    (tmp_path / "n4050-e6-s20260930/train.json").unlink()
+    result = summarize_learning_curve(tmp_path)
+    assert result["status"] == "incomplete" and result["conclusion"] == "필요량 미확정"
+    assert not result["saturation"]
+
+
+def test_curve_rejects_reordered_question_even_if_canonical_content_hash_matches(tmp_path):
+    source = Path(".local/laya-finetuning/curve-20260930/frozen/frozen.jsonl")
+    # Public fixture keeps this check runnable without private/local artifacts.
+    fixture = json.loads(
+        Path("evaluations/laya-finetuning/learning-curve-20260930.json").read_text("utf-8")
+    )
+    report, rows = data.prepare_synthetic(
+        fixture["cases"], fixture["reservation"], profile="synthetic-learning-curve"
+    )
+    report = data.freeze_dataset(rows, report, fixture["questions"], tmp_path)
+    source = tmp_path / "frozen.jsonl"
+    rows = data.read_jsonl(source)
+    for row in rows:
+        row["question"]["criteria"] = dict(reversed(list(row["question"]["criteria"].items())))
+    source.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), "utf-8")
+    import hashlib
+
+    report["file_sha256"] = hashlib.sha256(source.read_bytes()).hexdigest()
+    target = tmp_path / "manifest.json"
+    target.write_text(json.dumps(report))
+    with pytest.raises(ValueError, match="presentation order"):
+        data.load_frozen(source, target, "train", "synthetic-learning-curve")
+
+
+def test_curve_calibration_cannot_use_partial_success():
+    from scripts.evaluate_ollaya import choose_temperature
+
+    with pytest.raises(ValueError, match="450 calibration"):
+        choose_temperature(
+            dict(
+                data_profile="synthetic-learning-curve",
+                status="completed",
+                split="calibration",
+                rows=[],
+            )
+        )
+
+
+def test_reload_parity_supports_fifteen_and_rejects_mismatched_input():
+    from scripts.verify_laya_pilot import check_reload, parity_count
+
+    predictions = [
+        dict(
+            id=str(i),
+            state=f"input-{i}",
+            purpose="relevance",
+            question={},
+            answer=dict(choice="yes", probabilities={"yes": 0.8, "no": 0.2}),
+        )
+        for i in range(15)
+    ]
+    training = dict(
+        status="completed", checkpoint_sha256="same", after_fp32=copy.deepcopy(predictions)
+    )
+    reference = dict(
+        status="completed",
+        checkpoint_sha256="same",
+        parity_ids_sha256="ids",
+        predictions=predictions,
+    )
+    assert check_reload(training, reference) == 15
+    bad = copy.deepcopy(reference)
+    bad["predictions"][0]["state"] = "different input"
+    with pytest.raises(ValueError, match="input/order"):
+        check_reload(training, bad)
+    bad = copy.deepcopy(reference)
+    bad["predictions"][0]["answer"]["probabilities"] = {"yes": 0.7, "no": 0.3}
+    with pytest.raises(ValueError, match="probability"):
+        check_reload(training, bad)
+    bad = copy.deepcopy(reference)
+    bad["predictions"][1]["id"] = "0"
+    with pytest.raises(ValueError, match="IDs/count"):
+        parity_count(bad)

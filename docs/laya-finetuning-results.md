@@ -707,3 +707,58 @@ $dataArgs=@('--data-profile','synthetic-experiment','--dataset',"$frozen/frozen.
 최종 로컬 회귀 검사68개 통과(3.07초), 관련 trainer/evaluator/package/test의 Ruff 통과. 잠금 파일·전체 관측·질문/입력/정답·순서·학습 대상·자원 종료 조건을 결과 파일과 재대조했다. 소유 Ollaya 서버11444/11445는 적재 모델0개 확인 후 종료됐고 SemIf 평가 worker도 종료됐다. 원격CI·유료 자원·제품 기본 모델 교체는 사용하지 않았다.
 
 이번 승인 범위인 공개 재현·세 학습률 진단·두 후보 학습·개발 선택·보정·반입·새 시험 비교는 완료됐다. **학습 경로는 작동하지만 품질 개선은 미확인**이다. 자료/입력 표현의 일반화와 encoder 적응은 미해결 원인 후보이며 이번 범위를 넘는 추가 학습을 자동 실행하지 않는다. 새 시험90개는 이제 소진됐다. 실제 업무66개 확정·42개 보류,600개 기준과 독립 시험 부족은 그대로이며 이 합성 결과를 실제 개선으로 합산하지 않는다. 사용자에게 필요한 즉시 조치는 없다.
+
+
+## 2026-09-30 자료 규모 비교: 준비와 실행 기록
+
+이 절은 실행 중 기록이다. 아직 규모별 성능 곡선이나 필요량 결론이 나오지 않았다. 현재 실행 root는 `.local/laya-finetuning/curve-20260930-r3/`이며, 이전 root의 무효화된 revision2와 원본 모델·이전 실험 결과를 보존한다. 실제 자료66확정·42보류/600기준은 변경하지 않았다.
+
+### 첫 산출물: 다양성·분리·검토
+
+[공개 상황 목록](../evaluations/laya-finetuning/learning-curve-catalogue-20260930.json)에는6개 업무 주제별60개, 총360개의 작업과 두 판정 조건이 있다. [5400개 합성 입력·정답·이유·근거](../evaluations/laya-finetuning/learning-curve-20260930.json)는 그 상황별15개 문항이다. 이 문항들은 실제 실행 기록이 아니다.
+
+| 분할 | 관련성 | 근거 관계 | 도구 적합성 | 상황 묶음 |
+|---|---:|---:|---:|---:|
+| train | 1350 | 1350 | 1350 | 270 |
+| development | 150 | 150 | 150 | 30 |
+| calibration | 150 | 150 | 150 | 30 |
+| test | 150 | 150 | 150 | 30 |
+
+모든 분할에서 관련성/도구적합성의 각 라벨은 목적 수량의1/3, 근거관계의 각 라벨은1/5이다. 각 주제는 train45묶음·다른 분할5묶음이다. 학습 부분집합450/1350/4050은30/90/270개의 전체 묶음으로 중첩하며 주제와 라벨 비율을 유지한다.
+
+Codex가 작성한360개 조건과 문장 생성의 판정 규칙을 검토했고, 문항별 조합·입력/hash·라벨·근거 문장·출처 연결은 자동 검사했다. 개별5400문장을 사람이 수동으로 읽었다고 기록하지 않는다. `review.scope=authored_conditions_and_rendering_rules`, `individual_manual_read=false`, `human_reviewed=false`다. 같은 작성자와 공통 문장 구조를 사용하는 내부 합성 실험이다. 이름·숫자나 최소 변화만으로 독립 상황 수를 늘리는 검사를 거절하지만, 어휘 hash만으로 의미상 독립성을 증명할 수는 없다. 상황 간 공통 문법을 배운 성공을 실제 업무 일반화로 확대하지 않는다.
+
+초기 고유 입력 검사에서120개 반복이 발견돼 모델 실행 전에 수정했다. 최초 fixture와 고정본은 로컬 revision1에 남겼다. revision2 실행 중 후보 ID 끝번호가 정답 라벨과 연결되고 질문 제약이 라벨별로 다른 결함을 발견했다. 개발 정확도 점수와 새 시험 예측을 열람하기 전에 실행을 중단했다. 그때 완료된450개/6epoch/seed20260928 실행도 무효로 보존하며 후보 선택에서 제외한다. 모든 라벨에 동일한 opaque 후보 ID와 질문 제약을 적용한 revision3으로 원본부터 다시 시작했다. 재시작으로 예산 시계를 리셋하지 않았고 두 root의 산출물을40GiB 한도에 합산한다.
+
+revision3의5400개 목적/입력 쌍은 모두 고유하며 기존 실제·설명용44·공개 진단·이전 합성 자료852개와 자동 연결 충돌이 없다. `curve-20260930-r3/diversity-review.json`에 결과를 저장했다. 모든 분할과 답안은 새 모델 예측을 보기 전에 고정했다. 새 test450개의 예측은 아직 실행하지 않았다.
+
+| 고정 항목 | SHA-256 |
+|---|---|
+| revision3 frozen.jsonl | `39ee5bb4e36ccbedaf2f4c5fd884dbf6364b43e3c64536b45f16225209c9fdfc` |
+| 질문 | `fdc5984c609ffd1cd13078e7499bae8d42e5e8e75eaa4c62abcb9593c48b204a` |
+| 분할 | `4934069dcab5073a6314240c75eab4cafe3d82dce3cc8bcc277a95769db200c5` |
+| 선택지 표시 순서 | `f8e6507522f12a169a35ed3aad257e1307c4702a7b7cec47171961ead9506e20` |
+
+### 첫 산출물: FP32 캐시 대조와 짧은 측정
+
+revision3의 고정train15개를 원본 전체 경로와 새로 계산한 FP32 특징 경로로 다시 대조했다. 선택15/15일치·최대 확률차0으로0.0001기준을 통과했다. 무효화한 revision2의 캐시나 대조 결과는 재사용하지 않았다. encoder 특징을 train/development에 별도 저장하고, 입력·질문·토큰·원본 모델·토크나이저·분할·특징 파일 hash로 연결한다. 잘못된 데이터나 다른 모델의 캐시로 대체하지 않는다.
+
+revision3의 optimizer 갱신 없는15개 forward/backward 측정은3.779초, 전체 학습 추정17.57시간·특징 준비 추정0.83시간이었다. 실제 실행별 시간을 별도로 보고하고 기존12시간 한도를 유지한다.
+
+optimizer 갱신 없이15개 forward/backward만 측정한3.655초에서 전체16740업데이트 약61190초(17.00시간), 특징 준비 약4260초(1.18시간)를 추정했다. 워밍업을 포함해 과대 추정할 수 있으므로 첫 본 실행의 step 중앙값과 함께 해석한다. 승인된12시간·실행별90분·마지막2시간 확보 조건은 늘리지 않는다. 주 비교9개를 먼저 하고 남은 예산에서 대조6개를 수행한다. 시간 또는 자원으로 미완료인 실행을 정확도 실패나 효과 없음으로 해석하지 않는다.
+
+캐시/조정기 코드와 학습 코드의 hash를 별도로 남긴다. 어떤 optimizer 갱신 전, 실패/미실행 행 보존과 저장 정밀도 및 메모리 기록을 보강했다. 캐시 생산의 encoder/결정 계산 경로와 고정 입력은 변경하지 않았으며 `implementation-audit.json`에 변경 이유와 두 코드 hash를 저장했다. 실행 시작 시각을 다시 설정하지 않는다.
+
+### 외부 근거와 재현
+
+[공식 학습 안내](https://huggingface.co/convaiinnovations/laya-typed-decisions#training)의1200사례/6000판단은 해당 공개 실험의 규모이며 최소 필요량이 아니다. [공식 notebook](https://github.com/NandhaKishorM/laya/blob/9d955671415fc19f069b9cc998928075c1f255ec/notebooks/laya_finetune_typed_decisions_2xT4_kaggle.ipynb)은 다른 모델/장치/encoder 학습을 포함한다. [layaMOE 작성자의 CPU 사례](https://github.com/vishalmysore/layaMOE#results)와 [고정된 학습 코드](https://github.com/vishalmysore/layaMOE/blob/866456198d29cca836c83e66f32fb556857c4292/scripts/train_expert.py)는 frozen head·6e-4·특징 캐시를 조사할 근거다. 성공 수치나 자료량을 우리 multilingual 모델의 보장으로 가져오지 않는다. 원본 조사 파일/hash는 기존 `upstream-research-20260929/`에 보존한다.
+
+```powershell
+$curve='.local/laya-finetuning/curve-20260930-r3'
+$env:PYTHONPATH='src'
+.venv/Scripts/python.exe -X utf8 scripts/prepare_laya_training_data.py prepare --data-profile synthetic-learning-curve --reviewed evaluations/laya-finetuning/learning-curve-20260930.json --output "$curve/frozen"
+.local/laya-venv/Scripts/python.exe -X utf8 scripts/train_laya_pilot.py curve --data-profile synthetic-learning-curve --dataset "$curve/frozen/frozen.jsonl" --manifest "$curve/frozen/prepare.json" --split train --output $curve
+.venv/Scripts/python.exe -X utf8 scripts/evaluate_ollaya.py curve-summary --data-profile synthetic-learning-curve --curve-root $curve --output $curve
+```
+
+고정본/기존 실행은 덮어쓰지 않는다. 새 재현에는 별도 root를 사용하고 소진 시험 표식을 지우지 않는다. 실제 원문을 접근할 수 있는 로컬 감사에서 이전852개와 추가 검사했으며 개인 원문은 저장소에 포함하지 않는다. revision3 코드/핵심 회귀 검사는87passed다. 최종 코드의 전체 UTF-8 로컬 실행은372passed·3failed·2skipped였고, 기존 프로세스 준비/종료 시간 검사3개는 단독 재실행에서3passed였다. 이 실패 때문에 제품 코드를 변경하거나 검사 기준을 낮추지 않았다. Ruff와 diff 공백 검사도 통과했다. 규모별 결과·최종 시험 실행 여부와 원격 반영은 아래 최종 완료 기록에서 갱신한다.

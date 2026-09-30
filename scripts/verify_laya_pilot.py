@@ -12,6 +12,38 @@ from scripts.evaluate_ollaya import Client, process_snapshot, read, save, sha
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def parity_count(reference):
+    expected = 15 if reference.get("parity_ids_sha256") else 12
+    rows = reference["predictions"]
+    if len(rows) != expected or len({r["id"] for r in rows}) != expected:
+        raise ValueError("Reload parity IDs/count mismatch")
+    return expected
+
+
+def check_reload(training, reference):
+    if (
+        training.get("status") != "completed"
+        or reference.get("status") != "completed"
+        or training["checkpoint_sha256"] != reference["checkpoint_sha256"]
+    ):
+        raise ValueError("Training/reload checkpoint mismatch")
+    count = parity_count(reference)
+    if len(training["after_fp32"]) != count:
+        raise ValueError("Training/reload parity count mismatch")
+    for before, after in zip(training["after_fp32"], reference["predictions"], strict=True):
+        if any(before[k] != after[k] for k in ("id", "state", "purpose", "question")):
+            raise ValueError("Reload parity input/order changed")
+        a, b = before["answer"], after["answer"]
+        if (
+            a["choice"] != b["choice"]
+            or set(a["probabilities"]) != set(b["probabilities"])
+            or max(abs(a["probabilities"][k] - b["probabilities"][k]) for k in a["probabilities"])
+            > 0.005
+        ):
+            raise ValueError("Reload choice/probability parity failed")
+    return count
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pilot", type=Path, default=ROOT / ".local/laya-finetuning/pilot")
@@ -22,6 +54,7 @@ def main():
     if output.exists():
         raise FileExistsError("Parity result already exists")
     reference = read(args.pilot / "reload.json")
+    count = check_reload(read(args.pilot / "train.json"), reference)
     packaged = read(args.pilot / "package.json")
     if reference["checkpoint_sha256"] != packaged["checkpoint_sha256"]:
         raise ValueError("Reference and package checkpoints differ")
@@ -83,7 +116,7 @@ def main():
                 }
             )
             save(output, report)
-        report["passed"] = len(report["rows"]) == 12 and all(
+        report["passed"] = len(report["rows"]) == count and all(
             r["choice_match"] and r["maximum_probability_error"] <= 0.005 for r in report["rows"]
         )
     except Exception as exc:

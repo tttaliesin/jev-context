@@ -27,6 +27,264 @@ THRESHOLDS = [0, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95]
 BASE_MODEL = "laya:multilingual"
 
 
+def summarize_learning_curve(root):
+    """Pair identical cases and average seeds before resampling scenario groups."""
+    root = Path(root)
+    baseline = read(root / "features/development/baseline-development.json")
+    identity = (
+        "id",
+        "state_sha256",
+        "question_sha256",
+        "purpose",
+        "expected",
+        "critical",
+        "group_id",
+    )
+    reference = [[r[k] for k in identity] for r in baseline["rows"]]
+    if len(reference) != 450 or len({r[0] for r in reference}) != 450:
+        raise ValueError("Need 450 unique frozen development cases")
+    purposes = ("relevance", "evidence_relation", "capability_fit")
+
+    def score(report):
+        if (
+            report.get("status") != "completed"
+            or report.get("split") != "development"
+            or report.get("dataset_sha256") != baseline["dataset_sha256"]
+        ):
+            raise ValueError("Curve reports must complete on the same development dataset")
+        if [[r[k] for k in identity] for r in report["rows"]] != reference or any(
+            r["status"] != "observed" or r["repeat"] != 0 for r in report["rows"]
+        ):
+            raise ValueError("Curve input/order/failure mismatch")
+        if any(sum(r["purpose"] == p for r in report["rows"]) != 150 for p in purposes):
+            raise ValueError("Curve development purpose distribution changed")
+        return {
+            p: {
+                **metrics([r for r in report["rows"] if r["purpose"] == p]),
+                "p50_ms": None,
+                "p95_ms": None,
+                "latency_kind": "Development correctness uses cached encoder features; full inference timing is measured separately on the final test.",
+            }
+            for p in purposes
+        }
+
+    base_scores = score(baseline)
+    settings = {}
+    missing = []
+    for size, epochs in ((450, 6), (1350, 6), (4050, 6), (450, 54), (1350, 18)):
+        key = f"n{size}-e{epochs}"
+        members = []
+        for seed in (20260928, 20260929, 20260930):
+            directory = root / f"{key}-s{seed}"
+            try:
+                training, report = (
+                    read(directory / "train.json"),
+                    read(directory / "development.json"),
+                )
+                if (
+                    training.get("status") != "completed"
+                    or training.get("diagnostic")
+                    or training.get("seed") != seed
+                    or len(training.get("training_ids", [])) != size
+                    or training.get("epochs") != epochs
+                    or training.get("data_profile") != "synthetic-learning-curve"
+                    or training.get("batch_size") != 15
+                    or training.get("learning_rate") != 6e-4
+                    or training.get("dataset_sha256") != baseline["dataset_sha256"]
+                    or training.get("max_steps") != size // 15 * epochs
+                    or set(training.get("exposures", {})) != set(training["training_ids"])
+                    or set(training.get("exposures", {}).values()) != {epochs}
+                ):
+                    raise ValueError("Incomplete or inconsistent training exposure")
+                value = score(report)
+                members.append(
+                    dict(
+                        seed=seed,
+                        report=report,
+                        scores=value,
+                        training_seconds=training["elapsed_seconds"],
+                        memory_samples=training.get("memory_samples", []),
+                    )
+                )
+            except (OSError, ValueError, KeyError) as exc:
+                stored = (
+                    read(directory / "development.json")
+                    if (directory / "development.json").exists()
+                    else {}
+                )
+                recorded = {r["id"]: r for r in stored.get("rows", [])}
+                preserved = [
+                    recorded.get(
+                        r["id"],
+                        {
+                            **{k: r[k] for k in identity},
+                            "repeat": 0,
+                            "split": "development",
+                            "status": "not_run",
+                            "reason": "training_or_evaluation_incomplete",
+                        },
+                    )
+                    for r in baseline["rows"]
+                ]
+                missing.append(
+                    dict(setting=key, seed=seed, reason=str(exc), evaluation_rows=preserved)
+                )
+        if len(members) == 3:
+            settings[key] = dict(size=size, epochs=epochs, members=members)
+
+    def interval(left, right, purpose):
+        by_group = {}
+        changes = []
+        for i, original in enumerate(baseline["rows"]):
+            if purpose and original["purpose"] != purpose:
+                continue
+            a = statistics.mean(
+                m["report"]["rows"][i]["choice"] == original["expected"] for m in left
+            )
+            b = statistics.mean(
+                m["report"]["rows"][i]["choice"] == original["expected"] for m in right
+            )
+            by_group.setdefault(original["group_id"], []).append(a - b)
+            if a != b:
+                changes.append(
+                    dict(id=original["id"], before_correct_fraction=b, after_correct_fraction=a)
+                )
+        groups = list(by_group)
+        means = [statistics.mean(by_group[g]) for g in groups]
+        rng = random.Random(20260928)
+        samples = sorted(sum(rng.choices(means, k=len(means))) / len(means) for _ in range(10000))
+        return dict(
+            difference=statistics.mean(means),
+            bootstrap_95=[samples[250], samples[9749]],
+            groups=len(groups),
+            distinct_cases=sum(map(len, by_group.values())),
+            seed_repeats_are_independent_cases=False,
+            changes=changes,
+        )
+
+    base_members = [dict(report=baseline)]
+    output = {}
+    for key, setting in settings.items():
+        members = setting["members"]
+        means = {
+            p: dict(
+                accuracy=statistics.mean(m["scores"][p]["correct"] / 150 for m in members),
+                critical_errors=statistics.mean(m["scores"][p]["critical_errors"] for m in members),
+                nll=statistics.mean(m["scores"][p]["nll_observed"] for m in members),
+            )
+            for p in purposes
+        }
+        eligible = all(
+            statistics.mean(m["scores"][p]["correct"] / 150 for p in purposes)
+            >= statistics.mean(base_scores[p]["correct"] / 150 for p in purposes)
+            and all(
+                m["scores"][p]["critical_errors"] <= base_scores[p]["critical_errors"]
+                for p in purposes
+            )
+            for m in members
+        )
+        output[key] = dict(
+            size=setting["size"],
+            epochs=setting["epochs"],
+            updates=setting["size"] // 15 * setting["epochs"],
+            mean_scores=means,
+            seed_scores=[
+                dict(
+                    seed=m["seed"],
+                    scores=m["scores"],
+                    training_seconds=m["training_seconds"],
+                    memory_samples=m["memory_samples"],
+                )
+                for m in members
+            ],
+            eligible=eligible,
+            versus_original={p: interval(members, base_members, p) for p in purposes},
+        )
+    largest = settings.get("n4050-e6")
+    plateau = []
+    saturation = {}
+    improved_largest = False
+    if largest:
+        largest_delta = interval(largest["members"], base_members, None)
+        improved_largest = largest_delta["bootstrap_95"][0] > 0
+        for size in (450, 1350):
+            key = f"n{size}-e6"
+            if key not in settings:
+                continue
+            comparison = {
+                p: interval(settings[key]["members"], largest["members"], p) for p in purposes
+            }
+            seed_consistent = all(
+                abs(a["scores"][p]["correct"] - b["scores"][p]["correct"]) / 150 <= 0.02
+                and a["scores"][p]["critical_errors"] <= b["scores"][p]["critical_errors"]
+                for a, b in zip(settings[key]["members"], largest["members"], strict=True)
+                for p in purposes
+            )
+            passed = (
+                improved_largest
+                and output[key]["eligible"]
+                and seed_consistent
+                and all(
+                    min(comparison[p]["bootstrap_95"]) >= -0.02
+                    and max(comparison[p]["bootstrap_95"]) <= 0.02
+                    and output[key]["mean_scores"][p]["critical_errors"]
+                    <= output["n4050-e6"]["mean_scores"][p]["critical_errors"]
+                    for p in purposes
+                )
+            )
+            saturation[key] = dict(
+                passed=passed, seed_consistent=seed_consistent, comparisons=comparison
+            )
+            if passed:
+                plateau.append(key)
+    controls = {}
+    for size, epochs in ((450, 54), (1350, 18)):
+        key = f"n{size}-e{epochs}"
+        if key in settings and largest:
+            controls[key] = {
+                p: interval(settings[key]["members"], largest["members"], p) for p in purposes
+            }
+    eligible = [k for k, v in output.items() if v["eligible"]]
+    selected = (
+        min(plateau, key=lambda k: output[k]["size"])
+        if plateau
+        else min(
+            eligible,
+            key=lambda k: (
+                -statistics.mean(v["accuracy"] for v in output[k]["mean_scores"].values()),
+                sum(v["critical_errors"] for v in output[k]["mean_scores"].values()),
+                statistics.mean(v["nll"] for v in output[k]["mean_scores"].values()),
+                output[k]["size"],
+                output[k]["epochs"],
+            ),
+        )
+        if eligible
+        else None
+    )
+    selected_seed = None
+    if selected:
+        ordered = sorted(
+            settings[selected]["members"],
+            key=lambda m: (statistics.mean(m["scores"][p]["correct"] for p in purposes), m["seed"]),
+        )
+        selected_seed = ordered[1]["seed"]
+    return dict(
+        status="complete" if not missing else "incomplete",
+        baseline=base_scores,
+        settings=output,
+        missing_runs=missing,
+        saturation=saturation,
+        update_controls=controls,
+        selected_setting=selected,
+        selected_seed=selected_seed,
+        conclusion="포화 후보 확인" if plateau and not missing else "필요량 미확정",
+        largest_vs_original="개선 확인"
+        if improved_largest
+        else "낮은 성능에서 정체 또는 개선 불확실",
+        limitation="Agent-authored condition pairs share sentence generation rules; internal synthetic distribution only, not independent external or real-work validation. Group intervals condition on these three fixed seeds; individual seed results are reported separately.",
+    )
+
+
 def select_development_candidate(baseline, candidates):
     """Select with development only; candidates contain report and training metadata."""
     identity_fields = ("id", "state_sha256", "question_sha256", "purpose", "expected", "critical")
@@ -35,21 +293,22 @@ def select_development_candidate(baseline, candidates):
         if report.get("split") != "development" or report.get("status") != "completed":
             raise ValueError("Selection requires completed development reports")
         rows = report["rows"]
+        count = 450 if report.get("data_profile") == "synthetic-learning-curve" else 45
         if (
-            len(rows) != 45
-            or len({r["id"] for r in rows}) != 45
+            len(rows) != count
+            or len({r["id"] for r in rows}) != count
             or any(
                 r["split"] != "development" or r["status"] != "observed" or r["repeat"] != 0
                 for r in rows
             )
         ):
-            raise ValueError("Selection requires 45 unique complete development rows")
+            raise ValueError("Selection requires the fixed number of unique development rows")
         per_purpose = []
         for purpose in ("relevance", "evidence_relation", "capability_fit"):
             group = [r for r in rows if r["purpose"] == purpose]
-            if len(group) != 15:
+            if len(group) != count // 3:
                 raise ValueError("Development purpose count mismatch")
-            per_purpose.append(sum(r["choice"] == r["expected"] for r in group) / 15)
+            per_purpose.append(sum(r["choice"] == r["expected"] for r in group) / (count // 3))
         probabilities = [r["probabilities"][r["expected"]] for r in rows]
         if any(not math.isfinite(p) or not 0 <= p <= 1 for p in probabilities):
             raise ValueError("Invalid development probability")
@@ -74,6 +333,15 @@ def select_development_candidate(baseline, candidates):
                 and training["max_steps"] == 300
                 and training["learning_rate"] in {1e-4, 6e-4}
             )
+            if training.get("data_profile") == "synthetic-learning-curve":
+                n = len(training.get("training_ids", []))
+                extra = (
+                    n in {450, 1350, 4050}
+                    and training.get("learning_rate") == 6e-4
+                    and training.get("epochs") in {450: {6, 54}, 1350: {6, 18}, 4050: {6}}[n]
+                    and training.get("batch_size") == 15
+                    and training.get("seed") in {20260928, 20260929, 20260930}
+                )
             if not extra and (training["max_steps"], training["learning_rate"]) not in {
                 (100, 1e-5),
                 (300, 1e-5),
@@ -121,6 +389,12 @@ def select_development_candidate(baseline, candidates):
 
 
 def choose_temperature(report):
+    if report.get("data_profile") == "synthetic-learning-curve" and (
+        report.get("status") != "completed"
+        or len(report["rows"]) != 450
+        or len({r["id"] for r in report["rows"]}) != 450
+    ):
+        raise ValueError("Curve temperature requires all 450 calibration cases")
     if report.get("split") != "calibration" or any(
         r["split"] != "calibration" or r["status"] != "observed" for r in report["rows"]
     ):
@@ -153,6 +427,14 @@ def freeze_candidate(args):
     load_frozen(args.dataset, args.manifest, "test", args.data_profile)
     training_report = args.checkpoint.parent.parent / "train.json"
     training = read(training_report)
+    if args.data_profile == "synthetic-learning-curve":
+        curve_root = getattr(args, "curve_root", None)
+        if not curve_root:
+            raise ValueError("Curve candidate requires its development selection root")
+        selection = read(curve_root / "learning-curve.json")
+        chosen = f"{selection.get('selected_setting')}-s{selection.get('selected_seed')}"
+        if training_report.parent.name != chosen or selection.get("selected_setting") is None:
+            raise ValueError("Candidate was not selected on curve development results")
     if (args.checkpoint.parent / "diagnostic-only.json").exists() or training.get("diagnostic"):
         raise ValueError("Diagnostic checkpoints cannot become final candidates")
     if (
@@ -164,6 +446,13 @@ def freeze_candidate(args):
     calibration = read(args.calibration_report)
     if calibration["dataset_sha256"] != sha(args.dataset):
         raise ValueError("Calibration dataset mismatch")
+    if args.data_profile == "synthetic-learning-curve":
+        gold = load_frozen(args.dataset, args.manifest, "calibration", args.data_profile)
+        fields = ("id", "state_sha256", "purpose", "expected", "critical", "group_id")
+        if [[r[k] for k in fields] for r in calibration["rows"]] != [
+            [r[k] for k in fields] for r in gold
+        ]:
+            raise ValueError("Curve calibration cases/order changed")
     manifests = list((args.model_store / "manifests").rglob("pilot"))
     if len(manifests) != 1 or calibration.get("model_manifest_sha256") != sha(manifests[0]):
         raise ValueError("Calibration candidate manifest mismatch")
@@ -176,6 +465,8 @@ def freeze_candidate(args):
         Path(__file__),
         ROOT / "scripts/train_laya_pilot.py",
     ]
+    if args.data_profile == "synthetic-learning-curve":
+        files.extend([curve_root / "learning-curve.json", curve_root / "execution.json"])
     files.extend(p for p in args.model_store.rglob("*") if p.is_file())
     lock = {
         "dataset_sha256": sha(args.dataset),
@@ -202,6 +493,13 @@ def frozen_evaluation(args):
     ):
         raise ValueError("Frozen evaluation needs explicit dataset/manifest/profile/split")
     cases = load_frozen(args.dataset, args.manifest, args.split, args.data_profile)
+    curve_budget = None
+    if args.data_profile == "synthetic-learning-curve":
+        from scripts.train_laya_pilot import memory_gib
+
+        curve_budget = read(args.dataset.parent.parent / "execution.json")
+        if time.time() >= curve_budget["started_at_unix"] + 43200:
+            raise RuntimeError("Curve whole execution budget exhausted")
     if args.split == "test":
         if not args.candidate_lock:
             raise ValueError("Every final test requires a frozen candidate")
@@ -251,6 +549,8 @@ def frozen_evaluation(args):
         if client.call("/api/ps")["models"]:
             raise RuntimeError("Other Ollaya model is resident")
         began = time.perf_counter()
+        if curve_budget and memory_gib() < 4:
+            raise MemoryError("Require 4 GiB before evaluation model load")
         if args.backend == "semif":
             engine = SemifOpenVINO(profile)
             engine.prepare()
@@ -310,6 +610,12 @@ def frozen_evaluation(args):
                     row.update(status="not_run", reason="three_consecutive_errors")
                 else:
                     try:
+                        if curve_budget and (
+                            time.time() >= curve_budget["started_at_unix"] + 43200
+                            or time.perf_counter() - began > 5400
+                            or memory_gib() < 1.5
+                        ):
+                            raise RuntimeError("Curve evaluation time or memory limit")
                         q = question_contract(case["purpose"], case["question"])
                         if engine:
                             answer = engine.evaluate(
@@ -592,7 +898,7 @@ def compare_frozen(args):
         },
         "limitations": [
             "Same agent authored and reviewed labels; synthetic scenarios only",
-            "Ten test scenario groups; correlated repeats are not independent samples",
+            "Situation groups are the sampling unit; correlated repeats are not independent samples",
             "Product GPU versus Laya CPU; process working set excludes GPU allocation",
         ],
     }
@@ -1224,9 +1530,11 @@ def main():
             "frozen",
             "freeze-candidate",
             "compare",
+            "curve-summary",
         ],
     )
     parser.add_argument("--probe-dataset", type=Path)
+    parser.add_argument("--curve-root", type=Path)
     parser.add_argument(
         "--python-model", type=Path, default=ROOT / ".local/models/laya-multilingual"
     )
@@ -1234,7 +1542,9 @@ def main():
     parser.add_argument("--manifest", type=Path)
     parser.add_argument("--split", choices=["train", "development", "calibration", "test"])
     parser.add_argument(
-        "--data-profile", choices=["actual", "synthetic-experiment", "public-pilot"], required=True
+        "--data-profile",
+        choices=["actual", "synthetic-experiment", "synthetic-learning-curve", "public-pilot"],
+        required=True,
     )
     parser.add_argument("--backend", choices=["ollaya", "semif", "python"], default="ollaya")
     parser.add_argument("--model", default=BASE_MODEL)
@@ -1252,6 +1562,22 @@ def main():
     )
     parser.add_argument("--profile", type=Path, default=ROOT / ".local/semif-ov-profile.json")
     args = parser.parse_args()
+    if args.stage == "curve-summary":
+        if args.data_profile != "synthetic-learning-curve" or not args.curve_root:
+            parser.error("curve-summary requires --curve-root and synthetic-learning-curve")
+        report = summarize_learning_curve(args.curve_root)
+        args.output.mkdir(parents=True, exist_ok=True)
+        save(args.output / "learning-curve.json", report)
+        print(
+            json.dumps(
+                {
+                    k: report[k]
+                    for k in ("status", "conclusion", "selected_setting", "selected_seed")
+                },
+                ensure_ascii=False,
+            )
+        )
+        return
     if args.stage == "probe":
         existed = args.output.exists()
         try:

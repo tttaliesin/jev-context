@@ -10,6 +10,7 @@ import random
 import shutil
 import statistics
 import struct
+import subprocess
 import sys
 import threading
 import time
@@ -21,6 +22,45 @@ sys.path.insert(0, str(ROOT / "src"))
 
 
 def validate_run(args, cases):
+    if args.data_profile == "synthetic-learning-curve":
+        if not 0 < args.max_run_seconds <= 5400 or args.split not in {"train", "development"}:
+            raise ValueError("Curve cache/run limits or split are unapproved")
+        if args.stage == "cache":
+            if args.train_ids or args.diagnostic_ids or args.epochs or args.feature_cache:
+                raise ValueError("Cache cannot accept training selections")
+            return cases
+        ids = read(args.train_ids) if args.train_ids else []
+        by_id = {c["id"]: c for c in cases}
+        if (
+            len(ids) not in {450, 1350, 4050}
+            or len(set(ids)) != len(ids)
+            or set(ids) - by_id.keys()
+            or args.diagnostic_ids
+        ):
+            raise ValueError("Curve requires an approved unique frozen train subset")
+        approved = read(args.manifest)["train_subsets"].get(str(len(ids)))
+        if ids != approved:
+            raise ValueError("Curve subset differs from the fixed manifest")
+        allowed = {450: {6, 54}, 1350: {6, 18}, 4050: {6}}
+        if (
+            args.epochs not in allowed[len(ids)]
+            or args.learning_rate != 6e-4
+            or args.seed not in {20260928, 20260929, 20260930}
+            or args.effective_batch != 15
+            or not args.feature_cache
+            or not 0 < args.max_run_seconds <= 5400
+        ):
+            raise ValueError("Unapproved learning-curve training settings")
+        return [by_id[i] for i in ids]
+    if (
+        getattr(args, "epochs", None) is not None
+        or getattr(args, "train_ids", None)
+        or getattr(args, "feature_cache", None)
+        or getattr(args, "effective_batch", 1) != 1
+        or getattr(args, "seed", 20260928) != 20260928
+        or getattr(args, "max_run_seconds", 1200) != 1200
+    ):
+        raise ValueError("Curve options cannot change an existing training profile")
     steps = getattr(args, "steps", 100)
     rate = getattr(args, "learning_rate", 1e-5)
     extra = args.data_profile == "synthetic-experiment" and steps == 300 and rate in {1e-4, 6e-4}
@@ -80,6 +120,9 @@ def diagnostic_passed(snapshots, changed_tensors):
 def training_inputs(args):
     from scripts.prepare_laya_training_data import load_frozen
 
+    if getattr(args, "stage", "train") == "cache" and args.split in {"train", "development"}:
+        cases = load_frozen(args.dataset, args.manifest, args.split, args.data_profile)
+        return cases, {c["purpose"]: c["question"] for c in cases}
     if args.split != "train":
         raise ValueError("Training/reload parity must use train only")
     if args.data_profile == "public-pilot":
@@ -105,6 +148,562 @@ def training_inputs(args):
             raise ValueError("Question changed within purpose")
         questions[case["purpose"]] = case["question"]
     return validate_run(args, cases), questions
+
+
+def cached_logits(model, item):
+    """The installed DecisionModel's decision path, over one immutable FP32 feature row."""
+    import torch
+
+    h = item["h"] + model.type_emb(item["qtype"])[:, None, :]
+    if model.head is not None:
+        for layer in model.head.layers:
+            h = layer(h, src_key_padding_mask=~item["attention_mask"].bool())
+    idx = item["marker_pos"].clamp(min=0)[:, :, None].expand(-1, -1, h.size(-1))
+    return (
+        model.scorer(torch.gather(h, 1, idx))
+        .squeeze(-1)
+        .float()
+        .masked_fill(~item["marker_mask"], -1e4)
+    )
+
+
+def check_feature_cache(path, cases, base_hash, tokenizer_files, dataset_hash, split):
+    from scripts.prepare_laya_training_data import digest
+
+    meta = read(Path(path) / "cache.json")
+    if (
+        meta.get("status") != "completed"
+        or meta.get("base_sha256") != base_hash
+        or meta.get("tokenizer_files") != tokenizer_files
+        or meta.get("dataset_sha256") != dataset_hash
+        or meta.get("split") != split
+        or meta.get("dtype") != "float32"
+    ):
+        raise ValueError("Cache base/tokenizer/dataset/split/dtype mismatch")
+    by_id = {r["id"]: r for r in meta["rows"]}
+    if len(by_id) != len(meta["rows"]):
+        raise ValueError("Duplicate feature cache IDs")
+    for c in cases:
+        row = by_id.get(c["id"], {})
+        if row.get("state_sha256") != digest(c["state"]) or row.get("question_sha256") != digest(
+            c["question"]
+        ):
+            raise ValueError("Cached input/question changed")
+        target = (Path(path) / row["file"]).resolve()
+        if target.parent != Path(path).resolve() or sha(target) != row["sha256"]:
+            raise ValueError("Cached feature file changed or escaped its directory")
+    return by_id
+
+
+def cache_features(args, agent, cases, report, output, deadline, started):
+    import torch
+    from laya.common import build_sequence, collate_items, render_options, serialize_state
+
+    from scripts.prepare_laya_training_data import digest
+
+    report.update(dtype="float32", rows=[], split=args.split, parity=[])
+    development = []
+    feature_started = time.perf_counter()
+    saved_bytes = 0
+    agent.model.eval()
+    for index, case in enumerate(cases):
+        if memory_gib() < 1.5 or time.perf_counter() - started > args.max_run_seconds:
+            raise RuntimeError("Feature cache resource limit")
+        question = agent._to_internal(case["question"])
+        text = serialize_state(case["state"])
+        if len(agent.tok.encode(text, add_special_tokens=False)) > 1024:
+            raise ValueError("Feature input exceeds 1024 tokens")
+        seq, markers = build_sequence(agent.tok, case["state"], question, 1024, 256)
+        full, _ = build_sequence(agent.tok, case["state"], question, 32768, 32768)
+        if seq != full or len(markers) != len(render_options(question)):
+            raise ValueError("Feature input/options would be truncated")
+        batch = collate_items(
+            [[{"ids": seq, "markers": markers, "qtype": 0}]], agent.tok.pad_token_id
+        )
+        deadline["step"] = time.perf_counter() + 30
+        with torch.no_grad():
+            h = agent.model.encoder(
+                input_ids=batch["input_ids"], attention_mask=batch["attention_mask"]
+            ).last_hidden_state
+            item = {k: batch[k] for k in ("attention_mask", "marker_pos", "marker_mask", "qtype")}
+            item["h"] = h.detach().float().clone()
+            item["label"] = list(question["crit"]).index(case["expected"])
+            if args.split == "development":
+                labels = list(question["crit"])
+                z = cached_logits(agent.model, item)[0, : len(labels)]
+                development.append(
+                    {
+                        k: case[k]
+                        for k in (
+                            "id",
+                            "purpose",
+                            "expected",
+                            "critical",
+                            "group_id",
+                            "state_sha256",
+                        )
+                    }
+                    | dict(
+                        split="development",
+                        status="observed",
+                        repeat=0,
+                        question_sha256=digest(case["question"]),
+                        choice=labels[int(z.argmax())],
+                        probabilities=dict(zip(labels, z.softmax(-1).tolist(), strict=True)),
+                        latency_ms=0,
+                    )
+                )
+            if index < 15 and args.split == "train":
+                direct = agent.model(
+                    **{
+                        k: batch[k]
+                        for k in (
+                            "input_ids",
+                            "attention_mask",
+                            "marker_pos",
+                            "marker_mask",
+                            "qtype",
+                        )
+                    }
+                )[0]
+                cached = cached_logits(agent.model, item)
+                error = float((direct.softmax(-1) - cached.softmax(-1)).abs().max())
+                match = int(direct.argmax()) == int(cached.argmax())
+                report["parity"].append(dict(id=case["id"], choice_match=match, max_error=error))
+                if not match or error > 0.0001:
+                    raise ValueError("FP32 feature cache parity failed")
+        deadline["step"] = None
+        target = output / f"row-{index:05d}.pt"
+        torch.save(item, target)
+        saved_bytes += target.stat().st_size
+        report["rows"].append(
+            dict(
+                id=case["id"],
+                file=target.name,
+                sha256=sha(target),
+                state_sha256=digest(case["state"]),
+                question_sha256=digest(case["question"]),
+                token_sha256=digest(seq),
+                tokens=len(seq),
+            )
+        )
+        if index % 100 == 0:
+            save(output / "cache.json", report)
+            print(f"cached {index + 1}/{len(cases)}", flush=True)
+        if index == 14 and args.split == "train":
+            began = time.perf_counter()
+            deadline["step"] = began + 30
+            for name, param in agent.model.named_parameters():
+                param.requires_grad_(name.startswith(("head.", "type_emb.", "scorer.")))
+            agent.model.train()
+            agent.model.encoder.eval()
+            for row in report["rows"]:
+                probe = torch.load(output / row["file"], weights_only=True)
+                loss = torch.nn.functional.cross_entropy(
+                    cached_logits(agent.model, probe), torch.tensor([probe["label"]])
+                )
+                (loss / 15).backward()
+            norm = torch.nn.utils.clip_grad_norm_(
+                [p for p in agent.model.parameters() if p.requires_grad], 1, error_if_nonfinite=True
+            )
+            agent.model.zero_grad(set_to_none=True)
+            agent.model.eval()
+            deadline["step"] = None
+            elapsed = time.perf_counter() - began
+            report["preflight"] = dict(
+                head_batch15_forward_backward_seconds=elapsed,
+                gradient_norm=float(norm),
+                optimizer_updates=0,
+                estimated_training_seconds=elapsed * 16740,
+                estimated_cache_seconds=(began - feature_started) / 15 * 4500,
+            )
+            save(output / "cache.json", report)
+            print(f"preflight: {json.dumps(report['preflight'])}", flush=True)
+        if saved_bytes > 40 * 2**30:
+            raise RuntimeError("Feature cache exceeds disk budget")
+    report["feature_seconds"] = time.perf_counter() - feature_started
+    if sha(args.base / "model.safetensors") != report["base_sha256"]:
+        raise ValueError("Original encoder/model changed during caching")
+    if development:
+        from scripts.evaluate_ollaya import metrics
+
+        save(
+            output / "baseline-development.json",
+            dict(
+                status="completed",
+                data_profile=args.data_profile,
+                split="development",
+                dataset_sha256=report["dataset_sha256"],
+                rows=development,
+                metrics=metrics(development),
+            ),
+        )
+
+
+def run_curve(args):
+    """Sequential bounded coordinator; persistent elapsed budget cannot reset on resume."""
+    from scripts.prepare_laya_training_data import load_frozen
+
+    if args.data_profile != "synthetic-learning-curve" or args.split != "train":
+        raise ValueError("Curve coordinator requires the new frozen profile")
+    train = load_frozen(args.dataset, args.manifest, "train", args.data_profile)
+    root = args.output
+    root.mkdir(parents=True, exist_ok=True)
+    ledger_path = root / "execution.json"
+    ledger = (
+        read(ledger_path)
+        if ledger_path.exists()
+        else {
+            "started_at_unix": time.time(),
+            "limit_seconds": 43200,
+            "final_reserve_seconds": 7200,
+            "dataset_sha256": sha(args.dataset),
+            "trainer_sha256": sha(Path(__file__)),
+            "runs": [],
+            "status": "running",
+        }
+    )
+    if ledger["dataset_sha256"] != sha(args.dataset) or ledger["trainer_sha256"] != sha(
+        Path(__file__)
+    ):
+        raise ValueError("Coordinator dataset or code changed on resume")
+    artifact_roots = [Path(p).resolve() for p in ledger.get("artifact_roots", [str(root)])]
+    if any(
+        not p.is_relative_to((ROOT / ".local/laya-finetuning").resolve()) for p in artifact_roots
+    ):
+        raise ValueError("Artifact budget roots escaped the local experiment directory")
+    save(ledger_path, ledger)
+    manifest = read(args.manifest)
+    for size, ids in manifest["train_subsets"].items():
+        target = root / f"train-{size}.json"
+        if target.exists() and read(target) != ids:
+            raise ValueError("Fixed subset changed")
+        save(target, ids)
+    parity = [c["id"] for c in train[:15]]
+    save(root / "parity-ids.json", parity)
+    common = [
+        "--dataset",
+        str(args.dataset.resolve()),
+        "--manifest",
+        str(args.manifest.resolve()),
+        "--data-profile",
+        args.data_profile,
+        "--max-run-seconds",
+        "5400",
+    ]
+
+    def execute(name, command, report_path):
+        if report_path.exists() and read(report_path).get("status") == "completed":
+            return True
+        if any(r["name"] == name for r in ledger["runs"]):
+            return False
+        elapsed = time.time() - ledger["started_at_unix"]
+        disk = sum(
+            p.stat().st_size
+            for directory in artifact_roots
+            for p in directory.rglob("*")
+            if p.is_file()
+        )
+        needed = (args.base / "model.safetensors").stat().st_size * 2
+        if elapsed >= 43200 - 7200 or disk + needed > 40 * 2**30:
+            ledger["runs"].append(dict(name=name, status="not_run", reason="time_or_disk_budget"))
+            save(ledger_path, ledger)
+            return False
+        began = time.time()
+        log = root / (name + ".log")
+        with log.open("x", encoding="utf-8") as stream:
+            process = subprocess.Popen(
+                [sys.executable, "-X", "utf8", str(Path(__file__).resolve()), *command],
+                cwd=ROOT,
+                stdout=stream,
+                stderr=subprocess.STDOUT,
+            )
+            try:
+                code = process.wait(timeout=min(5500, 43200 - 7200 - elapsed))
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
+                code = 124
+        result = read(report_path) if report_path.exists() else {}
+        status = (
+            "completed"
+            if code == 0 and result.get("status") == "completed"
+            else "incomplete"
+            if code == 124
+            else "failed"
+        )
+        ledger["runs"].append(
+            dict(
+                name=name,
+                status=status,
+                exit_code=code,
+                seconds=time.time() - began,
+                report=str(report_path),
+                reason=result.get("error"),
+            )
+        )
+        save(ledger_path, ledger)
+        disk_after = sum(
+            p.stat().st_size
+            for directory in artifact_roots
+            for p in directory.rglob("*")
+            if p.is_file()
+        )
+        ledger["local_bytes"] = disk_after
+        if disk_after > 40 * 2**30:
+            ledger.update(status="blocked", reason="disk_budget_exceeded")
+            save(ledger_path, ledger)
+            raise RuntimeError("Curve artifact budget exceeded")
+        print(f"{name}: {status}, {time.time() - began:.1f}s", flush=True)
+        return status == "completed"
+
+    for split in ("train", "development"):
+        path = root / "features" / split
+        if not execute(
+            "cache-" + split,
+            ["cache", *common, "--split", split, "--output", str(path.resolve())],
+            path / "cache.json",
+        ):
+            ledger.update(status="blocked", reason="feature_cache_not_complete")
+            save(ledger_path, ledger)
+            return
+    # Original development predictions are produced without any optimizer updates.
+    cache_meta = read(root / "features/train/cache.json")
+    ledger["preflight"] = {
+        "cache_parity": cache_meta["parity"],
+        "feature_seconds": cache_meta["feature_seconds"],
+        "estimated_encoder_seconds_per_row": cache_meta["feature_seconds"] / 4050,
+    }
+    save(ledger_path, ledger)
+    for size, epochs in ((450, 6), (1350, 6), (4050, 6), (450, 54), (1350, 18)):
+        for seed in (20260928, 20260929, 20260930):
+            name = f"n{size}-e{epochs}-s{seed}"
+            path = root / name
+            ok = execute(
+                name,
+                [
+                    "train",
+                    *common,
+                    "--split",
+                    "train",
+                    "--output",
+                    str(path.resolve()),
+                    "--train-ids",
+                    str((root / f"train-{size}.json").resolve()),
+                    "--epochs",
+                    str(epochs),
+                    "--seed",
+                    str(seed),
+                    "--learning-rate",
+                    "0.0006",
+                    "--effective-batch",
+                    "15",
+                    "--feature-cache",
+                    str((root / "features/train").resolve()),
+                    "--parity-ids",
+                    str((root / "parity-ids.json").resolve()),
+                ],
+                path / "train.json",
+            )
+            if ok and "estimated_training_seconds" not in ledger:
+                step = read(path / "train.json")["step_median_seconds"]
+                ledger["estimated_training_seconds"] = step * 16740
+                save(ledger_path, ledger)
+            if not ok and memory_gib() < 4:
+                ledger.update(status="blocked", reason="memory_not_recovered")
+                save(ledger_path, ledger)
+                return
+    ledger.update(
+        status="development_complete", elapsed_seconds=time.time() - ledger["started_at_unix"]
+    )
+    save(ledger_path, ledger)
+
+
+def curve_train(args, agent, cases, report, deadline, started):
+    import torch
+
+    from scripts.evaluate_ollaya import metrics
+    from scripts.prepare_laya_training_data import digest, load_frozen
+
+    dev = load_frozen(args.dataset, args.manifest, "development", args.data_profile)
+    pending = [
+        {k: c[k] for k in ("id", "purpose", "expected", "critical", "group_id", "state_sha256")}
+        | dict(
+            split="development",
+            repeat=0,
+            question_sha256=digest(c["question"]),
+            status="not_run",
+            reason="training_not_complete",
+        )
+        for c in dev
+    ]
+    dev_report = dict(
+        status="not_run",
+        data_profile=args.data_profile,
+        split="development",
+        dataset_sha256=report["dataset_sha256"],
+        rows=pending,
+    )
+    save(args.output / "development.json", dev_report)
+
+    cache = check_feature_cache(
+        args.feature_cache,
+        cases,
+        report["base_sha256"],
+        report["tokenizer_files"],
+        report["dataset_sha256"],
+        "train",
+    )
+    parity = read(args.feature_cache / "cache.json").get("parity", [])
+    if len(parity) != 15 or any(not p["choice_match"] or p["max_error"] > 0.0001 for p in parity):
+        raise ValueError("Curve cache requires fifteen parity observations")
+    for p in agent.model.parameters():
+        p.requires_grad_(False)
+    prefixes = ("head.", "type_emb.", "scorer.")
+    parameters = [p for n, p in agent.model.named_parameters() if n.startswith(prefixes)]
+    for p in parameters:
+        p.requires_grad_(True)
+    opt = torch.optim.AdamW(parameters, lr=args.learning_rate, weight_decay=0.01)
+    initial = {
+        n: p.detach().clone() for n, p in agent.model.named_parameters() if n.startswith(prefixes)
+    }
+    report.update(
+        steps=[],
+        exposures={c["id"]: 0 for c in cases},
+        epochs=args.epochs,
+        batch_size=15,
+        microbatch_size=1,
+        max_steps=len(cases) // 15 * args.epochs,
+    )
+    for epoch in range(args.epochs):
+        order = list(cases)
+        random.shuffle(order)
+        for offset in range(0, len(order), 15):
+            if memory_gib() < 1.5 or time.perf_counter() - started > args.max_run_seconds:
+                raise RuntimeError("Curve run resource limit")
+            began = time.perf_counter()
+            deadline["step"] = began + 30
+            agent.model.train()
+            agent.model.encoder.eval()
+            opt.zero_grad(set_to_none=True)
+            losses, ids = [], []
+            for case in order[offset : offset + 15]:
+                item = torch.load(args.feature_cache / cache[case["id"]]["file"], weights_only=True)
+                if (
+                    item["h"].dtype != torch.float32
+                    or not torch.isfinite(item["h"]).all()
+                    or item["label"] != list(case["question"]["criteria"]).index(case["expected"])
+                ):
+                    raise ValueError("Feature dtype/value/label mismatch")
+                z = cached_logits(agent.model, item)
+                loss = torch.nn.functional.cross_entropy(z, torch.tensor([item["label"]]))
+                if not torch.isfinite(loss):
+                    raise ValueError("Non-finite cached training loss")
+                (loss / 15).backward()
+                losses.append(float(loss.detach()))
+                ids.append(case["id"])
+                report["exposures"][case["id"]] += 1
+            norm = torch.nn.utils.clip_grad_norm_(parameters, 1, error_if_nonfinite=True)
+            opt.step()
+            deadline["step"] = None
+            elapsed = time.perf_counter() - began
+            if elapsed > 30 or any(not torch.isfinite(p).all() for p in parameters):
+                raise ValueError("Invalid update/time limit")
+            report["steps"].append(
+                dict(
+                    step=len(report["steps"]) + 1,
+                    epoch=epoch + 1,
+                    case_ids=ids,
+                    loss=statistics.mean(losses),
+                    seconds=elapsed,
+                    gradient_norm=float(norm),
+                )
+            )
+            if len(report["steps"]) % 30 == 0:
+                from scripts.evaluate_ollaya import process_snapshot
+
+                report.setdefault("memory_samples", []).append(process_snapshot(os.getpid()))
+                save(args.output / "train.json", report)
+                print(f"curve step {len(report['steps'])}/{report['max_steps']}", flush=True)
+    if set(report["exposures"].values()) != {args.epochs}:
+        raise ValueError("Curve exposure counts differ from the approved epochs")
+    report["module_update_norms"] = {
+        prefix: math.sqrt(
+            sum(
+                float((p.detach() - initial[n]).square().sum())
+                for n, p in agent.model.named_parameters()
+                if n.startswith(prefix)
+            )
+        )
+        for prefix in prefixes
+    }
+    if not all(math.isfinite(v) and v > 0 for v in report["module_update_norms"].values()):
+        raise ValueError("Curve modules did not update normally")
+    report["step_median_seconds"] = statistics.median(s["seconds"] for s in report["steps"])
+    # Development must describe the stored candidate, including the base storage precision.
+    _, header = safetensors_header(args.base / "model.safetensors")
+    dtypes = {"F16": torch.float16, "F32": torch.float32, "BF16": torch.bfloat16}
+    with torch.no_grad():
+        for name, param in agent.model.named_parameters():
+            if name.startswith(prefixes):
+                restored = param.to(dtypes[header[name]["dtype"]]).float()
+                if not torch.isfinite(restored).all():
+                    raise ValueError("Non-finite stored candidate parameter")
+                param.copy_(restored)
+    report["development_precision"] = "checkpoint storage round-trip restored to FP32"
+    # Development predictions are generated by the same frozen-feature path, never used in loss.
+    dev_path = args.feature_cache.parent / "development"
+    dev_cache = check_feature_cache(
+        dev_path,
+        dev,
+        report["base_sha256"],
+        report["tokenizer_files"],
+        report["dataset_sha256"],
+        "development",
+    )
+    rows = []
+    agent.model.eval()
+    with torch.no_grad():
+        for case in dev:
+            if memory_gib() < 1.5 or time.perf_counter() - started > args.max_run_seconds:
+                raise RuntimeError("Development resource limit")
+            deadline["step"] = time.perf_counter() + 30
+            item = torch.load(dev_path / dev_cache[case["id"]]["file"], weights_only=True)
+            labels = list(case["question"]["criteria"])
+            z = cached_logits(agent.model, item)[0, : len(labels)]
+            probs = z.softmax(-1).tolist()
+            if any(not math.isfinite(p) for p in probs):
+                raise ValueError("Non-finite development output")
+            deadline["step"] = None
+            rows.append(
+                {
+                    k: case[k]
+                    for k in ("id", "purpose", "expected", "critical", "group_id", "state_sha256")
+                }
+                | {
+                    "split": "development",
+                    "status": "observed",
+                    "repeat": 0,
+                    "question_sha256": dev_cache[case["id"]]["question_sha256"],
+                    "choice": labels[int(z.argmax())],
+                    "probabilities": dict(zip(labels, probs, strict=True)),
+                    "latency_ms": 0,
+                }
+            )
+            if len(rows) % 30 == 0:
+                dev_report.update(status="running", rows=rows + pending[len(rows) :])
+                save(args.output / "development.json", dev_report)
+    save(
+        args.output / "development.json",
+        dict(
+            status="completed",
+            data_profile=args.data_profile,
+            split="development",
+            dataset_sha256=report["dataset_sha256"],
+            rows=rows,
+            metrics=metrics(rows),
+        ),
+    )
 
 
 def read(path):
@@ -203,7 +802,7 @@ def rewrite_weights(base, output, tensors):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("stage", choices=["train", "reload"])
+    parser.add_argument("stage", choices=["train", "reload", "cache", "curve"])
     parser.add_argument("--base", type=Path, default=ROOT / ".local/models/laya-multilingual")
     parser.add_argument("--output", type=Path, default=ROOT / ".local/laya-finetuning/pilot")
     parser.add_argument("--dataset", type=Path)
@@ -212,13 +811,28 @@ def main():
     parser.add_argument("--learning-rate", type=float, default=1e-5)
     parser.add_argument("--diagnostic-ids", type=Path)
     parser.add_argument("--parity-ids", type=Path)
+    parser.add_argument("--train-ids", type=Path)
+    parser.add_argument("--epochs", type=int)
+    parser.add_argument("--seed", type=int, default=20260928)
+    parser.add_argument("--feature-cache", type=Path)
+    parser.add_argument("--effective-batch", type=int, default=1)
+    parser.add_argument("--max-run-seconds", type=int, default=1200)
     parser.add_argument(
         "--split", choices=["train", "development", "calibration", "test"], required=True
     )
     parser.add_argument(
-        "--data-profile", choices=["actual", "synthetic-experiment", "public-pilot"], required=True
+        "--data-profile",
+        choices=["actual", "synthetic-experiment", "synthetic-learning-curve", "public-pilot"],
+        required=True,
     )
     args = parser.parse_args()
+    if args.stage == "curve":
+        from jev_context.engines import FileLock
+
+        args.output.mkdir(parents=True, exist_ok=True)
+        with FileLock(args.output / "coordinator.lock"):
+            run_curve(args)
+        return
     cases, questions = training_inputs(args)
     validate_run(args, cases)
     os.environ["HF_HUB_OFFLINE"] = "1"
@@ -230,8 +844,8 @@ def main():
     from jev_context.storage import FileLock
 
     torch.set_num_threads(4)
-    torch.manual_seed(20260928)
-    random.seed(20260928)
+    torch.manual_seed(args.seed)
+    random.seed(args.seed)
     output = args.output
     output.mkdir(parents=True, exist_ok=True)
     with (output / (args.stage + ".started")).open("x") as marker:
@@ -245,7 +859,7 @@ def main():
         "training_ids": [c["id"] for c in cases],
         "dataset_sha256": sha(args.dataset) if args.dataset else None,
         "manifest_sha256": sha(args.manifest) if args.manifest else None,
-        "seed": 20260928,
+        "seed": args.seed,
         "batch_size": 1,
         "threads": 4,
         "learning_rate": args.learning_rate,
@@ -263,7 +877,7 @@ def main():
         while not stopped.wait(0.5):
             now = time.perf_counter()
             if (
-                now - started > 1200
+                now - started > args.max_run_seconds
                 or (deadline["step"] and now > deadline["step"])
                 or memory_gib() < 1.5
             ):
@@ -297,9 +911,16 @@ def main():
         if args.parity_ids:
             parity = select_parity(cases, read(args.parity_ids), args.data_profile)
             report["parity_ids_sha256"] = sha(args.parity_ids)
-        if args.stage == "train":
-            model_path = output / "reference-base"
-            shutil.copytree(args.base, model_path)
+        if args.stage in {"train", "cache"}:
+            model_path = (
+                output.parent / "reference-base"
+                if args.data_profile == "synthetic-learning-curve"
+                else output / "reference-base"
+            )
+            if not model_path.exists():
+                shutil.copytree(args.base, model_path)
+            elif sha(model_path / "model.safetensors") != original_hash:
+                raise ValueError("Compatible reference weights changed")
             cfg, overrides = compatible_encoder_config(read(model_path / "encoder/config.json"))
             save(model_path / "encoder/config.json", cfg)
             report["reference_config_overrides"] = overrides
@@ -368,6 +989,36 @@ def main():
                 }
                 for case in parity
             ]
+
+        if args.stage == "cache":
+            cache_features(args, agent, cases, report, output, deadline, started)
+            report.update(status="completed", elapsed_seconds=time.perf_counter() - started)
+            save(output / "cache.json", report)
+            return
+        if args.data_profile == "synthetic-learning-curve" and args.stage == "train":
+            report["before"] = predictions()
+            curve_train(args, agent, cases, report, deadline, started)
+            checkpoint = output / "checkpoint"
+            checkpoint.mkdir()
+            for directory in ("encoder", "tokenizer"):
+                shutil.copytree(model_path / directory, checkpoint / directory)
+            shutil.copyfile(
+                model_path / "rl_agent_config.json", checkpoint / "rl_agent_config.json"
+            )
+            report["changed_tensors"] = rewrite_weights(
+                base_weights, checkpoint / "model.safetensors", agent.model.state_dict()
+            )
+            if not report["changed_tensors"] or any(
+                n.startswith("encoder.") for n in report["changed_tensors"]
+            ):
+                raise ValueError("Curve encoder changed or no weight update")
+            report["checkpoint_sha256"] = sha(checkpoint / "model.safetensors")
+            report["after_fp32"] = predictions()
+            report.update(status="completed", elapsed_seconds=time.perf_counter() - started)
+            if sha(base_weights) != original_hash:
+                raise ValueError("Original model changed")
+            save(output / "train.json", report)
+            return
 
         if args.stage == "reload":
             report["predictions"] = predictions()
