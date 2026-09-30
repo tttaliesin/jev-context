@@ -9,8 +9,11 @@ import http.client
 import ipaddress
 import json
 import math
+import os
+import queue
 import random
 import statistics
+import subprocess
 import threading
 import time
 from collections import Counter
@@ -533,6 +536,116 @@ def freeze_candidate(args):
     print(json.dumps({"candidate_frozen": True, "temperature": temperature}))
 
 
+def runner_choice(raw, question):
+    """Decode the existing runner's uncalibrated choice logits in supplied label order."""
+    if question.get("type") != "choice" or raw.get("state_truncated"):
+        raise ValueError("Runner requires an untruncated choice question")
+    answers = raw.get("questions", [])
+    labels = list(question["criteria"])
+    if len(answers) != 1 or answers[0].get("act_logits") is not None:
+        raise ValueError("Unexpected runner question/act output")
+    logits = answers[0].get("logits", [])
+    if len(logits) != len(labels) or any(not math.isfinite(v) for v in logits):
+        raise ValueError("Runner logits/order/count changed")
+    values = [math.exp(v - max(logits)) for v in logits]
+    probabilities = dict(zip(labels, (v / sum(values) for v in values), strict=True))
+    return {"choice": max(probabilities, key=probabilities.get), "raw_distribution": probabilities}
+
+
+@contextlib.contextmanager
+def laya_runner(model_store, model, output):
+    """Launch this installed Ollaya's own CPU runner with an explicit ORT thread count."""
+    model_store = Path(model_store).resolve()
+    manifest = model_store / "manifests/ollaya.dev/library" / model.replace(":", "/")
+    if not manifest.resolve().is_relative_to(model_store):
+        raise ValueError("Runner manifest escapes the model store")
+    data = read(manifest)
+    layers = {}
+    for layer in [data["config"], *data["layers"]]:
+        file = model_store / "blobs" / layer["digest"].replace(":", "-")
+        if (
+            not file.resolve().is_relative_to(model_store)
+            or sha(file) != layer["digest"].split(":")[1]
+        ):
+            raise ValueError("Runner model blob integrity failed")
+        if layer.get("annotations", {}).get("org.ollaya.precision") == "fp16":
+            continue
+        layers[layer["mediaType"].removeprefix("application/vnd.ollaya.")] = file
+    decision = read(layers["decision"])
+    calibration = read(layers["calibration"])
+    if (
+        decision.get("family") != "laya"
+        or calibration.get("temperature") != [1.0, 1.0, 1.0]
+        or calibration.get("temperature_by_options")
+    ):
+        raise ValueError("Direct runner only supports Laya with unit model calibration")
+    binary = ROOT / ".local/ollaya-evaluation/runtime/bin/ollaya.exe"
+    command = [
+        str(binary),
+        "runner",
+        "--graph-fp32",
+        str(layers["graph.onnx"]),
+        "--tokenizer",
+        str(layers["tokenizer"]),
+        "--decision",
+        str(layers["decision"]),
+        "--device",
+        "cpu",
+        "--threads",
+        "4",
+    ]
+    with (Path(output) / "runner-stderr.log").open("x", encoding="utf-8") as errors:
+        process = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=errors,
+            text=True,
+            encoding="utf-8",
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+        )
+        hello_queue = queue.Queue()
+        reader = threading.Thread(
+            target=lambda: hello_queue.put(process.stdout.readline()), daemon=True
+        )
+        reader.start()
+        try:
+            from scripts.train_laya_pilot import memory_gib
+
+            began = time.monotonic()
+            while reader.is_alive():
+                if time.monotonic() - began > 300 or memory_gib() < 1.5:
+                    raise RuntimeError("Runner preparation time/memory limit")
+                reader.join(0.25)
+            hello = json.loads(hello_queue.get_nowait())
+            if process.poll() is not None or any(
+                hello.get(k) != v
+                for k, v in {"device": "cpu", "precision": "fp32", "engine": "onnx"}.items()
+            ):
+                raise ValueError("Runner CPU/FP32/ONNX identity mismatch")
+            client = Client(f"http://127.0.0.1:{int(hello['port'])}")
+            health = client.call("/health")
+            if any(health.get(k) != hello[k] for k in ("device", "precision", "engine")):
+                raise ValueError("Runner health identity mismatch")
+            yield (
+                client,
+                process.pid,
+                {
+                    "command": command,
+                    "binary_sha256": sha(binary),
+                    "hello": hello,
+                    "health": health,
+                    "intra_op_threads": 4,
+                    "mode": "existing_ollaya_runner",
+                },
+            )
+        finally:
+            if process.poll() is None:
+                process.terminate()
+                process.wait(timeout=30)
+            process.stdout.close()
+            reader.join(timeout=1)
+
+
 def frozen_evaluation(args):
     from jev_context.storage import FileLock
     from scripts.prepare_laya_training_data import digest, load_frozen
@@ -545,6 +658,14 @@ def frozen_evaluation(args):
     ):
         raise ValueError("Frozen evaluation needs explicit dataset/manifest/profile/split")
     cases = load_frozen(args.dataset, args.manifest, args.split, args.data_profile)
+    direct_runner = getattr(args, "runner_threads", None) is not None
+    if direct_runner and (
+        args.runner_threads != 4
+        or args.backend != "ollaya"
+        or args.data_profile != "synthetic-learning-curve"
+        or any(c["question"].get("type") != "choice" for c in cases)
+    ):
+        raise ValueError("Explicit runner threads require curve Laya choice evaluation")
     curve_budget = None
     if args.data_profile == "synthetic-learning-curve":
         from scripts.train_laya_pilot import memory_gib
@@ -598,7 +719,7 @@ def frozen_evaluation(args):
         leases.enter_context(FileLock(ROOT / ".local/laya-finetuning/experiment-model.lock"))
         if args.backend == "ollaya":
             leases.enter_context(FileLock(Path(profile["lock_root"]) / "resident.lock"))
-        if client.call("/api/ps")["models"]:
+        if not direct_runner and client.call("/api/ps")["models"]:
             raise RuntimeError("Other Ollaya model is resident")
         began = time.perf_counter()
         if curve_budget and memory_gib() < 4:
@@ -609,7 +730,7 @@ def frozen_evaluation(args):
             report.update(profile=profile, fingerprint=engine.fingerprint, startup=engine.startup)
             pid = engine.process.pid
         else:
-            if not args.server_pid:
+            if not args.server_pid and not direct_runner:
                 raise ValueError("Ollaya needs owned server PID")
             manifest = (
                 args.model_store / "manifests/ollaya.dev/library" / args.model.replace(":", "/")
@@ -623,12 +744,19 @@ def frozen_evaluation(args):
             report["model_config"] = read(
                 args.model_store / "blobs" / manifest_data["config"]["digest"].replace(":", "-")
             )
-            report["runtime_version"] = client.call("/api/version")
-            owned_ollaya_load = True
-            report["load"] = client.call(
-                "/api/decide", {"model": args.model, "keep_alive": -1}, timeout=300
-            )
-            pid = args.server_pid
+            if direct_runner:
+                client, pid, report["runner"] = leases.enter_context(
+                    laya_runner(args.model_store, args.model, args.output)
+                )
+                report["conditions"]["intra_op_threads"] = 4
+                report["conditions"]["execution_mode"] = "existing_ollaya_runner"
+            else:
+                report["runtime_version"] = client.call("/api/version")
+                owned_ollaya_load = True
+                report["load"] = client.call(
+                    "/api/decide", {"model": args.model, "keep_alive": -1}, timeout=300
+                )
+                pid = args.server_pid
         report["preparation_seconds"] = time.perf_counter() - began
 
         def sample():
@@ -679,6 +807,16 @@ def frozen_evaluation(args):
                                     "questions": [q],
                                 }
                             )["answers"][0]
+                        elif direct_runner:
+                            raw = client.call(
+                                "/decide",
+                                {
+                                    "state": case["state"],
+                                    "questions": {case["purpose"]: case["question"]},
+                                },
+                                timeout=30,
+                            )
+                            answer = runner_choice(raw, case["question"])
                         else:
                             raw = client.call(
                                 "/v1/systemone",
@@ -771,6 +909,20 @@ def frozen_evaluation(args):
 
 
 def paired_comparison(baseline, candidate):
+    if (
+        baseline.get("data_profile") == "synthetic-learning-curve"
+        and baseline.get("backend") == candidate.get("backend") == "ollaya"
+    ):
+        for report in (baseline, candidate):
+            if (
+                report["conditions"].get("intra_op_threads") != 4
+                or report["conditions"].get("execution_mode") != "existing_ollaya_runner"
+                or report.get("runner", {}).get("hello", {}).get("device") != "cpu"
+                or report.get("runner", {}).get("hello", {}).get("precision") != "fp32"
+            ):
+                raise ValueError("Curve comparison requires matching CPU/FP32/four-thread runners")
+        if baseline["runner"]["binary_sha256"] != candidate["runner"]["binary_sha256"]:
+            raise ValueError("Curve runner binary changed between models")
     if (
         baseline["dataset_sha256"] != candidate["dataset_sha256"]
         or baseline["conditions"]["case_order"] != candidate["conditions"]["case_order"]
@@ -1608,6 +1760,7 @@ def main():
     parser.add_argument("--candidate-report", type=Path)
     parser.add_argument("--product-report", type=Path)
     parser.add_argument("--server-pid", type=int)
+    parser.add_argument("--runner-threads", type=int, choices=[4])
     parser.add_argument("--endpoint", default="http://127.0.0.1:11437")
     parser.add_argument("--output", type=Path, default=ROOT / ".local/ollaya-evaluation/results")
     parser.add_argument(

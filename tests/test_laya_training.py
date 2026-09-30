@@ -1358,3 +1358,121 @@ def test_reload_parity_supports_fifteen_and_rejects_mismatched_input():
     bad["predictions"][1]["id"] = "0"
     with pytest.raises(ValueError, match="IDs/count"):
         parity_count(bad)
+
+
+def test_direct_runner_maps_supplied_label_order_and_rejects_invalid_output():
+    from scripts.evaluate_ollaya import runner_choice
+
+    q = dict(type="choice", criteria={"unfit": "no", "fit": "yes"})
+    raw = dict(questions=[dict(logits=[-10, 10])], state_truncated=False)
+    answer = runner_choice(raw, q)
+    assert answer["choice"] == "fit"
+    assert list(answer["raw_distribution"]) == ["unfit", "fit"]
+    reversed_q = {**q, "criteria": dict(reversed(list(q["criteria"].items())))}
+    assert runner_choice(raw, reversed_q)["choice"] == "unfit"
+    for invalid in [
+        {**raw, "state_truncated": True},
+        {**raw, "questions": [dict(logits=[float("nan"), 0])]},
+        {**raw, "questions": [dict(logits=[1])]},
+        {**raw, "questions": [dict(logits=[1, 2], act_logits=[0, 1])]},
+        {**raw, "questions": []},
+    ]:
+        with pytest.raises(ValueError):
+            runner_choice(invalid, q)
+
+
+def test_direct_runner_explicit_threads_integrity_and_cleanup(tmp_path, monkeypatch):
+    import io
+    import json
+
+    from scripts import evaluate_ollaya as evaluate
+    from scripts import train_laya_pilot as trainer
+
+    store = tmp_path / "store"
+    blobs = store / "blobs"
+    blobs.mkdir(parents=True)
+    layers = []
+    payloads = {
+        "config.v1+json": {},
+        "decision": dict(family="laya"),
+        "calibration": dict(temperature=[1, 1, 1], temperature_by_options={}),
+        "tokenizer": {"fixture": "tokenizer"},
+        "graph.onnx": {"fixture": "graph"},
+    }
+    for kind, payload in payloads.items():
+        file = blobs / kind
+        file.write_text(json.dumps(payload))
+        digest = evaluate.sha(file)
+        file.rename(blobs / ("sha256-" + digest))
+        layers.append(dict(mediaType="application/vnd.ollaya." + kind, digest="sha256:" + digest))
+    manifest = store / "manifests/ollaya.dev/library/laya/multilingual"
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text(json.dumps(dict(config=layers[0], layers=layers[1:])))
+    binary = tmp_path / ".local/ollaya-evaluation/runtime/bin/ollaya.exe"
+    binary.parent.mkdir(parents=True)
+    binary.write_bytes(b"pinned-installed-binary")
+    monkeypatch.setattr(evaluate, "ROOT", tmp_path)
+    monkeypatch.setattr(trainer, "memory_gib", lambda: 8)
+    children = []
+
+    class Child:
+        def __init__(self, command, **kwargs):
+            self.command = command
+            self.pid = 123
+            self.code = None
+            self.stdout = io.StringIO(
+                json.dumps(dict(port=12345, device="cpu", precision="fp32", engine="onnx"))
+            )
+            children.append(self)
+
+        def poll(self):
+            return self.code
+
+        def terminate(self):
+            self.code = 0
+
+        def wait(self, timeout):
+            return self.code
+
+    class Client:
+        def __init__(self, endpoint):
+            self.endpoint = endpoint
+
+        def call(self, path):
+            assert path == "/health"
+            return dict(device="cpu", precision="fp32", engine="onnx")
+
+    monkeypatch.setattr(evaluate.subprocess, "Popen", Child)
+    monkeypatch.setattr(evaluate, "Client", Client)
+    output = tmp_path / "valid"
+    output.mkdir()
+    with evaluate.laya_runner(store, "laya:multilingual", output) as (client, pid, conditions):
+        assert pid == 123 and client.endpoint == "http://127.0.0.1:12345"
+        assert children[-1].command[-4:] == ["--device", "cpu", "--threads", "4"]
+        assert conditions["intra_op_threads"] == 4
+    assert children[-1].poll() == 0 and children[-1].stdout.closed
+    target = blobs / layers[-1]["digest"].replace(":", "-")
+    target.write_text("changed graph")
+    with pytest.raises(ValueError, match="integrity"):
+        with evaluate.laya_runner(store, "laya:multilingual", output):
+            pytest.fail("Changed model must not load")
+    assert len(children) == 1
+
+
+def test_curve_runtime_comparison_rejects_unverified_threads_and_changed_binary():
+    from scripts.evaluate_ollaya import paired_comparison
+
+    report = dict(
+        data_profile="synthetic-learning-curve",
+        backend="ollaya",
+        conditions=dict(intra_op_threads=4, execution_mode="existing_ollaya_runner"),
+        runner=dict(hello=dict(device="cpu", precision="fp32"), binary_sha256="pinned"),
+    )
+    bad = copy.deepcopy(report)
+    bad["conditions"]["intra_op_threads"] = None
+    with pytest.raises(ValueError, match="four-thread"):
+        paired_comparison(report, bad)
+    bad = copy.deepcopy(report)
+    bad["runner"]["binary_sha256"] = "different"
+    with pytest.raises(ValueError, match="binary changed"):
+        paired_comparison(report, bad)

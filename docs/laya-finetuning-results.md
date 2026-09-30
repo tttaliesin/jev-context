@@ -779,3 +779,26 @@ revision3 train 특징4050개는1760초, 별도 development 특징450개는249�
 이는 한 seed의 내부 합성 개발 결과다. 자료량의 충분성·포화·최종 시험 개선은 아직 확정하지 않는다. 학습 설정은 결과를 보고 바꾸지 않았다.
 
 사용자의 중단 요청 후 재개 시 실제 프로세스가 남아 있지 않음을 확인했다. 두 번째 seed20260929는30updates의 마지막 저장 기록만 있고 checkpoint가 없었다. 해당 디렉터리와 로그를 `n450-e6-s20260929-interrupted-20260930T0225`로 같은 root에 보존하고 `execution.json`의 `interrupted_attempts`에 기록했다. 마지막 저장 이후 실제 갱신 수는 알 수 없으며 완료 모델로 세지 않는다. 원본부터 같은 seed를 재시작했고 완료된 첫 모델·캐시는 재사용했다. 전체 예산 시작 시각과40GiB 합산 범위를 유지한다.
+
+
+### 450문항 세 seed와 최종 CPU 실행 조건 확인
+
+revision3에서450문항·6epoch·180updates를 원본에서 세 번 완료했다. 같은 개발450개(목적별150개)를 사용한 중간 결과다.
+
+| seed | 관련성 | 근거 관계 | 도구 적합성 | 합계 | 중요 오판 |
+|---|---:|---:|---:|---:|---:|
+| 원본 |56/150|47/150|58/150|161/450|205|
+|20260928|139/150|112/150|144/150|395/450|48|
+|20260929|121/150|101/150|144/150|366/450|74|
+|20260930|143/150|103/150|143/150|389/450|53|
+
+이 수치는 합성 개발 자료에서 세 seed 모두 원본보다 높다는 관측이다. 자료 규모의 포화나 최종 시험 통과를 뜻하지 않는다.1,350/4,050문항과 같은 업데이트 수 대조가 끝나기 전에는 필요한 자료량을 확정하지 않는다.
+
+[설치 버전0.7.3의 공식 scheduler](https://github.com/ollaya-dev/ollaya/blob/b89397464ae6bb33627680eb5b0ea6fb5987b4dd/crates/ollaya-server/src/scheduler.rs#L433)를 대조한 결과 일반 daemon은 runner에 `--threads`를 전달하지 않는다. `OMP_NUM_THREADS=4`를 실제 ONNX4스레드 검증으로 대신하지 않는다. 동일 바이너리의 기존 `runner --threads 4 --device cpu` 경로를 평가 CLI의 `--runner-threads 4`로 선택할 수 있게 보완했다. 모델과 설정을 업데이트하지 않았으며 공개 MCP 계약도 유지했다. 설치 바이너리의 `runner --help`에서 해당 옵션을 직접 확인했다. 실제 모델의15개 대조와 최종 비교는 학습 뒤에 수행하며, 이 절 작성 시점에는 미실행이다.
+
+새 로컬 검사에서는 logits/선택지 순서 연결·비정상 값·입력 초과 거절, blob hash 변경 차단, CPU/FP32/4스레드 실행 인자와 자식 프로세스 종료, 비교 중 다른 binary/미확인 스레드 조건 거절을 확인했다. 기존 관련 검사와 함께91개가 통과했다. 최초 기본 임시 폴더 실행은 Windows 접근 권한으로 fixture를 만들지 못했으며, 저장소 내 새 임시 검사 경로로 재실행했다. 실제 모델 검증을 단위 검사 성공으로 대신하지 않는다.
+
+```powershell
+$env:PYTHONPATH='src'
+.venv/Scripts/python.exe -X utf8 -m pytest tests/test_laya_training.py tests/test_ollaya_evaluation.py tests/test_ollaya_tuning.py -q -p no:cacheprovider --basetemp .local/test-runs/curve-runner-20260930-0312
+```
