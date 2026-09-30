@@ -1225,9 +1225,27 @@ def test_curve_resamples_groups_not_seed_rows_and_blocks_missing_runs(tmp_path, 
     assert interval["groups"] == 30 and interval["distinct_cases"] == 150
     assert interval["bootstrap_95"] == [1, 1]
     (tmp_path / "n4050-e6-s20260930/train.json").unlink()
+    (tmp_path / "execution.json").write_text(
+        json.dumps(
+            {
+                "runs": [
+                    {
+                        "name": "n4050-e6-s20260930",
+                        "status": "incomplete",
+                        "exit_code": 124,
+                        "reason": "time_limit",
+                    }
+                ]
+            }
+        )
+    )
     result = summarize_learning_curve(tmp_path)
     assert result["status"] == "incomplete" and result["conclusion"] == "필요량 미확정"
     assert not result["saturation"]
+    missing = result["missing_runs"][0]
+    assert missing["execution"]["reason"] == "time_limit"
+    assert missing["planned_optimizer_steps"] == 1620
+    assert len(missing["evaluation_rows"]) == 450
 
 
 def test_evaluation_checks_frozen_gold_even_if_all_model_reports_agree():

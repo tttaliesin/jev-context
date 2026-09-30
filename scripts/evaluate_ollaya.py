@@ -105,6 +105,8 @@ def summarize_learning_curve(root):
     base_scores = score(baseline)
     settings = {}
     missing = []
+    execution = read(root / "execution.json") if (root / "execution.json").exists() else {}
+    executions = {run["name"]: run for run in execution.get("runs", [])}
     for size, epochs in ((450, 6), (1350, 6), (4050, 6), (450, 54), (1350, 18)):
         key = f"n{size}-e{epochs}"
         members = []
@@ -141,6 +143,11 @@ def summarize_learning_curve(root):
                     )
                 )
             except (OSError, ValueError, KeyError) as exc:
+                recorded_execution = executions.get(f"{key}-s{seed}", {})
+                try:
+                    training_state = read(directory / "train.json")
+                except (OSError, ValueError):
+                    training_state = {}
                 stored = (
                     read(directory / "development.json")
                     if (directory / "development.json").exists()
@@ -161,7 +168,17 @@ def summarize_learning_curve(root):
                     for r in baseline["rows"]
                 ]
                 missing.append(
-                    dict(setting=key, seed=seed, reason=str(exc), evaluation_rows=preserved)
+                    dict(
+                        setting=key,
+                        seed=seed,
+                        reason=str(exc),
+                        execution=recorded_execution,
+                        training_status=training_state.get("status", "not_run"),
+                        training_error=training_state.get("error"),
+                        completed_optimizer_steps=len(training_state.get("steps", [])),
+                        planned_optimizer_steps=size // 15 * epochs,
+                        evaluation_rows=preserved,
+                    )
                 )
         if len(members) == 3:
             settings[key] = dict(size=size, epochs=epochs, members=members)
