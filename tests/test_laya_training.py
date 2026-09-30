@@ -1241,6 +1241,7 @@ def test_curve_resamples_groups_not_seed_rows_and_blocks_missing_runs(tmp_path, 
     )
     result = summarize_learning_curve(tmp_path)
     assert result["status"] == "incomplete" and result["conclusion"] == "필요량 미확정"
+    assert result["largest_vs_original"] == "최대 규모 미완료로 비교 미실행"
     assert not result["saturation"]
     missing = result["missing_runs"][0]
     assert missing["execution"]["reason"] == "time_limit"

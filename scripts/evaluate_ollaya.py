@@ -332,7 +332,9 @@ def summarize_learning_curve(root):
         selected_setting=selected,
         selected_seed=selected_seed,
         conclusion="포화 후보 확인" if plateau and not missing else "필요량 미확정",
-        largest_vs_original="개선 확인"
+        largest_vs_original="최대 규모 미완료로 비교 미실행"
+        if not largest
+        else "개선 확인"
         if improved_largest
         else "낮은 성능에서 정체 또는 개선 불확실",
         limitation="Agent-authored condition pairs share sentence generation rules; internal synthetic distribution only, not independent external or real-work validation. Group intervals condition on these three fixed seeds; individual seed results are reported separately.",
