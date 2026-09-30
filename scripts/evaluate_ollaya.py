@@ -542,8 +542,13 @@ def runner_choice(raw, question):
         raise ValueError("Runner requires an untruncated choice question")
     answers = raw.get("questions", [])
     labels = list(question["criteria"])
-    if len(answers) != 1 or answers[0].get("act_logits") is not None:
-        raise ValueError("Unexpected runner question/act output")
+    if len(answers) != 1:
+        raise ValueError("Unexpected runner question count")
+    # The Laya runner returns its unused two-way act output even for choice questions.
+    # Choice probabilities use option logits, as the daemon's choice renderer does.
+    act = answers[0].get("act_logits")
+    if act is not None and (len(act) != 2 or any(not math.isfinite(v) for v in act)):
+        raise ValueError("Invalid auxiliary runner act output")
     logits = answers[0].get("logits", [])
     if len(logits) != len(labels) or any(not math.isfinite(v) for v in logits):
         raise ValueError("Runner logits/order/count changed")
@@ -577,6 +582,8 @@ def laya_runner(model_store, model, output):
         decision.get("family") != "laya"
         or calibration.get("temperature") != [1.0, 1.0, 1.0]
         or calibration.get("temperature_by_options")
+        or calibration.get("temperature_map")
+        or calibration.get("temperature_range")
     ):
         raise ValueError("Direct runner only supports Laya with unit model calibration")
     binary = ROOT / ".local/ollaya-evaluation/runtime/bin/ollaya.exe"

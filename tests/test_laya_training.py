@@ -1364,7 +1364,7 @@ def test_direct_runner_maps_supplied_label_order_and_rejects_invalid_output():
     from scripts.evaluate_ollaya import runner_choice
 
     q = dict(type="choice", criteria={"unfit": "no", "fit": "yes"})
-    raw = dict(questions=[dict(logits=[-10, 10])], state_truncated=False)
+    raw = dict(questions=[dict(logits=[-10, 10], act_logits=[20, -20])], state_truncated=False)
     answer = runner_choice(raw, q)
     assert answer["choice"] == "fit"
     assert list(answer["raw_distribution"]) == ["unfit", "fit"]
@@ -1374,7 +1374,8 @@ def test_direct_runner_maps_supplied_label_order_and_rejects_invalid_output():
         {**raw, "state_truncated": True},
         {**raw, "questions": [dict(logits=[float("nan"), 0])]},
         {**raw, "questions": [dict(logits=[1])]},
-        {**raw, "questions": [dict(logits=[1, 2], act_logits=[0, 1])]},
+        {**raw, "questions": [dict(logits=[1, 2], act_logits=[float("nan"), 1])]},
+        {**raw, "questions": [dict(logits=[1, 2], act_logits=[0, 1, 2])]},
         {**raw, "questions": []},
     ]:
         with pytest.raises(ValueError):
@@ -1451,6 +1452,25 @@ def test_direct_runner_explicit_threads_integrity_and_cleanup(tmp_path, monkeypa
         assert children[-1].command[-4:] == ["--device", "cpu", "--threads", "4"]
         assert conditions["intra_op_threads"] == 4
     assert children[-1].poll() == 0 and children[-1].stdout.closed
+    original_manifest = manifest.read_text()
+    mapped_calibration = blobs / "input-conditioned-calibration"
+    mapped_calibration.write_text(
+        json.dumps(
+            {
+                **payloads["calibration"],
+                "temperature_map": {"kind": "von-entropy-length-v1", "bias": 2},
+            }
+        )
+    )
+    mapped_hash = evaluate.sha(mapped_calibration)
+    mapped_calibration.rename(blobs / ("sha256-" + mapped_hash))
+    mapped = json.loads(original_manifest)
+    mapped["layers"][1]["digest"] = "sha256:" + mapped_hash
+    manifest.write_text(json.dumps(mapped))
+    with pytest.raises(ValueError, match="unit model calibration"):
+        with evaluate.laya_runner(store, "laya:multilingual", output):
+            pytest.fail("Input-conditioned calibration must not be silently bypassed")
+    manifest.write_text(original_manifest)
     target = blobs / layers[-1]["digest"].replace(":", "-")
     target.write_text("changed graph")
     with pytest.raises(ValueError, match="integrity"):

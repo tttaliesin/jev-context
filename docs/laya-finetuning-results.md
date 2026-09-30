@@ -802,3 +802,5 @@ revision3에서450문항·6epoch·180updates를 원본에서 세 번 완료했�
 $env:PYTHONPATH='src'
 .venv/Scripts/python.exe -X utf8 -m pytest tests/test_laya_training.py tests/test_ollaya_evaluation.py tests/test_ollaya_tuning.py -q -p no:cacheprovider --basetemp .local/test-runs/curve-runner-20260930-0312
 ```
+
+공식[ONNX 출력](https://github.com/ollaya-dev/ollaya/blob/b89397464ae6bb33627680eb5b0ea6fb5987b4dd/crates/ollaya-runner/src/onnx.rs#L343)과[choice 렌더링](https://github.com/ollaya-dev/ollaya/blob/b89397464ae6bb33627680eb5b0ea6fb5987b4dd/crates/ollaya-decision/src/answer.rs#L110)을 추가 대조했다. Laya는 choice에도 보조 act 두 값을 반환하지만 선택과 확률은 option logits로 계산한다. 직접 경로는 유한한 보조 출력은 허용하고 choice에는 사용하지 않으며, 입력 조건별 온도나 온도 범위가 지정된 모델은 거절한다. 공식softmax와 첫 최대값 선택 방식도 대조했다. 수정 후91개 재검사와 보정 설정 거절을 포함한 직접 경로3개 검사가 통과했다.
