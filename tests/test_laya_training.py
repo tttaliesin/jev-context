@@ -1160,14 +1160,14 @@ def test_curve_training_settings_cannot_reduce_exposure_or_leak_split(tmp_path):
         validate_run(args, cases)
 
 
-def test_curve_resamples_groups_not_seed_rows_and_blocks_missing_runs(tmp_path):
-    from scripts.evaluate_ollaya import summarize_learning_curve
+def test_curve_resamples_groups_not_seed_rows_and_blocks_missing_runs(tmp_path, monkeypatch):
+    from scripts.evaluate_ollaya import sha, summarize_learning_curve
 
     rows = [
         dict(
             id=f"r{i}",
             state_sha256=f"s{i}",
-            question_sha256="q",
+            question_sha256=data.digest({"criteria": {"yes": "yes", "no": "no"}}),
             purpose=p,
             expected="yes",
             critical=True,
@@ -1185,7 +1185,13 @@ def test_curve_resamples_groups_not_seed_rows_and_blocks_missing_runs(tmp_path):
     # IDs identify each purpose too; groups are shared causal scenarios with five cases/purpose.
     for row in rows:
         row["id"] += row["purpose"]
-    baseline = dict(status="completed", split="development", dataset_sha256="frozen", rows=rows)
+    (tmp_path / "frozen").mkdir()
+    dataset = tmp_path / "frozen/frozen.jsonl"
+    dataset.write_text("fixed dataset")
+    frozen_hash = sha(dataset)
+    cases = [{**row, "question": {"criteria": {"yes": "yes", "no": "no"}}} for row in rows]
+    monkeypatch.setattr(data, "load_frozen", lambda *args: cases)
+    baseline = dict(status="completed", split="development", dataset_sha256=frozen_hash, rows=rows)
     base_path = tmp_path / "features/development"
     base_path.mkdir(parents=True)
     (base_path / "baseline-development.json").write_text(json.dumps(baseline))
@@ -1200,7 +1206,7 @@ def test_curve_resamples_groups_not_seed_rows_and_blocks_missing_runs(tmp_path):
                 data_profile="synthetic-learning-curve",
                 batch_size=15,
                 learning_rate=6e-4,
-                dataset_sha256="frozen",
+                dataset_sha256=frozen_hash,
                 epochs=epochs,
                 max_steps=size // 15 * epochs,
                 exposures={str(i): epochs for i in range(size)},
@@ -1222,6 +1228,43 @@ def test_curve_resamples_groups_not_seed_rows_and_blocks_missing_runs(tmp_path):
     result = summarize_learning_curve(tmp_path)
     assert result["status"] == "incomplete" and result["conclusion"] == "필요량 미확정"
     assert not result["saturation"]
+
+
+def test_evaluation_checks_frozen_gold_even_if_all_model_reports_agree():
+    from scripts.evaluate_ollaya import validate_frozen_evaluation_rows
+
+    case = dict(
+        id="fixed",
+        state_sha256="state",
+        purpose="relevance",
+        expected="yes",
+        critical=True,
+        group_id="workflow",
+        question={"criteria": {"yes": "yes", "no": "no"}},
+    )
+    row = {k: v for k, v in case.items() if k != "question"}
+    row.update(
+        question_sha256=data.digest(case["question"]),
+        split="test",
+        repeat=0,
+        status="observed",
+        choice="yes",
+        probabilities={"yes": 0.9, "no": 0.1},
+    )
+    validate_frozen_evaluation_rows({"rows": [row]}, [case], "test", 1)
+    for field, value in (
+        ("expected", "no"),
+        ("question_sha256", "changed"),
+        ("state_sha256", "changed"),
+        ("group_id", "other"),
+        ("repeat", 1),
+    ):
+        with pytest.raises(ValueError, match="frozen"):
+            validate_frozen_evaluation_rows({"rows": [{**row, field: value}]}, [case], "test", 1)
+    failed = {**row, "status": "not_run", "reason": "memory_limit"}
+    validate_frozen_evaluation_rows({"rows": [failed]}, [case], "test", 1)
+    with pytest.raises(ValueError, match="frozen"):
+        validate_frozen_evaluation_rows({"rows": [row, row]}, [case], "test", 1)
 
 
 def test_curve_rejects_reordered_question_even_if_canonical_content_hash_matches(tmp_path):

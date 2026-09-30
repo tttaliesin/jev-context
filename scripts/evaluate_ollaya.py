@@ -27,10 +27,44 @@ THRESHOLDS = [0, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95]
 BASE_MODEL = "laya:multilingual"
 
 
+def validate_frozen_evaluation_rows(report, cases, split, repeats):
+    """Check reports against frozen inputs, not just against another report."""
+    from scripts.prepare_laya_training_data import digest
+
+    fields = ("id", "state_sha256", "purpose", "expected", "critical", "group_id")
+    wanted = [
+        [case[k] for k in fields] + [digest(case["question"]), split, repeat]
+        for repeat in range(repeats)
+        for case in cases
+    ]
+    actual = [
+        [row[k] for k in fields] + [row["question_sha256"], row["split"], row["repeat"]]
+        for row in report["rows"]
+    ]
+    if actual != wanted:
+        raise ValueError("Evaluation rows differ from frozen input/question/label/order")
+    for row, case in zip(report["rows"], cases * repeats, strict=True):
+        if row["status"] == "observed" and (
+            row["choice"] not in case["question"]["criteria"]
+            or set(row["probabilities"]) != set(case["question"]["criteria"])
+            or any(not math.isfinite(v) or not 0 <= v <= 1 for v in row["probabilities"].values())
+        ):
+            raise ValueError("Evaluation labels or probabilities differ from frozen question")
+
+
 def summarize_learning_curve(root):
     """Pair identical cases and average seeds before resampling scenario groups."""
     root = Path(root)
+    from scripts.prepare_laya_training_data import load_frozen
+
+    dataset = root / "frozen/frozen.jsonl"
+    cases = load_frozen(
+        dataset, root / "frozen/prepare.json", "development", "synthetic-learning-curve"
+    )
     baseline = read(root / "features/development/baseline-development.json")
+    if baseline["dataset_sha256"] != sha(dataset):
+        raise ValueError("Curve baseline dataset changed")
+    validate_frozen_evaluation_rows(baseline, cases, "development", 1)
     identity = (
         "id",
         "state_sha256",
@@ -448,6 +482,7 @@ def freeze_candidate(args):
         raise ValueError("Calibration dataset mismatch")
     if args.data_profile == "synthetic-learning-curve":
         gold = load_frozen(args.dataset, args.manifest, "calibration", args.data_profile)
+        validate_frozen_evaluation_rows(calibration, gold, "calibration", 1)
         fields = ("id", "state_sha256", "purpose", "expected", "critical", "group_id")
         if [[r[k] for k in fields] for r in calibration["rows"]] != [
             [r[k] for k in fields] for r in gold
@@ -827,6 +862,7 @@ def compare_frozen(args):
         read(p) for p in (args.baseline_report, args.candidate_report, args.product_report)
     )
     for report in (baseline, candidate, product):
+        validate_frozen_evaluation_rows(report, cases, "test", 3)
         if (
             report["split"] != "test"
             or report["dataset_sha256"] != sha(args.dataset)
