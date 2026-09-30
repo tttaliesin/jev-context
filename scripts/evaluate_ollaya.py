@@ -14,6 +14,7 @@ import queue
 import random
 import statistics
 import subprocess
+import sys
 import threading
 import time
 from collections import Counter
@@ -24,6 +25,7 @@ from urllib.parse import urlsplit
 from jev_context.engines import SemifOpenVINO, convert
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 FIXTURES = ROOT / "evaluations/ollaya"
 TEMPERATURES = [0.5, 0.75, 1, 1.5, 2, 3, 4]
 THRESHOLDS = [0, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95]

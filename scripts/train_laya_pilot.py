@@ -340,6 +340,70 @@ def cache_features(args, agent, cases, report, output, deadline, started):
         )
 
 
+def forecast_curve_run(root, ledger, size, epochs, base_hash, max_seconds=5400):
+    """Estimate the next run from comparable observed timing, never from accuracy."""
+    observations = []
+    root = Path(root).resolve()
+    for run in ledger["runs"]:
+        path = Path(run.get("report", "")).resolve()
+        if not path.is_relative_to(root) or not path.is_file():
+            continue
+        report = read(path)
+        watchdog_path = path.parent / "watchdog-abort.json"
+        watchdog = read(watchdog_path) if watchdog_path.exists() else {}
+        usable = report.get("status") == "completed" or (
+            run.get("exit_code") == 124
+            and watchdog.get("elapsed_seconds", 0) >= max_seconds
+        )
+        if not usable or (
+            report.get("diagnostic")
+            or report.get("data_profile") != "synthetic-learning-curve"
+            or report.get("dataset_sha256") != ledger["dataset_sha256"]
+            or report.get("trainer_sha256") != ledger["trainer_sha256"]
+            or report.get("base_sha256") != base_hash
+            or report.get("device") != "cpu"
+            or report.get("threads") != 4
+            or report.get("batch_size") != 15
+            or report.get("microbatch_size") != 1
+            or len(report.get("training_ids", [])) != size
+        ):
+            continue
+        values = [s.get("seconds") for s in report.get("steps", [])]
+        if len(values) < 30 or any(
+            not isinstance(v, (int, float)) or not math.isfinite(v) or not 0 < v <= 30
+            for v in values
+        ):
+            continue
+        observations.append((statistics.median(values), run["name"]))
+    if not observations:
+        return None
+    seconds, source = min(observations)
+    updates = size // 15 * epochs
+    return {
+        "estimated_optimizer_seconds": seconds * updates,
+        "seconds_per_update": seconds,
+        "planned_updates": updates,
+        "source_run": source,
+        "excludes_load_and_evaluation": True,
+        "uncertainty": "Timing forecast, not a guarantee; CPU load can change.",
+    }
+
+
+def stop_owned_process(process):
+    """Stop only the subprocess tree created by this coordinator."""
+    if os.name == "nt":
+        subprocess.run(
+            ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+    else:
+        process.kill()
+    process.wait()
+
+
 def run_curve(args):
     """Sequential bounded coordinator; persistent elapsed budget cannot reset on resume."""
     from scripts.prepare_laya_training_data import load_frozen
@@ -421,8 +485,7 @@ def run_curve(args):
             try:
                 code = process.wait(timeout=min(5500, 43200 - 7200 - elapsed))
             except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait()
+                stop_owned_process(process)
                 code = 124
         result = read(report_path) if report_path.exists() else {}
         status = (
@@ -432,6 +495,8 @@ def run_curve(args):
             if code == 124
             else "failed"
         )
+        watchdog_path = report_path.parent / "watchdog-abort.json"
+        watchdog = read(watchdog_path) if watchdog_path.exists() else {}
         ledger["runs"].append(
             dict(
                 name=name,
@@ -439,7 +504,10 @@ def run_curve(args):
                 exit_code=code,
                 seconds=time.time() - began,
                 report=str(report_path),
-                reason=result.get("error"),
+                reason=result.get("error")
+                or watchdog.get("reason")
+                or ("subprocess_time_limit" if code == 124 else None),
+                watchdog_abort=watchdog,
             )
         )
         save(ledger_path, ledger)
@@ -479,6 +547,22 @@ def run_curve(args):
         for seed in (20260928, 20260929, 20260930):
             name = f"n{size}-e{epochs}-s{seed}"
             path = root / name
+            if not any(r["name"] == name for r in ledger["runs"]):
+                forecast = forecast_curve_run(root, ledger, size, epochs, cache_meta["base_sha256"])
+                remaining = 36000 - (time.time() - ledger["started_at_unix"])
+                if forecast and forecast["estimated_optimizer_seconds"] > min(5400, remaining):
+                    ledger["runs"].append(
+                        dict(
+                            name=name,
+                            status="not_run",
+                            reason="estimated_runtime_exceeds_run_or_training_budget",
+                            report=str(path / "train.json"),
+                            runtime_forecast=forecast,
+                        )
+                    )
+                    save(ledger_path, ledger)
+                    print(f"{name}: not_run, observed timing exceeds remaining limits", flush=True)
+                    continue
             ok = execute(
                 name,
                 [
@@ -514,7 +598,10 @@ def run_curve(args):
                 save(ledger_path, ledger)
                 return
     ledger.update(
-        status="development_complete", elapsed_seconds=time.time() - ledger["started_at_unix"]
+        status="development_complete"
+        if all(r["status"] == "completed" for r in ledger["runs"] if r["name"].startswith("n"))
+        else "development_incomplete",
+        elapsed_seconds=time.time() - ledger["started_at_unix"],
     )
     save(ledger_path, ledger)
 

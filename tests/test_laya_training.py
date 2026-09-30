@@ -12,6 +12,115 @@ from scripts import prepare_laya_training_data as data
 from scripts.train_laya_pilot import compatible_encoder_config, safetensors_header
 
 
+def test_curve_runtime_forecast_uses_comparable_observations_only(tmp_path):
+    from scripts import train_laya_pilot as training
+
+    path = tmp_path / "n4050-e6-s20260928" / "train.json"
+    path.parent.mkdir()
+    report = dict(
+        data_profile="synthetic-learning-curve", dataset_sha256="data",
+        trainer_sha256="code", base_sha256="base", device="cpu", threads=4,
+        batch_size=15, microbatch_size=1, training_ids=list(range(4050)),
+        steps=[{"seconds": 4.0} for _ in range(30)], diagnostic=False,
+    )
+    path.write_text(json.dumps(report), encoding="utf-8")
+    (path.parent / "watchdog-abort.json").write_text(
+        json.dumps({"elapsed_seconds": 5400.1}), encoding="utf-8"
+    )
+    ledger = dict(dataset_sha256="data", trainer_sha256="code", runs=[
+        {"name": path.parent.name, "report": str(path), "exit_code": 124}
+    ])
+    forecast = training.forecast_curve_run(tmp_path, ledger, 4050, 6, "base")
+    assert forecast["estimated_optimizer_seconds"] == 6480
+    assert forecast["planned_updates"] == 1620
+    assert training.forecast_curve_run(tmp_path, ledger, 450, 54, "base") is None
+    for key, value in [
+        ("diagnostic", True), ("base_sha256", "other"), ("dataset_sha256", "other"),
+        ("trainer_sha256", "other"), ("threads", 2), ("microbatch_size", 15),
+        ("device", "gpu"), ("steps", [{"seconds": float("nan")} for _ in range(30)]),
+        ("steps", [{"seconds": 4.0} for _ in range(29)]),
+    ]:
+        changed = dict(report, **{key: value})
+        path.write_text(json.dumps(changed), encoding="utf-8")
+        assert training.forecast_curve_run(tmp_path, ledger, 4050, 6, "base") is None
+    fast = tmp_path / "fast" / "train.json"
+    fast.parent.mkdir()
+    fast.write_text(json.dumps(dict(report, status="completed", steps=[{"seconds": 2}]*30)))
+    ledger["runs"].append({"name": "fast", "report": str(fast), "exit_code": 0})
+    forecast = training.forecast_curve_run(tmp_path, ledger, 4050, 6, "base")
+    assert forecast["source_run"] == "fast"
+    assert forecast["estimated_optimizer_seconds"] == 3240
+
+
+def test_curve_coordinator_skips_repeat_timeouts_without_launching_models(tmp_path, monkeypatch):
+    from scripts import train_laya_pilot as training
+
+    root = tmp_path / ".local/laya-finetuning/curve"
+    root.mkdir(parents=True)
+    base = tmp_path / "base"
+    base.mkdir()
+    (base / "model.safetensors").write_bytes(b"weights")
+    dataset = root / "frozen.jsonl"
+    dataset.write_bytes(b"frozen")
+    subsets = {str(n): [f"id-{i}" for i in range(n)] for n in [450, 1350, 4050]}
+    manifest = root / "prepare.json"
+    training.save(manifest, {"train_subsets": subsets})
+    monkeypatch.setattr(training, "ROOT", tmp_path)
+    monkeypatch.setattr(training, "memory_gib", lambda: 8)
+    monkeypatch.setattr(data, "load_frozen", lambda *args: [{"id": i} for i in subsets["4050"]])
+    monkeypatch.setattr(training.subprocess, "Popen", lambda *a, **k: pytest.fail("Model launched"))
+    ledger = dict(
+        dataset_sha256=training.sha(dataset), trainer_sha256=training.sha(Path(training.__file__)),
+        started_at_unix=training.time.time(), runs=[], status="running",
+    )
+    for split in ["train", "development"]:
+        p = root / "features" / split
+        p.mkdir(parents=True)
+        training.save(p / "cache.json", dict(status="completed", parity=[], feature_seconds=1,
+                                             base_sha256=training.sha(base / "model.safetensors")))
+    for n in [450, 1350, 4050]:
+        for seed in ([20260928, 20260929, 20260930] if n != 4050 else [20260928]):
+            name = f"n{n}-e6-s{seed}"
+            p = root / name
+            p.mkdir()
+            completed = n != 4050
+            report = dict(
+                status="completed" if completed else "running", data_profile="synthetic-learning-curve",
+                dataset_sha256=ledger["dataset_sha256"], trainer_sha256=ledger["trainer_sha256"],
+                base_sha256=training.sha(base / "model.safetensors"), device="cpu", threads=4,
+                batch_size=15, microbatch_size=1, training_ids=subsets[str(n)],
+                steps=[{"seconds": 4} for _ in range(30)], step_median_seconds=4,
+            )
+            training.save(p / "train.json", report)
+            if not completed:
+                training.save(p / "watchdog-abort.json", {"elapsed_seconds": 5400.1})
+            ledger["runs"].append(dict(name=name, status="completed" if completed else "incomplete",
+                                      report=str(p / "train.json"), exit_code=0 if completed else 124))
+    training.save(root / "execution.json", ledger)
+    args = SimpleNamespace(data_profile="synthetic-learning-curve", split="train", dataset=dataset,
+                           manifest=manifest, output=root, base=base)
+    training.run_curve(args)
+    result = training.read(root / "execution.json")
+    skipped = [r for r in result["runs"] if r["status"] == "not_run"]
+    assert len(skipped) == 8
+    assert result["status"] == "development_incomplete"
+    assert all(r["reason"] == "estimated_runtime_exceeds_run_or_training_budget" for r in skipped)
+    assert result["started_at_unix"] == ledger["started_at_unix"]
+    assert all(r["runtime_forecast"]["planned_updates"] == 1620 for r in skipped)
+
+
+def test_windows_timeout_stops_only_the_owned_process_tree(monkeypatch):
+    from scripts import train_laya_pilot as training
+
+    calls = []
+    monkeypatch.setattr(training, "os", SimpleNamespace(name="nt"))
+    monkeypatch.setattr(training.subprocess, "CREATE_NO_WINDOW", 0, raising=False)
+    monkeypatch.setattr(training.subprocess, "run", lambda cmd, **kwargs: calls.append(cmd))
+    process = SimpleNamespace(pid=1234, wait=lambda: calls.append("wait"))
+    training.stop_owned_process(process)
+    assert calls == [["taskkill", "/PID", "1234", "/T", "/F"], "wait"]
+
+
 def reservation_fixture(tmp_path):
     path = tmp_path / "reservation.sqlite"
     db = sqlite3.connect(path)
