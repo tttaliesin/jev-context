@@ -352,8 +352,7 @@ def forecast_curve_run(root, ledger, size, epochs, base_hash, max_seconds=5400):
         watchdog_path = path.parent / "watchdog-abort.json"
         watchdog = read(watchdog_path) if watchdog_path.exists() else {}
         usable = report.get("status") == "completed" or (
-            run.get("exit_code") == 124
-            and watchdog.get("elapsed_seconds", 0) >= max_seconds
+            run.get("exit_code") == 124 and watchdog.get("elapsed_seconds", 0) >= max_seconds
         )
         if not usable or (
             report.get("diagnostic")

@@ -479,19 +479,74 @@ def check_candidate_lock(path, dataset, model_store=None):
     return lock
 
 
+def curve_development_best(root, dataset, manifest):
+    """Explicit product comparison selection; preserve the curve's median-seed rule."""
+    from scripts.prepare_laya_training_data import load_frozen
+
+    cases = load_frozen(dataset, manifest, "development", "synthetic-learning-curve")
+    base_path = root / "features/development/baseline-development.json"
+    baseline = read(base_path)
+    validate_frozen_evaluation_rows(baseline, cases, "development", 1)
+    candidates, files = {}, [base_path, root / "execution.json"]
+    subsets = read(manifest)["train_subsets"]
+    for run in read(root / "execution.json")["runs"]:
+        if run["status"] != "completed" or not run["name"].startswith("n"):
+            continue
+        folder = (root / run["name"]).resolve()
+        if folder.parent != root.resolve():
+            raise ValueError("Development selection path escapes the curve root")
+        training, report = read(folder / "train.json"), read(folder / "development.json")
+        n, epochs = len(training["training_ids"]), training["epochs"]
+        if (
+            training.get("diagnostic")
+            or training.get("status") != "completed"
+            or training["training_ids"] != subsets.get(str(n))
+            or training["max_steps"] != n // 15 * epochs
+            or set(training.get("exposures", {})) != set(training["training_ids"])
+            or set(training.get("exposures", {}).values()) != {epochs}
+        ):
+            raise ValueError("Development selection training is diagnostic or inconsistent")
+        validate_frozen_evaluation_rows(report, cases, "development", 1)
+        # Per-purpose critical errors must not regress; a total can hide a regression.
+        if any(
+            metrics([r for r in report["rows"] if r["purpose"] == purpose])["critical_errors"]
+            > metrics([r for r in baseline["rows"] if r["purpose"] == purpose])["critical_errors"]
+            for purpose in ("relevance", "evidence_relation", "capability_fit")
+        ):
+            continue
+        candidates[run["name"]] = {"training": training, "report": report}
+        files.extend([folder / "train.json", folder / "development.json"])
+    selected = select_development_candidate(baseline, candidates)
+    if not selected["selected"]:
+        raise ValueError("No eligible development-best candidate")
+    return selected, files
+
+
 def freeze_candidate(args):
     from scripts.prepare_laya_training_data import load_frozen
 
+    if (args.dataset.parent / "test-consumed.json").exists():
+        raise ValueError("Final test is consumed; a revised candidate requires a new test")
     load_frozen(args.dataset, args.manifest, "test", args.data_profile)
     training_report = args.checkpoint.parent.parent / "train.json"
     training = read(training_report)
+    selection_rule = getattr(args, "candidate_selection", "curve-median")
+    if selection_rule != "curve-median" and args.data_profile != "synthetic-learning-curve":
+        raise ValueError("Development-best selection requires the curve profile")
+    selection_files, selection = [], None
     if args.data_profile == "synthetic-learning-curve":
         curve_root = getattr(args, "curve_root", None)
         if not curve_root:
             raise ValueError("Curve candidate requires its development selection root")
-        selection = read(curve_root / "learning-curve.json")
-        chosen = f"{selection.get('selected_setting')}-s{selection.get('selected_seed')}"
-        if training_report.parent.name != chosen or selection.get("selected_setting") is None:
+        if selection_rule == "development-best":
+            selection, selection_files = curve_development_best(
+                curve_root, args.dataset, args.manifest
+            )
+            chosen = selection["selected"]
+        else:
+            selection = read(curve_root / "learning-curve.json")
+            chosen = f"{selection.get('selected_setting')}-s{selection.get('selected_seed')}"
+        if training_report.parent.name != chosen:
             raise ValueError("Candidate was not selected on curve development results")
     if (args.checkpoint.parent / "diagnostic-only.json").exists() or training.get("diagnostic"):
         raise ValueError("Diagnostic checkpoints cannot become final candidates")
@@ -526,6 +581,7 @@ def freeze_candidate(args):
     ]
     if args.data_profile == "synthetic-learning-curve":
         files.extend([curve_root / "learning-curve.json", curve_root / "execution.json"])
+        files.extend(selection_files)
     files.extend(p for p in args.model_store.rglob("*") if p.is_file())
     lock = {
         "dataset_sha256": sha(args.dataset),
@@ -534,6 +590,8 @@ def freeze_candidate(args):
         "frozen_at_unix": time.time(),
         "files": [{"path": str(p.resolve()), "sha256": sha(p)} for p in files],
         "promotion_eligible": False,
+        "candidate_selection": selection_rule,
+        "development_selection": selection,
     }
     with args.candidate_lock.open("x", encoding="utf-8") as stream:
         json.dump(lock, stream, indent=2)
@@ -669,6 +727,8 @@ def frozen_evaluation(args):
     ):
         raise ValueError("Frozen evaluation needs explicit dataset/manifest/profile/split")
     cases = load_frozen(args.dataset, args.manifest, args.split, args.data_profile)
+    if args.split == "test" and (args.dataset.parent / "test-consumed.json").exists():
+        raise ValueError("Final test is consumed; do not reopen it as a fresh evaluation")
     direct_runner = getattr(args, "runner_threads", None) is not None
     if direct_runner and (
         args.runner_threads != 4
@@ -1136,6 +1196,120 @@ def compare_frozen(args):
                     p: {
                         "before": r["baseline"]["correct"],
                         "after": r["candidate"]["correct"],
+                        "count": r["candidate"]["count"],
+                        "interval": r["bootstrap_95"],
+                        "passed": r["improvement_gate_passed"],
+                    }
+                    for p, r in paired.items()
+                },
+            },
+            ensure_ascii=False,
+        )
+    )
+
+
+def compare_product(args):
+    """Compare two locked, identically ordered tests without changing curve selection."""
+    from scripts.prepare_laya_training_data import load_frozen
+
+    if args.data_profile != "synthetic-learning-curve":
+        raise ValueError("Product comparison requires the frozen curve profile")
+    cases = load_frozen(args.dataset, args.manifest, "test", args.data_profile)
+    lock = check_candidate_lock(args.candidate_lock, args.dataset)
+    product, candidate = read(args.product_report), read(args.candidate_report)
+    if product.get("backend") != "semif" or candidate.get("backend") != "ollaya":
+        raise ValueError("Product comparison requires SemIf and Ollaya reports")
+    if product.get("profile") != read(args.profile):
+        raise ValueError("Product profile differs from the preserved profile")
+    if (
+        candidate["conditions"].get("intra_op_threads") != 4
+        or candidate["conditions"].get("execution_mode") != "existing_ollaya_runner"
+        or candidate.get("runner", {}).get("hello", {}).get("device") != "cpu"
+        or candidate.get("runner", {}).get("hello", {}).get("precision") != "fp32"
+    ):
+        raise ValueError("Candidate requires the CPU/FP32/four-thread runner")
+    calibration = read(args.calibration_report)
+    validate_frozen_evaluation_rows(
+        calibration,
+        load_frozen(args.dataset, args.manifest, "calibration", args.data_profile),
+        "calibration",
+        1,
+    )
+    if (
+        calibration["dataset_sha256"] != sha(args.dataset)
+        or calibration["model_manifest_sha256"] != candidate["model_manifest_sha256"]
+        or choose_temperature(calibration) != lock["temperature"]
+    ):
+        raise ValueError("Candidate calibration or manifest differs from the lock")
+    for report in (product, candidate):
+        validate_frozen_evaluation_rows(report, cases, "test", 3)
+        if (
+            report["split"] != "test"
+            or report["dataset_sha256"] != sha(args.dataset)
+            or report["manifest_sha256"] != sha(args.manifest)
+            or report["conditions"]["repeats"] != 3
+            or report["conditions"]["case_order"] != [c["id"] for c in cases]
+            or report["started_at_unix"] < lock["frozen_at_unix"]
+            or report.get("candidate_lock_sha256") != sha(args.candidate_lock)
+        ):
+            raise ValueError("Product comparison must follow the same lock on the same test")
+    args.output.mkdir(parents=True, exist_ok=True)
+    with (args.dataset.parent / "test-consumed.json").open("x", encoding="utf-8") as stream:
+        json.dump(
+            {
+                "dataset_sha256": sha(args.dataset),
+                "candidate_lock_sha256": sha(args.candidate_lock),
+                "consumed_at_unix": time.time(),
+                "reason": "Product comparison predictions opened; revised candidates need a new test",
+            },
+            stream,
+            indent=2,
+        )
+    paired = paired_comparison(product, candidate)
+    calibrated = copy.deepcopy([r for r in candidate["rows"] if r["repeat"] == 0])
+    for row in calibrated:
+        if row.get("probabilities"):
+            row["probabilities"] = scale(row["probabilities"], lock["temperature"])
+    result = {
+        "data_profile": args.data_profile,
+        "dataset_sha256": sha(args.dataset),
+        "candidate_lock_sha256": sha(args.candidate_lock),
+        "candidate_selection": lock.get("candidate_selection"),
+        "product_comparison": paired,
+        "candidate_temperature": lock["temperature"],
+        "calibrated_candidate": metrics(calibrated),
+        "conclusion": "synthetic_product_superiority_observed"
+        if all(p["improvement_gate_passed"] for p in paired.values())
+        else "product_superiority_unconfirmed",
+        "promotion_eligible": False,
+        "actual_business_improvement": "unverified",
+        "reports": {
+            name: {
+                "sha256": sha(path),
+                "preparation_seconds": report.get("preparation_seconds"),
+                "conditions": report["conditions"],
+            }
+            for name, path, report in (
+                ("product", args.product_report, product),
+                ("candidate", args.candidate_report, candidate),
+            )
+        },
+        "limitations": [
+            "Internal agent-authored synthetic distribution; no external or real-work validation",
+            "Best development seed was selected; development accuracy is not final accuracy",
+            "Product GPU versus Laya CPU; process working set excludes GPU allocation",
+            "Three timing repetitions do not create new independent accuracy samples",
+        ],
+    }
+    save(args.output / "comparison.json", result)
+    print(
+        json.dumps(
+            {
+                "conclusion": result["conclusion"],
+                "purposes": {
+                    p: {
+                        "product": r["baseline"]["correct"],
+                        "candidate": r["candidate"]["correct"],
                         "count": r["candidate"]["count"],
                         "interval": r["bootstrap_95"],
                         "passed": r["improvement_gate_passed"],
@@ -1746,11 +1920,17 @@ def main():
             "frozen",
             "freeze-candidate",
             "compare",
+            "compare-product",
             "curve-summary",
         ],
     )
     parser.add_argument("--probe-dataset", type=Path)
     parser.add_argument("--curve-root", type=Path)
+    parser.add_argument(
+        "--candidate-selection",
+        choices=["curve-median", "development-best"],
+        default="curve-median",
+    )
     parser.add_argument(
         "--python-model", type=Path, default=ROOT / ".local/models/laya-multilingual"
     )
@@ -1812,6 +1992,9 @@ def main():
         parser.error("Probe dataset and Python backend require probe stage")
     if args.stage == "compare":
         compare_frozen(args)
+        return
+    if args.stage == "compare-product":
+        compare_product(args)
         return
     if args.stage == "frozen":
         frozen_evaluation(args)

@@ -18,26 +18,40 @@ def test_curve_runtime_forecast_uses_comparable_observations_only(tmp_path):
     path = tmp_path / "n4050-e6-s20260928" / "train.json"
     path.parent.mkdir()
     report = dict(
-        data_profile="synthetic-learning-curve", dataset_sha256="data",
-        trainer_sha256="code", base_sha256="base", device="cpu", threads=4,
-        batch_size=15, microbatch_size=1, training_ids=list(range(4050)),
-        steps=[{"seconds": 4.0} for _ in range(30)], diagnostic=False,
+        data_profile="synthetic-learning-curve",
+        dataset_sha256="data",
+        trainer_sha256="code",
+        base_sha256="base",
+        device="cpu",
+        threads=4,
+        batch_size=15,
+        microbatch_size=1,
+        training_ids=list(range(4050)),
+        steps=[{"seconds": 4.0} for _ in range(30)],
+        diagnostic=False,
     )
     path.write_text(json.dumps(report), encoding="utf-8")
     (path.parent / "watchdog-abort.json").write_text(
         json.dumps({"elapsed_seconds": 5400.1}), encoding="utf-8"
     )
-    ledger = dict(dataset_sha256="data", trainer_sha256="code", runs=[
-        {"name": path.parent.name, "report": str(path), "exit_code": 124}
-    ])
+    ledger = dict(
+        dataset_sha256="data",
+        trainer_sha256="code",
+        runs=[{"name": path.parent.name, "report": str(path), "exit_code": 124}],
+    )
     forecast = training.forecast_curve_run(tmp_path, ledger, 4050, 6, "base")
     assert forecast["estimated_optimizer_seconds"] == 6480
     assert forecast["planned_updates"] == 1620
     assert training.forecast_curve_run(tmp_path, ledger, 450, 54, "base") is None
     for key, value in [
-        ("diagnostic", True), ("base_sha256", "other"), ("dataset_sha256", "other"),
-        ("trainer_sha256", "other"), ("threads", 2), ("microbatch_size", 15),
-        ("device", "gpu"), ("steps", [{"seconds": float("nan")} for _ in range(30)]),
+        ("diagnostic", True),
+        ("base_sha256", "other"),
+        ("dataset_sha256", "other"),
+        ("trainer_sha256", "other"),
+        ("threads", 2),
+        ("microbatch_size", 15),
+        ("device", "gpu"),
+        ("steps", [{"seconds": float("nan")} for _ in range(30)]),
         ("steps", [{"seconds": 4.0} for _ in range(29)]),
     ]:
         changed = dict(report, **{key: value})
@@ -45,7 +59,7 @@ def test_curve_runtime_forecast_uses_comparable_observations_only(tmp_path):
         assert training.forecast_curve_run(tmp_path, ledger, 4050, 6, "base") is None
     fast = tmp_path / "fast" / "train.json"
     fast.parent.mkdir()
-    fast.write_text(json.dumps(dict(report, status="completed", steps=[{"seconds": 2}]*30)))
+    fast.write_text(json.dumps(dict(report, status="completed", steps=[{"seconds": 2}] * 30)))
     ledger["runs"].append({"name": "fast", "report": str(fast), "exit_code": 0})
     forecast = training.forecast_curve_run(tmp_path, ledger, 4050, 6, "base")
     assert forecast["source_run"] == "fast"
@@ -70,35 +84,64 @@ def test_curve_coordinator_skips_repeat_timeouts_without_launching_models(tmp_pa
     monkeypatch.setattr(data, "load_frozen", lambda *args: [{"id": i} for i in subsets["4050"]])
     monkeypatch.setattr(training.subprocess, "Popen", lambda *a, **k: pytest.fail("Model launched"))
     ledger = dict(
-        dataset_sha256=training.sha(dataset), trainer_sha256=training.sha(Path(training.__file__)),
-        started_at_unix=training.time.time(), runs=[], status="running",
+        dataset_sha256=training.sha(dataset),
+        trainer_sha256=training.sha(Path(training.__file__)),
+        started_at_unix=training.time.time(),
+        runs=[],
+        status="running",
     )
     for split in ["train", "development"]:
         p = root / "features" / split
         p.mkdir(parents=True)
-        training.save(p / "cache.json", dict(status="completed", parity=[], feature_seconds=1,
-                                             base_sha256=training.sha(base / "model.safetensors")))
+        training.save(
+            p / "cache.json",
+            dict(
+                status="completed",
+                parity=[],
+                feature_seconds=1,
+                base_sha256=training.sha(base / "model.safetensors"),
+            ),
+        )
     for n in [450, 1350, 4050]:
-        for seed in ([20260928, 20260929, 20260930] if n != 4050 else [20260928]):
+        for seed in [20260928, 20260929, 20260930] if n != 4050 else [20260928]:
             name = f"n{n}-e6-s{seed}"
             p = root / name
             p.mkdir()
             completed = n != 4050
             report = dict(
-                status="completed" if completed else "running", data_profile="synthetic-learning-curve",
-                dataset_sha256=ledger["dataset_sha256"], trainer_sha256=ledger["trainer_sha256"],
-                base_sha256=training.sha(base / "model.safetensors"), device="cpu", threads=4,
-                batch_size=15, microbatch_size=1, training_ids=subsets[str(n)],
-                steps=[{"seconds": 4} for _ in range(30)], step_median_seconds=4,
+                status="completed" if completed else "running",
+                data_profile="synthetic-learning-curve",
+                dataset_sha256=ledger["dataset_sha256"],
+                trainer_sha256=ledger["trainer_sha256"],
+                base_sha256=training.sha(base / "model.safetensors"),
+                device="cpu",
+                threads=4,
+                batch_size=15,
+                microbatch_size=1,
+                training_ids=subsets[str(n)],
+                steps=[{"seconds": 4} for _ in range(30)],
+                step_median_seconds=4,
             )
             training.save(p / "train.json", report)
             if not completed:
                 training.save(p / "watchdog-abort.json", {"elapsed_seconds": 5400.1})
-            ledger["runs"].append(dict(name=name, status="completed" if completed else "incomplete",
-                                      report=str(p / "train.json"), exit_code=0 if completed else 124))
+            ledger["runs"].append(
+                dict(
+                    name=name,
+                    status="completed" if completed else "incomplete",
+                    report=str(p / "train.json"),
+                    exit_code=0 if completed else 124,
+                )
+            )
     training.save(root / "execution.json", ledger)
-    args = SimpleNamespace(data_profile="synthetic-learning-curve", split="train", dataset=dataset,
-                           manifest=manifest, output=root, base=base)
+    args = SimpleNamespace(
+        data_profile="synthetic-learning-curve",
+        split="train",
+        dataset=dataset,
+        manifest=manifest,
+        output=root,
+        base=base,
+    )
     training.run_curve(args)
     result = training.read(root / "execution.json")
     skipped = [r for r in result["runs"] if r["status"] == "not_run"]
@@ -119,6 +162,215 @@ def test_windows_timeout_stops_only_the_owned_process_tree(monkeypatch):
     process = SimpleNamespace(pid=1234, wait=lambda: calls.append("wait"))
     training.stop_owned_process(process)
     assert calls == [["taskkill", "/PID", "1234", "/T", "/F"], "wait"]
+
+
+def product_comparison_cases(split):
+    purposes = ("relevance", "evidence_relation", "capability_fit")
+    return [
+        dict(
+            id=f"{split}-{i}",
+            split=split,
+            purpose=purposes[i % 3],
+            expected="a",
+            critical=True,
+            group_id=f"g-{i // 15}",
+            state_sha256=f"s-{split}-{i}",
+            question={"type": "choice", "criteria": {"a": "yes", "b": "no"}},
+        )
+        for i in range(450)
+    ]
+
+
+def product_comparison_report(cases, correct, repeats=1):
+    rows = []
+    for repeat in range(repeats):
+        for i, c in enumerate(cases):
+            rows.append(
+                {
+                    **{
+                        k: c[k]
+                        for k in (
+                            "id",
+                            "split",
+                            "purpose",
+                            "expected",
+                            "critical",
+                            "group_id",
+                            "state_sha256",
+                        )
+                    },
+                    "repeat": repeat,
+                    "question_sha256": data.digest(c["question"]),
+                    "choice": "a" if i < correct else "b",
+                    "status": "observed",
+                    "probabilities": {
+                        "a": 0.9 if i < correct else 0.1,
+                        "b": 0.1 if i < correct else 0.9,
+                    },
+                    "latency_ms": 20,
+                }
+            )
+    return dict(
+        status="completed",
+        split=cases[0]["split"],
+        data_profile="synthetic-learning-curve",
+        rows=rows,
+        conditions={"repeats": repeats, "case_order": [c["id"] for c in cases]},
+        memory_samples=[{"working_set_sum_bytes": 1000}],
+    )
+
+
+def test_explicit_development_best_preserves_curve_selection_and_rejects_tampering(
+    tmp_path, monkeypatch
+):
+    from scripts import evaluate_ollaya as evaluation
+
+    cases = product_comparison_cases("development")
+    monkeypatch.setattr(data, "load_frozen", lambda *args: cases)
+    dataset = tmp_path / "frozen.jsonl"
+    dataset.write_text("frozen")
+    ids = [f"train-{i}" for i in range(450)]
+    manifest = tmp_path / "prepare.json"
+    evaluation.save(manifest, {"train_subsets": {"450": ids}})
+    baseline = product_comparison_report(cases, 0)
+    baseline["dataset_sha256"] = evaluation.sha(dataset)
+    evaluation.save(tmp_path / "features/development/baseline-development.json", baseline)
+    runs = []
+    for seed, correct in [(20260928, 395), (20260929, 442)]:
+        name = f"n450-e6-s{seed}"
+        folder = tmp_path / name
+        report = product_comparison_report(cases, correct)
+        report["dataset_sha256"] = evaluation.sha(dataset)
+        training = dict(
+            status="completed",
+            diagnostic=False,
+            training_ids=ids,
+            epochs=6,
+            max_steps=180,
+            exposures=dict.fromkeys(ids, 6),
+            learning_rate=6e-4,
+            batch_size=15,
+            seed=seed,
+            data_profile="synthetic-learning-curve",
+            dataset_sha256=evaluation.sha(dataset),
+        )
+        evaluation.save(folder / "train.json", training)
+        evaluation.save(folder / "development.json", report)
+        runs.append({"name": name, "status": "completed"})
+    evaluation.save(tmp_path / "execution.json", {"runs": runs})
+    prior = {"selected_setting": "n450-e6", "selected_seed": 20260928}
+    evaluation.save(tmp_path / "learning-curve.json", prior)
+    selection, files = evaluation.curve_development_best(tmp_path, dataset, manifest)
+    assert selection["selected"] == "n450-e6-s20260929"
+    assert evaluation.read(tmp_path / "learning-curve.json") == prior
+    assert tmp_path / "execution.json" in files
+    path = tmp_path / "n450-e6-s20260929/development.json"
+    clean = evaluation.read(path)
+    damaged = json.loads(json.dumps(clean))
+    damaged["rows"][0]["question_sha256"] = "another-question"
+    evaluation.save(path, damaged)
+    with pytest.raises(ValueError, match="frozen"):
+        evaluation.curve_development_best(tmp_path, dataset, manifest)
+    evaluation.save(path, clean)
+    training_path = path.with_name("train.json")
+    training = evaluation.read(training_path)
+    training["diagnostic"] = True
+    evaluation.save(training_path, training)
+    with pytest.raises(ValueError, match="diagnostic"):
+        evaluation.curve_development_best(tmp_path, dataset, manifest)
+
+
+def test_product_comparison_guards_lock_and_counts_failures_and_consumes_test(
+    tmp_path, monkeypatch
+):
+    import copy
+
+    from scripts import evaluate_ollaya as evaluation
+
+    splits = {s: product_comparison_cases(s) for s in ("calibration", "test")}
+    monkeypatch.setattr(
+        data, "load_frozen", lambda dataset, manifest, split, profile: splits[split]
+    )
+    dataset, manifest, profile, lock_path = [
+        tmp_path / n for n in ("data", "manifest", "profile", "lock")
+    ]
+    for p in (dataset, manifest, profile, lock_path):
+        p.write_text("{}")
+    calibration = product_comparison_report(splits["calibration"], 450)
+    calibration.update(dataset_sha256=evaluation.sha(dataset), model_manifest_sha256="model")
+    evaluation.save(tmp_path / "calibration.json", calibration)
+    lock = dict(
+        frozen_at_unix=10,
+        temperature=evaluation.choose_temperature(calibration),
+        candidate_selection="development-best",
+    )
+    monkeypatch.setattr(evaluation, "check_candidate_lock", lambda *args: lock)
+    reports = {}
+    for name, backend, correct in [("product", "semif", 300), ("candidate", "ollaya", 440)]:
+        report = product_comparison_report(splits["test"], correct, 3)
+        report.update(
+            backend=backend,
+            dataset_sha256=evaluation.sha(dataset),
+            manifest_sha256=evaluation.sha(manifest),
+            started_at_unix=11,
+            candidate_lock_sha256=evaluation.sha(lock_path),
+            model_manifest_sha256="model",
+        )
+        report["profile"] = {}
+        report["conditions"].update(intra_op_threads=4, execution_mode="existing_ollaya_runner")
+        report["runner"] = {"hello": {"device": "cpu", "precision": "fp32"}}
+        reports[name] = report
+        evaluation.save(tmp_path / f"{name}.json", report)
+    args = SimpleNamespace(
+        data_profile="synthetic-learning-curve",
+        dataset=dataset,
+        manifest=manifest,
+        profile=profile,
+        candidate_lock=lock_path,
+        output=tmp_path / "results",
+        calibration_report=tmp_path / "calibration.json",
+        product_report=tmp_path / "product.json",
+        candidate_report=tmp_path / "candidate.json",
+    )
+    for change, message in [
+        (lambda r: r.update(started_at_unix=9), "lock"),
+        (lambda r: r["rows"][0].update(state_sha256="other"), "frozen"),
+        (lambda r: r["conditions"].update(intra_op_threads=8), "four-thread"),
+    ]:
+        damaged = copy.deepcopy(reports["candidate"])
+        change(damaged)
+        evaluation.save(args.candidate_report, damaged)
+        with pytest.raises(ValueError, match=message):
+            evaluation.compare_product(args)
+        assert not (tmp_path / "test-consumed.json").exists()
+    failed = copy.deepcopy(reports["candidate"])
+    failed["rows"][0].update(status="error", reason="observed_failure")
+    failed.update(status="incomplete")
+    evaluation.save(args.candidate_report, failed)
+    evaluation.compare_product(args)
+    result = evaluation.read(args.output / "comparison.json")
+    assert result["conclusion"] == "product_superiority_unconfirmed"
+    assert result["product_comparison"]["relevance"]["candidate"]["count"] == 150
+    assert result["product_comparison"]["relevance"]["candidate"]["errors"] == 1
+    assert not result["promotion_eligible"]
+    with pytest.raises(FileExistsError):
+        evaluation.compare_product(args)
+
+
+def test_consumed_test_cannot_freeze_or_run_new_models(tmp_path, monkeypatch):
+    from scripts import evaluate_ollaya as evaluation
+
+    monkeypatch.setattr(data, "load_frozen", lambda *args: [])
+    (tmp_path / "test-consumed.json").write_text("{}")
+    args = SimpleNamespace(
+        dataset=tmp_path / "frozen.jsonl",
+        manifest=tmp_path / "prepare.json",
+        split="test",
+        data_profile="synthetic-learning-curve",
+    )
+    for operation in (evaluation.freeze_candidate, evaluation.frozen_evaluation):
+        with pytest.raises(ValueError, match="consumed"):
+            operation(args)
 
 
 def reservation_fixture(tmp_path):

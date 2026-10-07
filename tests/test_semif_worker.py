@@ -1,8 +1,40 @@
 import io
 import json
+import sys
 from types import SimpleNamespace
 
+import pytest
+
 from jev_context import semif_worker
+
+
+def test_native_tokenizer_loader_does_not_import_transformers(tmp_path, monkeypatch):
+    (tmp_path / "tokenizer_config.json").write_text('{"backend":"tokenizers"}')
+    (tmp_path / "chat_template.jinja").write_text("text")
+    marker = object()
+    monkeypatch.setattr(semif_worker, "TextTokenizer", lambda path: marker)
+    monkeypatch.setitem(sys.modules, "transformers", None)
+    assert semif_worker.load_tokenizer(tmp_path) == (marker, "prepared_native_text")
+
+
+def test_native_text_prompt_rejects_unverified_chat_modes():
+    tokenizer = object.__new__(semif_worker.TextTokenizer)
+    tokenizer.template = SimpleNamespace(render=lambda **kwargs: kwargs)
+    messages = [{"role": "user", "content": "한글 <tag> {{not_executed}}"}]
+    rendered = tokenizer.apply_chat_template(messages, enable_thinking=False)
+    assert rendered["messages"] == messages
+    assert rendered["enable_thinking"] is False and rendered["tools"] is None
+    for bad, kwargs in (
+        (messages, {"enable_thinking": True}),
+        (messages, {"enable_thinking": False, "tokenize": True}),
+        ([{"role": "assistant", "content": "reply"}], {"enable_thinking": False}),
+        (
+            [{"role": "user", "content": [{"type": "text", "text": "x"}]}],
+            {"enable_thinking": False},
+        ),
+    ):
+        with pytest.raises(ValueError, match="text decision prompt"):
+            tokenizer.apply_chat_template(bad, **kwargs)
 
 
 def fake_model(monkeypatch):

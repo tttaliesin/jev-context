@@ -23,6 +23,71 @@ DIRECT_SYSTEM = (
 )
 
 
+class TextTokenizer:
+    """Use the prepared fast tokenizer and text chat template without loading PyTorch."""
+
+    def __init__(self, model_path):
+        from jinja2 import TemplateError
+        from jinja2.sandbox import ImmutableSandboxedEnvironment
+        from tokenizers import Tokenizer
+
+        config = json.loads((model_path / "tokenizer_config.json").read_text(encoding="utf-8"))
+        template = (model_path / "chat_template.jinja").read_text(encoding="utf-8")
+        if config.get("backend") != "tokenizers" or "generation %}" in template:
+            raise ValueError("Unsupported native text tokenizer configuration")
+        self.backend = Tokenizer.from_file(str(model_path / "tokenizer.json"))
+        self.backend.no_padding()
+        self.backend.no_truncation()
+        environment = ImmutableSandboxedEnvironment(
+            trim_blocks=True, lstrip_blocks=True, extensions=["jinja2.ext.loopcontrols"]
+        )
+
+        def raise_exception(message):
+            raise TemplateError(message)
+
+        environment.globals["raise_exception"] = raise_exception
+        environment.filters["tojson"] = lambda value, **kwargs: json.dumps(
+            value, ensure_ascii=kwargs.pop("ensure_ascii", False), **kwargs
+        )
+        self.template = environment.from_string(template)
+
+    def apply_chat_template(self, messages, tokenize=False, add_generation_prompt=True, **kwargs):
+        if (
+            tokenize
+            or kwargs != {"enable_thinking": False}
+            or any(
+                message["role"] not in ("system", "user") or not isinstance(message["content"], str)
+                for message in messages
+            )
+        ):
+            raise ValueError("SemIf native tokenizer accepts only its text decision prompt")
+        return self.template.render(
+            messages=messages,
+            tools=None,
+            documents=None,
+            add_generation_prompt=add_generation_prompt,
+            enable_thinking=False,
+        )
+
+    def encode(self, text, add_special_tokens=False):
+        return self.backend.encode(text, add_special_tokens=add_special_tokens).ids
+
+    def decode(self, ids):
+        return self.backend.decode(ids, skip_special_tokens=False)
+
+
+def load_tokenizer(model_path):
+    """Keep legacy prepared models supported; native loading is limited to this file contract."""
+    config_path = model_path / "tokenizer_config.json"
+    if config_path.is_file() and (model_path / "chat_template.jinja").is_file():
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+        if config.get("backend") == "tokenizers":
+            return TextTokenizer(model_path), "prepared_native_text"
+    from transformers import AutoTokenizer
+
+    return AutoTokenizer.from_pretrained(model_path, local_files_only=True), "transformers"
+
+
 def prompt_ids(tokenizer, state, question, options):
     """Tokenized chat prompt plus the single-token answer slot of each option letter.
 
@@ -112,7 +177,6 @@ def main(protocol):
     with contextlib.redirect_stdout(sys.stderr):
         started = time.perf_counter()
         import openvino as ov
-        from transformers import AutoTokenizer
 
         from jev_context.openvino_cache import (
             cache_namespace,
@@ -129,7 +193,7 @@ def main(protocol):
             "attempts": [],
         }
         started = time.perf_counter()
-        tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True)
+        tokenizer, startup["tokenizer_backend"] = load_tokenizer(model_path)
         warm = [["yes", "Korean"], ["no", "other"]]
         warm_ids = prompt_ids(tokenizer, {"text": "준비 확인"}, {"instructions": "Kor?"}, warm)
         startup["tokenizer_seconds"] = time.perf_counter() - started
